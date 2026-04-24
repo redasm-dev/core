@@ -1,3 +1,0 @@
-[submodule "rdcore/libs/taojson"]
-	path = rdcore/libs/taojson
-	url = https://github.com/taocpp/json.git

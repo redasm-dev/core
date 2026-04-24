@@ -1,0 +1,118 @@
+#include "type.h"
+#include "core/context.h"
+#include "io/flagsbuffer.h"
+#include "support/error.h"
+#include "types/def.h"
+
+usize rd_size_of(const RDContext* ctx, const char* name, usize n) {
+    return rd_i_size_of(ctx, name, n, RD_TYPE_NONE);
+}
+
+usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
+                   RDTypeFlags flags) {
+    assert(ctx->processorplugin && "invalid processor");
+    RDTypeDef* tdef = rd_i_typedef_find(ctx, name, true);
+    usize sz;
+
+    if(tdef->kind == RD_TKIND_FUNC) {
+        sz = ctx->processorplugin->code_ptr_size;
+        if(!sz) sz = ctx->processorplugin->ptr_size;
+    }
+    else if(flags & RD_TYPE_ISPOINTER) {
+        sz = ctx->processorplugin->ptr_size;
+    }
+    else {
+        if(!tdef->size) rd_i_typedef_resolve_size(ctx, tdef);
+        panic_if(!tdef->size, "type '%s' has unresolved size", name);
+        sz = tdef->size;
+    }
+
+    return n > 0 ? sz * n : sz;
+}
+
+const char* rd_integral_from_size(unsigned int size) {
+    switch(size) {
+        case sizeof(u8): return "u8";
+        case sizeof(u16): return "u16";
+        case sizeof(u32): return "u32";
+        case sizeof(u64): return "u64";
+        default: break;
+    }
+
+    panic("integral type not found for size: %u", size);
+}
+
+bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
+                   RDTypeFlags flags, RDConfidence c) {
+    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    if(!seg) return false;
+
+    usize newsz = rd_i_size_of(ctx, name, n, flags);
+    if(!newsz) return false;
+
+    RDTypeFull oldt;
+    if(rd_i_db_get_type(ctx, address, &oldt)) {
+        usize oldsz =
+            rd_i_size_of(ctx, oldt.base.name, oldt.base.count, oldt.base.flags);
+
+        if(oldt.confidence > c) return false; // confidence wins over size
+
+        if(oldt.confidence == c && newsz <= oldsz)
+            return false; // no upgrade needed
+    }
+
+    usize idx = rd_i_address2index(seg, address);
+    usize startidx_exp = idx;
+    usize endidx_exp = startidx_exp + newsz;
+    rd_i_flagsbuffer_expand_range(seg->flags, &startidx_exp, &endidx_exp);
+
+    if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
+                                   endidx_exp - startidx_exp))
+        return false;
+
+    rd_i_db_del_type_range(ctx, startidx_exp, endidx_exp);
+
+    rd_i_flagsbuffer_undefine(seg->flags, startidx_exp,
+                              endidx_exp - startidx_exp);
+
+    rd_i_flagsbuffer_set_type(seg->flags, idx, newsz);
+    rd_i_db_set_type(ctx, address, name, n, flags, c);
+    return true;
+}
+
+bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
+    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+    if(!rd_i_flagsbuffer_has_type(seg->flags, idx)) return false;
+
+    bool ok = rd_i_db_get_type(ctx, address, t);
+    assert(ok && "cannot find type in database");
+    return true;
+}
+
+bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t) {
+    RDTypeFull tf;
+    if(rd_i_get_type(ctx, address, &tf)) {
+        if(t) *t = tf.base;
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_auto_type(RDContext* ctx, RDAddress address, const char* name, usize n,
+                  RDTypeFlags flags) {
+    return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_AUTO);
+}
+
+bool rd_library_type(RDContext* ctx, RDAddress address, const char* name,
+                     usize n, RDTypeFlags flags) {
+    return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_LIBRARY);
+}
+
+bool rd_user_type(RDContext* ctx, RDAddress address, const char* name, usize n,
+                  RDTypeFlags flags) {
+    return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_USER);
+}

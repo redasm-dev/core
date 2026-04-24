@@ -1,2 +1,0 @@
-# LibREDasm
-REDasm Core Library

@@ -1,1 +1,5 @@
-__pycache__/
+.*
+!/.gitignore
+.automaton
+compile_commands.json
+build

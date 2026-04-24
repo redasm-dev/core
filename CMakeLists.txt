@@ -1,105 +1,107 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.25)
 
-project(LibREDasm)
-include(cmake/functions.cmake)
-include(cmake/installdirs.cmake)
+project(redasm C)
 
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-option(RDAPI_DOC "Build API Documentation" ON)
-option(ENABLE_TESTS "Enable Unit Testing" ON)
-add_definitions(-DSHARED_OBJECT_EXT="${CMAKE_SHARED_LIBRARY_SUFFIX}" -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES)
+include(cmake/Dependencies.cmake)
+setup_dependencies()
 
-# set(CPM_USE_LOCAL_PACKAGES ON)
-include(cmake/get_cpm.cmake) # https://github.com/TheLartians/CPM.cmake
-CPMAddPackage("gh:gabime/spdlog@1.9.2")
-CPMAddPackage("gh:nlohmann/json@3.10.5")
+add_library(${PROJECT_NAME} SHARED)
+add_library(redasm::redasm ALIAS ${PROJECT_NAME})
 
-if(ENABLE_TESTS)
-    add_subdirectory(tests)
-endif(ENABLE_TESTS)
+include(cmake/Compiler.cmake)
+setup_compiler(${PROJECT_NAME})
 
-if(RDAPI_DOC)
-    check_documentation()
-endif(RDAPI_DOC)
+include(CheckLibraryExists)
+check_library_exists(m log "" HAVE_LIBM)
 
-check_ccache_and_ld()
+target_sources(${PROJECT_NAME} 
+    PRIVATE
+        src/core/db/db.c
+        src/core/db/schema.c
+        src/core/context.c
+        src/core/engine.c
+        src/core/function.c
+        src/core/mapping.c
+        src/core/segment.c
+        src/core/state.c
+        src/core/stringfinder.c
+        src/core/worker.c
+        src/graphs/graph.c
+        src/graphs/layered.c
+        src/io/buffer.c
+        src/io/flags.c
+        src/io/flagsbuffer.c
+        src/io/reader.c
+        src/listing/builder.c
+        src/listing/listing.c
+        src/plugins/builtin/analyzers.c
+        src/plugins/builtin/loaders.c
+        src/plugins/builtin/processors.c
+        src/plugins/command.c
+        src/plugins/module.c
+        src/rdil/rdil.c
+        src/support/byteorder.c
+        src/support/containers.c
+        src/support/error.c
+        src/support/hash.c
+        src/support/logging.c
+        src/support/pattern.c
+        src/support/utils.c
+        src/support/stringpool.c
+        src/surface/graph.c
+        src/surface/items.c
+        src/surface/path.c
+        src/surface/renderer.c
+        src/surface/state.c
+        src/surface/surface.c
+        src/types/def.c
+        src/types/type.c
+        src/redasm.c
+        src/theme.c
+)
 
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    find_package(Threads REQUIRED)
+target_include_directories(${PROJECT_NAME}
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        sqlite3
+)
+
+if(HAVE_LIBM)
+    target_link_libraries(${PROJECT_NAME} PRIVATE m)
 endif()
 
-if(WIN32)
-    add_definitions(-D_WIN32_WINNT=0x0601) # Try to keep Windows 7 compatibility
-endif()
+include(GNUInstallDirs)
 
-# Core
-file(GLOB_RECURSE LIBS_HEADERS
-     rdcore/libs/binutils_demangler/*.h* rdcore/libs/miniz/*.h* rdcore/libs/taojson/include/*.h*
-     rdcore/libs/undname.h)
+install(
+    TARGETS ${PROJECT_NAME}
+    EXPORT ${PROJECT_NAME}Targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
-file(GLOB_RECURSE LIBS_SOURCES
-     rdcore/libs/binutils_demangler/*.c* rdcore/libs/miniz/*.c* rdcore/libs/taojson/include/*.c*)
+install(
+    DIRECTORY include/redasm
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
-file(GLOB_RECURSE RDCORE_HEADERS
-     rdcore/buffer/*.h* rdcore/builtin/*.h* rdcore/containers/*.h*
-     rdcore/database/*.h* rdcore/document/*.h* rdcore/engine/*.h*
-     rdcore/graph/*.h* rdcore/plugin/*.h* rdcore/rdil/*.h*
-     rdcore/serializer/*.h* rdcore/surface/*.h*
-     rdcore/support/*.h* rdcore/types/*.h* rdcore/config.h
-     rdcore/context.h rdcore/disassembler.h rdcore/object.h)
+include(CMakePackageConfigHelpers)
 
-file(GLOB_RECURSE RDCORE_SOURCES
-     rdcore/buffer/*.c* rdcore/builtin/*.c* rdcore/containers/*.c*
-     rdcore/database/*.c* rdcore/document/*.c* rdcore/engine/*.c*
-     rdcore/graph/*.c* rdcore/plugin/*.c* rdcore/rdil/*.c*
-     rdcore/serializer/*.c* rdcore/surface/*.c*
-     rdcore/support/*.c* rdcore/types/*.c* rdcore/config.cpp
-     rdcore/context.cpp rdcore/disassembler.cpp rdcore/object.cpp)
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/redasmConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
+)
 
-# API
-file(GLOB_RECURSE RDAPI_HEADERS rdapi/*.h*)
-file(GLOB_RECURSE RDAPI_SOURCES rdapi/*.c*)
-
-set(HEADERS ${LIBS_HEADERS} ${RDCORE_HEADERS} ${RDAPI_HEADERS})
-set(SOURCES ${LIBS_SOURCES} ${RDCORE_SOURCES} ${RDAPI_SOURCES})
-
-add_subdirectory(rdcore/libs/taojson EXCLUDE_FROM_ALL)
-add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
-
-target_link_libraries(${PROJECT_NAME} PRIVATE taocpp::json spdlog nlohmann_json::nlohmann_json)
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
-
-set_target_properties(${PROJECT_NAME} PROPERTIES
-                      POSITION_INDEPENDENT_CODE ON
-                      CXX_EXTENSIONS OFF
-                      OUTPUT_NAME "LibREDasm"
-                      PREFIX "")
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
-endif()
-
-if(CMAKE_BUILD_TYPE MATCHES "Debug") # Enforce warnings as errors if not in Release mode
-    if(MSVC)
-        target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX /permissive)
-    else()
-        target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Werror -Wextra -Wno-error=extra -Wshadow -pedantic)
-    endif()
-endif()
-
-install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}Config
-        ARCHIVE DESTINATION ${REDASM_INSTALL_LIBDIR}
-        LIBRARY DESTINATION ${REDASM_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${REDASM_INSTALL_BINDIR})  # This is for Windows
-
-install(DIRECTORY rdapi
-        DESTINATION ${REDASM_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.h")
-
-install(DIRECTORY rdapi
-        DESTINATION ${REDASM_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.h")
-
-install(FILES rdapi/FindREDasm.cmake
-        DESTINATION ${REDASM_CMAKE_PATH})
+install(
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
+)
