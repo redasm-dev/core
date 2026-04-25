@@ -1,16 +1,13 @@
 #pragma once
 
-void _log_impl(const char* level, const char* func, const char* fmt, ...);
-void _log_impl_l(const char* level, const char* func, int line, const char* fmt,
-                 ...);
+#include <redasm/support/logging.h>
 
 #if defined(NDEBUG)
-#define LOG_TRACE(fmt, ...)
+#define LOG_DEBUG(fmt, ...)
 #else
-#define LOG_TRACE(fmt, ...)                                                    \
-    _log_impl_l("TRACE", __func__, __LINE__, fmt, ##__VA_ARGS__)
+#define LOG_DEBUG(fmt, ...) rd_log(RD_LOG_DEBUG, __func__, fmt, ##__VA_ARGS__)
 #endif
 
-#define LOG_INFO(fmt, ...) _log_impl("INFO ", __func__, fmt, ##__VA_ARGS__)
-#define LOG_WARN(fmt, ...) _log_impl("WARN ", __func__, fmt, ##__VA_ARGS__)
-#define LOG_FAIL(fmt, ...) _log_impl("FAIL ", __func__, fmt, ##__VA_ARGS__)
+#define LOG_INFO(fmt, ...) rd_log(RD_LOG_INFO, __func__, fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) rd_log(RD_LOG_WARN, __func__, fmt, ##__VA_ARGS__)
+#define LOG_FAIL(fmt, ...) rd_log(RD_LOG_FAIL, __func__, fmt, ##__VA_ARGS__)

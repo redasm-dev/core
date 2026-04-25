@@ -51,8 +51,14 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.analyzers);
     vect_destroy(&rd_i_state.processors);
     vect_destroy(&rd_i_state.loaders);
+    vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
     _rd_i_state_unload_modules();
+}
+
+void rd_set_log_callback(RDLogCallback cb, void* userdata) {
+    rd_i_state.log_callback = cb;
+    rd_i_state.log_userdata = userdata;
 }
 
 const RDLoaderPlugin* rd_loader_find(const char* id) {

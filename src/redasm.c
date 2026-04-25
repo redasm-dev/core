@@ -57,7 +57,7 @@ RDContextSlice rd_test(const char* filepath) {
         RDPlugin** it;
         vect_each(it, &rd_i_state.loaders) {
             const RDLoaderPlugin* p = (*it)->loader;
-            LOG_TRACE("testing '%s' ...", p->name);
+            LOG_DEBUG("testing '%s' ...", p->name);
 
             RDLoader* ldr = p->create ? p->create(p) : NULL;
 
@@ -172,7 +172,7 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
         return false;
     }
 
-    LOG_TRACE("registering loader '%s' [%s]", l->id, l->name);
+    LOG_DEBUG("registering loader '%s' [%s]", l->id, l->name);
     RDPlugin* plugin = malloc(sizeof(*plugin));
     plugin->loader = l;
     vect_push(&rd_i_state.loaders, plugin);
@@ -197,7 +197,7 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
         return false;
     }
 
-    LOG_TRACE("registering processor '%s' [%s]", p->id, p->name);
+    LOG_DEBUG("registering processor '%s' [%s]", p->id, p->name);
     RDPlugin* plugin = malloc(sizeof(*plugin));
     plugin->processor = p;
     vect_push(&rd_i_state.processors, plugin);
@@ -217,7 +217,7 @@ bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
         return false;
     }
 
-    LOG_TRACE("registering analyzer '%s' [%s]", a->id, a->name);
+    LOG_DEBUG("registering analyzer '%s' [%s]", a->id, a->name);
     RDPlugin* plugin = malloc(sizeof(*plugin));
     plugin->analyzer = a;
     vect_push(&rd_i_state.analyzers, plugin);
@@ -238,7 +238,7 @@ bool rd_register_command(const RDCommandPlugin* c) {
         return false;
     }
 
-    LOG_TRACE("registering command '%s' [%s]", c->id, c->name);
+    LOG_DEBUG("registering command '%s' [%s]", c->id, c->name);
     RDPlugin* plugin = malloc(sizeof(*plugin));
     plugin->command = c;
     vect_push(&rd_i_state.commands, plugin);

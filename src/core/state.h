@@ -13,19 +13,25 @@ typedef struct RDPluginVect {
 
 typedef struct RDGlobalState {
     RDModule* modules;
+
     RDPluginVect loaders;
     RDPluginVect processors;
     RDPluginVect analyzers;
     RDPluginVect commands;
+
     RDTheme theme;
+
+    RDLogCallback log_callback;
+    void* log_userdata;
+
     RDCharVect fmt_buf;
+    RDCharVect log_buf;
 
     struct {
         RDContext** data;
         usize length;
         usize capacity;
     } tests;
-
 } RDGlobalState;
 
 extern RDGlobalState rd_i_state;

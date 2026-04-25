@@ -195,7 +195,7 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
         }
     }
 
-    LOG_TRACE("mapping segment '%s' (Address: [%X, %X))", name, addr, endaddr);
+    LOG_DEBUG("mapping segment '%s' (Address: [%X, %X))", name, addr, endaddr);
 
     // TODO: davide - Store flags for this segment in DB
     RDSegmentFull* s = calloc(1, sizeof(*s));
@@ -253,7 +253,7 @@ bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
         }
     }
 
-    LOG_TRACE("mapping input at %X (Address: [%X, %X))", off, addr, endaddr);
+    LOG_DEBUG("mapping input at %X (Address: [%X, %X))", off, addr, endaddr);
 
     // write bytes into the segment's flags buffer
     usize buf_idx = rd_i_address2index(seg, addr);

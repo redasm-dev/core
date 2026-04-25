@@ -11,6 +11,7 @@
 #include <redasm/plugins/processor/processor.h>
 #include <redasm/plugins/processor/rdil.h>
 #include <redasm/segment.h>
+#include <redasm/support/logging.h>
 #include <redasm/support/utils.h>
 #include <redasm/surface/graph.h>
 #include <redasm/surface/renderer.h>
