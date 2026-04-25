@@ -183,7 +183,7 @@ static void _rdil_render_expr(RDRenderer* r, const RDILInstruction* il,
             RDAddress addr = _rdil_read_uleb(il, cur);
             const char* name = rd_get_name(r->context, addr);
             if(name) {
-                rd_renderer_text(r, name, RD_THEME_ADDRESS,
+                rd_renderer_text(r, name, RD_THEME_LOCATION,
                                  RD_THEME_BACKGROUND);
             }
             else
@@ -193,7 +193,7 @@ static void _rdil_render_expr(RDRenderer* r, const RDILInstruction* il,
 
         case RD_IL_SYM: {
             const char* name = (const char*)(il->data + *cur);
-            rd_renderer_text(r, name, RD_THEME_ADDRESS, RD_THEME_BACKGROUND);
+            rd_renderer_text(r, name, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
             *cur += strlen(name) + 1;
             break;
         }

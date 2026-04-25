@@ -302,8 +302,8 @@ static void _rd_render_label_item(RDRenderer* r, const RDListingItem* item) {
     assert(hasname && "cannot get label name");
 
     rd_i_renderer_new_row(r, item);
-    rd_renderer_text(r, n.value, RD_THEME_ADDRESS, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, ":", RD_THEME_ADDRESS, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, ":", RD_THEME_LOCATION, RD_THEME_BACKGROUND);
 }
 
 static void _rd_render_instruction_item(RDRenderer* r,
@@ -363,7 +363,7 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
 
     if(item->array_index != RD_LISTING_NO_INDEX) {
         rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec(item->array_index), RD_THEME_CONSTANT,
+        rd_renderer_text(r, rd_i_to_dec(item->array_index), RD_THEME_NUMBER,
                          RD_THEME_BACKGROUND);
         rd_renderer_norm(r, "]");
     }
@@ -371,7 +371,7 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
     // 5. array size
     if(item->type.count > 0) {
         rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec(item->type.count), RD_THEME_CONSTANT,
+        rd_renderer_text(r, rd_i_to_dec(item->type.count), RD_THEME_NUMBER,
                          RD_THEME_BACKGROUND);
         rd_renderer_norm(r, "]");
     }

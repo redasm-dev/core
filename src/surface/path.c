@@ -60,7 +60,7 @@ static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
     RDThemeKind style;
 
     if(is_loop)
-        style = RD_THEME_NOP;
+        style = RD_THEME_MUTED;
     else
         style = is_dst_cond ? RD_THEME_JUMP_COND : RD_THEME_JUMP;
 

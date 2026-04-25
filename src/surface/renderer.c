@@ -394,7 +394,7 @@ void rd_renderer_reg(RDRenderer* self, int reg) {
 }
 
 void rd_renderer_nop(RDRenderer* self, const char* s) {
-    rd_renderer_text(self, s, RD_THEME_NOP, RD_THEME_BACKGROUND);
+    rd_renderer_text(self, s, RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
 void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
@@ -403,14 +403,14 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
     bool hasname = rd_i_get_name(self->context, address, true, &n);
 
     if(hasname)
-        rd_renderer_text(self, n.value, RD_THEME_ADDRESS, RD_THEME_BACKGROUND);
+        rd_renderer_text(self, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
     else
-        _rd_renderer_num(self, address, 16, fill, flags, RD_THEME_ADDRESS);
+        _rd_renderer_num(self, address, 16, fill, flags, RD_THEME_LOCATION);
 }
 
 void rd_renderer_cnst(RDRenderer* self, i64 c, unsigned int base, usize fill,
                       RDNumberFlags flags) {
-    _rd_renderer_num(self, c, base, fill, flags, RD_THEME_CONSTANT);
+    _rd_renderer_num(self, c, base, fill, flags, RD_THEME_NUMBER);
 }
 
 RDContext* rd_renderer_get_context(RDRenderer* self) { return self->context; }

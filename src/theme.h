@@ -7,17 +7,15 @@ typedef char RDColor[8]; // 7 chars + null terminator
 
 typedef struct RDTheme {
     RDColor fg, bg, seek;
-    RDColor comment, auto_comment;
     RDColor highlight_fg, highlight_bg;
     RDColor selection_fg, selection_bg;
     RDColor cursor_fg, cursor_bg;
     RDColor segment, function, type;
-    RDColor address, constant, reg;
-    RDColor string, symbol, data, pointer, imported;
-    RDColor nop, ret, call, jump, jump_cond;
-    RDColor entry_fg, entry_bg;
-    RDColor graph_bg, graph_edge, graph_edge_loop, graph_edge_loop_cond;
-    RDColor success, fail, warning;
+    RDColor location, number, reg, string;
+    RDColor comment;
+    RDColor ret, call, jump, jump_cond;
+    RDColor success, fail, warning, muted;
+    RDColor flag_code, flag_data;
 } RDTheme;
 
 void rd_i_theme_init(RDTheme* self);
