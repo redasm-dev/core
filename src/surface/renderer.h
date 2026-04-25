@@ -26,8 +26,9 @@ typedef struct RDRowVect {
 
 typedef struct RDRenderer {
     RDContext* context;
-    const RDSegmentFull* curr_segment;
-    usize flags, columns, auto_columns;
+    RDRenderFlags flags;
+    RDRenderMode mode;
+    usize columns, auto_columns;
     RDAddress curr_address;
     LIndex listing_idx;
     RDRowVect rows_front, rows_back;
@@ -43,11 +44,15 @@ static inline bool rd_i_renderer_has_flag(RDRenderer* self, usize f) {
     return self->flags & f;
 }
 
-RDRenderer* rd_i_renderer_create(RDContext* ctx, usize flags);
+static inline RDRenderMode rd_i_renderer_get_mode(const RDRenderer* self) {
+    return self->mode;
+}
+
+RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags);
 void rd_i_renderer_destroy(RDRenderer* self);
 void rd_i_renderer_clear(RDRenderer* self);
 void rd_i_renderer_swap(RDRenderer* self);
-void rd_i_renderer_set_rdil(RDRenderer* self, bool b);
+void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m);
 void rd_i_renderer_set_cursor_visible(RDRenderer* self, bool b);
 void rd_i_renderer_fill_columns(RDRenderer* self);
 void rd_i_renderer_highlight_row(RDRenderer* self, int row);
@@ -56,11 +61,10 @@ void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col);
 void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
                                        int startcol, int endrow, int endcol);
 void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item);
-void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item);
 void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item);
+void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item);
+void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item);
 void rd_i_renderer_write_text(RDRenderer* self, RDCharVect* v);
-const RDSegmentFull* rd_i_renderer_check_segment(RDRenderer* self,
-                                                 const RDListingItem* item);
 void rd_i_renderer_set_current_item(RDRenderer* self, LIndex idx,
                                     const RDListingItem* item);
 

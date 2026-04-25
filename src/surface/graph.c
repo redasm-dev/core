@@ -241,12 +241,12 @@ const char* rd_surfacegraph_get_selected_text(RDSurfaceGraph* self) {
     return rd_i_renderer_get_text(self->renderer, start, end);
 }
 
-bool rd_surfacegraph_has_rdil(const RDSurfaceGraph* self) {
-    return rd_i_renderer_has_flag(self->renderer, RD_RENDERER_RDIL);
+RDRenderMode rd_surfacegraph_get_mode(const RDSurfaceGraph* self) {
+    return rd_i_renderer_get_mode(self->renderer);
 }
 
-void rd_surfacegraph_set_rdil(RDSurfaceGraph* self, bool b) {
-    rd_i_renderer_set_rdil(self->renderer, b);
+void rd_surfacegraph_set_mode(RDSurfaceGraph* self, RDRenderMode m) {
+    rd_i_renderer_set_mode(self->renderer, m);
 }
 
 void rd_surfacegraph_set_cursor_visible(RDSurfaceGraph* self, bool b) {

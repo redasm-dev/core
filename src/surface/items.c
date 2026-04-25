@@ -134,7 +134,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 }
 
 static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RENDERER_NOREFS)) return;
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_REFS)) return;
 
     RDContext* ctx = r->context;
     if(!rd_i_get_xrefs_from_ex(ctx, item->address, &r->xrefs)) return;
@@ -154,7 +154,7 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
 }
 
 static void _rd_render_comment(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RENDERER_NOCOMMENTS)) return;
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
     const char* cmt = rd_get_comment(r->context, item->address);
     if(!cmt) return;
@@ -240,14 +240,13 @@ static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
 }
 
 static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RENDERER_NOSEGMENT)) return;
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return;
 
     const RDContext* ctx = r->context;
     const RDProcessorPlugin* p = ctx->processorplugin;
     assert(p && "invalid processor plugin");
 
-    const RDSegmentFull* seg = rd_i_renderer_check_segment(r, item);
-    assert(seg && "invalid segment");
+    const RDSegmentFull* seg = item->segment;
 
     rd_i_renderer_new_row(r, item);
 
@@ -270,7 +269,7 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
 }
 
 static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RENDERER_NOFUNCTION)) return;
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
 
     RDContext* ctx = r->context;
     const RDProcessorPlugin* p = ctx->processorplugin;
@@ -310,10 +309,11 @@ static void _rd_render_instruction_item(RDRenderer* r,
                                         const RDListingItem* item) {
     rd_i_renderer_new_row(r, item);
 
-    if(r->flags & RD_RENDERER_RDIL)
-        rd_i_renderer_rdil(r, item);
-    else
-        rd_i_renderer_instr(r, item);
+    switch(r->mode) {
+        case RD_RM_RDIL: rd_i_renderer_rdil(r, item); break;
+        case RD_RM_FLAGS: rd_i_renderer_flags(r, item); break;
+        default: rd_i_renderer_instr(r, item); break;
+    }
 
     _rd_render_refs(r, item);
     _rd_render_comment(r, item);

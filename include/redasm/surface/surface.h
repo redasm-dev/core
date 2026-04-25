@@ -20,17 +20,17 @@ typedef struct RDSurfacePathSlice {
 } RDSurfacePathSlice;
 
 // clang-format off
-RD_API RDSurface* rd_surface_create(RDContext* ctx, usize flags);
+RD_API RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags);
 RD_API void rd_surface_destroy(RDSurface* self);
 RD_API void rd_surface_clear_history(RDSurface* self);
 RD_API void rd_surface_clear_selection(RDSurface* self);
 RD_API void rd_surface_render(RDSurface* self, usize n);
-RD_API void rd_surface_set_rdil(RDSurface* self, bool b);
+RD_API void rd_surface_set_mode(RDSurface* self, RDRenderMode m);
 RD_API void rd_surface_set_cursor_visible(RDSurface* self, bool b);
 RD_API void rd_surface_set_columns(RDSurface* self, usize cols);
 RD_API void rd_surface_seek(RDSurface* self, usize index);
 RD_API void rd_surface_set_highlight_word(RDSurface* self, const char* word);
-RD_API bool rd_surface_has_rdil(const RDSurface* self);
+RD_API RDRenderMode rd_surface_get_mode(const RDSurface* self);
 RD_API bool rd_surface_has_selection(const RDSurface* self);
 RD_API bool rd_surface_can_go_back(const RDSurface* self);
 RD_API bool rd_surface_can_go_forward(const RDSurface* self);

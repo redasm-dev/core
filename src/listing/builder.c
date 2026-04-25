@@ -21,7 +21,7 @@ static usize _rd_listing_count_fill(RDListingBuilder* b, usize startidx,
     usize i;
 
     for(i = startidx + 1; i < b->flags->base.length; i++) {
-        if(!rd_i_flagsbuffer_has_unknown(b->flags, i)) break;
+        if(!rd_flagsbuffer_has_unknown(b->flags, i)) break;
         if(rd_i_flagsbuffer_has_info(b->flags, i)) break;
 
         u8 v;
@@ -35,7 +35,7 @@ static usize _rd_listing_count_fill(RDListingBuilder* b, usize startidx,
 
 static RDListingModifier _rd_listing_check_modifiers(RDListingBuilder* b,
                                                      usize index) {
-    if(rd_i_flagsbuffer_has_exported(b->flags, index)) {
+    if(rd_flagsbuffer_has_exported(b->flags, index)) {
         vect_push(&b->listing.exported, b->address);
         vect_push(&b->listing.symbols, (RDSymbol){
                                            .kind = RD_SYMBOL_EXPORTED,
@@ -44,7 +44,7 @@ static RDListingModifier _rd_listing_check_modifiers(RDListingBuilder* b,
         return RD_LMOD_EXPORTED;
     }
 
-    if(rd_i_flagsbuffer_has_imported(b->flags, index)) {
+    if(rd_flagsbuffer_has_imported(b->flags, index)) {
         vect_push(&b->listing.imported, b->address);
         vect_push(&b->listing.symbols, (RDSymbol){
                                            .kind = RD_SYMBOL_IMPORTED,
@@ -62,12 +62,12 @@ static void _rd_listing_process_unknown(RDListingBuilder* b) {
 
     while(b->address < b->segment->base.end_address) {
         usize idx = rd_i_address2index(b->segment, b->address);
-        if(!rd_i_flagsbuffer_has_unknown(b->flags, idx)) break;
+        if(!rd_flagsbuffer_has_unknown(b->flags, idx)) break;
 
         // split on info flags
         if(rd_i_flagsbuffer_has_info(b->flags, idx)) {
             if(len) {
-                rd_i_listing_add_hex_dump(&b->listing, startaddress,
+                rd_i_listing_add_hex_dump(&b->listing, b->segment, startaddress,
                                           b->address);
                 startaddress = b->address;
                 len = 0;
@@ -75,7 +75,7 @@ static void _rd_listing_process_unknown(RDListingBuilder* b) {
 
             _rd_listing_check_modifiers(b, idx);
             rd_i_listing_pop_indent(&b->listing, 2);
-            rd_i_listing_add_label(&b->listing, b->address);
+            rd_i_listing_add_label(&b->listing, b->segment, b->address);
             rd_i_listing_push_indent(&b->listing, 2);
         }
 
@@ -85,10 +85,10 @@ static void _rd_listing_process_unknown(RDListingBuilder* b) {
 
         if(fillcount > RD_LISTING_HEX_LINE) {
             if(len)
-                rd_i_listing_add_hex_dump(&b->listing, startaddress,
+                rd_i_listing_add_hex_dump(&b->listing, b->segment, startaddress,
                                           b->address);
 
-            rd_i_listing_add_fill(&b->listing, b->address,
+            rd_i_listing_add_fill(&b->listing, b->segment, b->address,
                                   b->address + fillcount, fb);
             b->address += fillcount;
             startaddress = b->address;
@@ -97,7 +97,8 @@ static void _rd_listing_process_unknown(RDListingBuilder* b) {
         }
 
         if(len && !(len % RD_LISTING_HEX_LINE)) {
-            rd_i_listing_add_hex_dump(&b->listing, startaddress, b->address);
+            rd_i_listing_add_hex_dump(&b->listing, b->segment, startaddress,
+                                      b->address);
             startaddress = b->address;
             len = 0;
         }
@@ -107,13 +108,14 @@ static void _rd_listing_process_unknown(RDListingBuilder* b) {
     }
 
     if(b->address > startaddress)
-        rd_i_listing_add_hex_dump(&b->listing, startaddress, b->address);
+        rd_i_listing_add_hex_dump(&b->listing, b->segment, startaddress,
+                                  b->address);
 }
 
 static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
                                        bool isroot) {
     RDAddress startaddr = b->address;
-    LIndex idx = rd_i_listing_add_type(&b->listing, b->address, t);
+    LIndex idx = rd_i_listing_add_type(&b->listing, b->segment, b->address, t);
     const RDTypeDef* tdef = rd_i_typedef_find(b->context, t->name, true);
 
     if(t->count > 0) {
@@ -187,7 +189,7 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
     usize index = rd_i_address2index(b->segment, b->address);
     rd_i_listing_push_indent(&b->listing, 2);
 
-    if(rd_i_flagsbuffer_has_func(b->flags, index)) {
+    if(rd_flagsbuffer_has_func(b->flags, index)) {
         RDFunction* f = rd_i_function_create(b->context, b->address);
         vect_push(&b->listing.functions, f);
 
@@ -198,17 +200,17 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
 
         rd_i_listing_pop_indent(&b->listing, 2);
         RDListingModifier mod = _rd_listing_check_modifiers(b, index);
-        LIndex lidx = rd_i_listing_add_function(&b->listing, f);
+        LIndex lidx = rd_i_listing_add_function(&b->listing, b->segment, f);
         vect_at(&b->listing, lidx)->mod = mod;
         rd_i_listing_push_indent(&b->listing, 2);
     }
     else if(rd_i_flagsbuffer_has_xref_in(b->flags, index)) {
         rd_i_listing_pop_indent(&b->listing, 2);
-        rd_i_listing_add_label(&b->listing, b->address);
+        rd_i_listing_add_label(&b->listing, b->segment, b->address);
         rd_i_listing_push_indent(&b->listing, 2);
     }
 
-    rd_i_listing_add_instruction(&b->listing, b->address);
+    rd_i_listing_add_instruction(&b->listing, b->segment, b->address);
 
     usize len = rd_i_flagsbuffer_get_range_length(b->flags, index);
     panic_if(!len, "invalid code length");
@@ -236,14 +238,14 @@ void rd_i_listing_build(RDContext* ctx) {
 
         while(b.address < b.segment->base.end_address) {
             usize i = rd_i_address2index(b.segment, b.address);
-            assert(!rd_i_flagsbuffer_has_tail(b.flags, i) && "tail detected");
+            assert(!rd_flagsbuffer_has_tail(b.flags, i) && "tail detected");
             rd_i_listing_push_indent(&b.listing, 2);
 
-            if(rd_i_flagsbuffer_has_unknown(b.flags, i))
+            if(rd_flagsbuffer_has_unknown(b.flags, i))
                 _rd_listing_process_unknown(&b);
-            else if(rd_i_flagsbuffer_has_data(b.flags, i))
+            else if(rd_flagsbuffer_has_data(b.flags, i))
                 _rd_listing_process_data(&b);
-            else if(rd_i_flagsbuffer_has_code(b.flags, i))
+            else if(rd_flagsbuffer_has_code(b.flags, i))
                 _rd_listing_process_code(&b);
             else
                 unreachable();

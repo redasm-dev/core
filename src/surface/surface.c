@@ -41,7 +41,7 @@ static void _rd_surface_render_range(RDSurface* self, LIndex idx, usize n) {
         rd_i_render_item_at(self->renderer, idx);
 }
 
-RDSurface* rd_surface_create(RDContext* ctx, usize flags) {
+RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags) {
     RDSurface* self = malloc(sizeof(*self));
 
     *self = (RDSurface){
@@ -74,8 +74,8 @@ bool rd_surface_set_pos(RDSurface* self, int row, int col) {
     return rd_i_surfacestate_set_pos(&self->state, row, col);
 }
 
-void rd_surface_set_rdil(RDSurface* self, bool b) {
-    rd_i_renderer_set_rdil(self->renderer, b);
+void rd_surface_set_mode(RDSurface* self, RDRenderMode m) {
+    rd_i_renderer_set_mode(self->renderer, m);
 }
 
 void rd_surface_set_cursor_visible(RDSurface* self, bool b) {
@@ -86,8 +86,8 @@ void rd_surface_set_columns(RDSurface* self, usize cols) {
     self->renderer->columns = cols;
 }
 
-bool rd_surface_has_rdil(const RDSurface* self) {
-    return rd_i_renderer_has_flag(self->renderer, RD_RENDERER_RDIL);
+RDRenderMode rd_surface_get_mode(const RDSurface* self) {
+    return rd_i_renderer_get_mode(self->renderer);
 }
 
 bool rd_surface_has_selection(const RDSurface* self) {

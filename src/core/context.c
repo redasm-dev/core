@@ -57,7 +57,7 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
     const RDSegmentFull* seg = rd_i_find_segment(self, address);
     if(!seg) return false;
 
-    if(rd_i_flagsbuffer_has_name(seg->flags, rd_i_address2index(seg, address)))
+    if(rd_flagsbuffer_has_name(seg->flags, rd_i_address2index(seg, address)))
         return rd_i_db_get_name(self, address, n);
 
     if(!autoname) return false;
@@ -79,7 +79,7 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
         else
             prefix = t.base.name;
     }
-    else if(rd_i_flagsbuffer_has_func(seg->flags, idx))
+    else if(rd_flagsbuffer_has_func(seg->flags, idx))
         prefix = "sub";
     else
         prefix = "loc";
@@ -97,13 +97,13 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
-    if(rd_i_flagsbuffer_has_tail(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
         rd_i_add_problem(self, address, address,
                          "cannot set name '%s' on tail byte", name);
         return false;
     }
 
-    bool hasname = rd_i_flagsbuffer_has_name(seg->flags, idx);
+    bool hasname = rd_flagsbuffer_has_name(seg->flags, idx);
     RDName oldname = {0};
 
     if(hasname) {
@@ -384,7 +384,7 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
 
         if(idx < vect_length(&self->listing) &&
            vect_at(&self->listing, idx)->address == address) {
-            RDRenderer* r = rd_i_renderer_create(self, RD_RENDERER_TEXT);
+            RDRenderer* r = rd_i_renderer_create(self, RD_RF_TEXT);
             rd_i_render_item_at(r, idx);
             rd_i_renderer_swap(r);
             rd_i_renderer_write_text(r, &self->str_buf);
@@ -444,7 +444,7 @@ bool rd_set_noreturn(RDContext* self, RDAddress address) {
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(!rd_i_flagsbuffer_has_func(seg->flags, idx)) {
+    if(!rd_flagsbuffer_has_func(seg->flags, idx)) {
         rd_i_add_problem(self, address, address,
                          "cannot set noreturn on a non-function address");
         return false;
@@ -459,7 +459,7 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_flagsbuffer_has_tail(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
         rd_i_add_problem(self, address, address,
                          "cannot set comment on tail byte");
         return false;
@@ -488,8 +488,8 @@ bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
     usize index = rd_i_address2index(seg, address);
 
     // conflict checks
-    if(rd_i_flagsbuffer_has_tail(seg->flags, index)) return false;
-    if(rd_i_flagsbuffer_has_data(seg->flags, index)) return false;
+    if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
+    if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
     return rd_i_engine_enqueue_call(self, address, name, c);
 }
 
@@ -824,7 +824,7 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_flagsbuffer_has_tail(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
         rd_i_add_problem(self, address, address,
                          "cannot set imported on tail byte");
         return false;
@@ -898,7 +898,7 @@ bool rd_set_exported(RDContext* ctx, RDAddress address, const char* name) {
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_flagsbuffer_has_tail(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
         rd_i_add_problem(ctx, address, address,
                          "cannot set exported on tail byte");
         return false;
@@ -931,7 +931,7 @@ bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
-    if(!rd_i_flagsbuffer_has_imported(seg->flags, idx)) return false;
+    if(!rd_flagsbuffer_has_imported(seg->flags, idx)) return false;
     return rd_i_db_get_imported(ctx, address, imp);
 }
 
@@ -966,12 +966,12 @@ bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
     usize toidx = rd_i_address2index(toseg, toaddr);
 
-    if(rd_i_flagsbuffer_has_tail(fromseg->flags, fromidx)) {
+    if(rd_flagsbuffer_has_tail(fromseg->flags, fromidx)) {
         rd_i_add_problem(self, fromaddr, fromaddr, "ref FROM tail byte");
         return false;
     }
 
-    bool isreftotail = rd_i_flagsbuffer_has_tail(toseg->flags, toidx);
+    bool isreftotail = rd_flagsbuffer_has_tail(toseg->flags, toidx);
 
     if(isreftotail) // report only
         rd_i_add_problem(self, fromaddr, toaddr, "ref TO tail byte");

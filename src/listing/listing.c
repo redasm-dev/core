@@ -4,11 +4,12 @@
 
 #define RD_LISTING_INDENT_BASE 2
 
-static LIndex _rd_listing_add_item(RDListing* self, RDListingItemKind kind,
-                                   RDAddress address) {
+static LIndex _rd_listing_add_item(RDListing* self, const RDSegmentFull* s,
+                                   RDListingItemKind kind, RDAddress address) {
     LIndex idx = self->length;
 
     vect_push(self, (RDListingItem){
+                        .segment = s,
                         .kind = kind,
                         .address = address,
                         .indent = self->indent,
@@ -57,45 +58,49 @@ void rd_i_listing_pop_indent(RDListing* self, int c) {
 }
 
 LIndex rd_i_listing_add_segment(RDListing* self, const RDSegmentFull* s) {
-    return _rd_listing_add_item(self, RD_LK_SEGMENT, s->base.start_address);
+    return _rd_listing_add_item(self, s, RD_LK_SEGMENT, s->base.start_address);
 }
 
-LIndex rd_i_listing_add_type(RDListing* self, RDAddress address,
-                             const RDType* t) {
-    LIndex idx = _rd_listing_add_item(self, RD_LK_TYPE, address);
+LIndex rd_i_listing_add_type(RDListing* self, const RDSegmentFull* s,
+                             RDAddress address, const RDType* t) {
+    LIndex idx = _rd_listing_add_item(self, s, RD_LK_TYPE, address);
     self->data[idx].type = *t;
     self->data[idx].array_index = RD_LISTING_NO_INDEX;
     self->data[idx].member_index = RD_LISTING_NO_INDEX;
     return idx;
 }
 
-LIndex rd_i_listing_add_hex_dump(RDListing* self, RDAddress startaddr,
-                                 RDAddress endaddr) {
-    LIndex idx = _rd_listing_add_item(self, RD_LK_HEX_DUMP, startaddr);
+LIndex rd_i_listing_add_hex_dump(RDListing* self, const RDSegmentFull* s,
+                                 RDAddress startaddr, RDAddress endaddr) {
+    LIndex idx = _rd_listing_add_item(self, s, RD_LK_HEX_DUMP, startaddr);
     self->data[idx].end_address = endaddr;
     return idx;
 }
 
-LIndex rd_i_listing_add_fill(RDListing* self, RDAddress startaddr,
-                             RDAddress endaddr, RDListingFillByte fb) {
-    LIndex idx = _rd_listing_add_item(self, RD_LK_FILL, startaddr);
+LIndex rd_i_listing_add_fill(RDListing* self, const RDSegmentFull* s,
+                             RDAddress startaddr, RDAddress endaddr,
+                             RDListingFillByte fb) {
+    LIndex idx = _rd_listing_add_item(self, s, RD_LK_FILL, startaddr);
     self->data[idx].end_address = endaddr;
     self->data[idx].fill = fb;
     return idx;
 }
 
-LIndex rd_i_listing_add_function(RDListing* self, const RDFunction* f) {
-    LIndex idx = _rd_listing_add_item(self, RD_LK_FUNCTION, f->address);
+LIndex rd_i_listing_add_function(RDListing* self, const RDSegmentFull* s,
+                                 const RDFunction* f) {
+    LIndex idx = _rd_listing_add_item(self, s, RD_LK_FUNCTION, f->address);
     self->data[idx].func = f;
     return idx;
 }
 
-LIndex rd_i_listing_add_instruction(RDListing* self, RDAddress addr) {
-    return _rd_listing_add_item(self, RD_LK_INSTRUCTION, addr);
+LIndex rd_i_listing_add_instruction(RDListing* self, const RDSegmentFull* s,
+                                    RDAddress addr) {
+    return _rd_listing_add_item(self, s, RD_LK_INSTRUCTION, addr);
 }
 
-LIndex rd_i_listing_add_label(RDListing* self, RDAddress addr) {
-    return _rd_listing_add_item(self, RD_LK_LABEL, addr);
+LIndex rd_i_listing_add_label(RDListing* self, const RDSegmentFull* s,
+                              RDAddress addr) {
+    return _rd_listing_add_item(self, s, RD_LK_LABEL, addr);
 }
 
 LIndex rd_i_listing_lower_bound(const RDListing* self, RDAddress address) {

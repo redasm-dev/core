@@ -110,7 +110,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         .features = ctx->worker.dslot_info.n ? RD_IF_DSLOT : RD_IF_NONE,
     };
 
-    if(rd_i_flagsbuffer_has_code(ctx->worker.segment->flags, idx)) {
+    if(rd_flagsbuffer_has_code(ctx->worker.segment->flags, idx)) {
         instr.length =
             rd_i_flagsbuffer_get_range_length(ctx->worker.segment->flags, idx);
 
@@ -218,10 +218,10 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     if(!idx) return false;
 
     idx--;
-    while(idx > 0 && rd_i_flagsbuffer_has_tail(seg->flags, idx))
+    while(idx > 0 && rd_flagsbuffer_has_tail(seg->flags, idx))
         idx--;
 
-    if(rd_i_flagsbuffer_has_tail(seg->flags, idx)) return false;
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
 
     *instr = (RDInstruction){0};
     return rd_i_engine_decode(ctx, rd_i_index2address(seg, idx), instr);

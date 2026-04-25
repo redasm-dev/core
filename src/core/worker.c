@@ -59,8 +59,8 @@ static void _rd_worker_promote_refs(RDContext* ctx) {
 
         for(usize i = 0; i < flags->base.length; i++) {
             if(!rd_i_flagsbuffer_has_xref_in(seg->flags, i)) continue;
-            if(rd_i_flagsbuffer_has_code(seg->flags, i)) continue;
-            if(rd_i_flagsbuffer_has_tail(seg->flags, i)) continue;
+            if(rd_flagsbuffer_has_code(seg->flags, i)) continue;
+            if(rd_flagsbuffer_has_tail(seg->flags, i)) continue;
 
             RDAddress addr = rd_i_index2address(seg, i);
             const RDXRefVect* refs =
@@ -91,14 +91,14 @@ static void _rd_worker_scan_prologues(RDContext* ctx) {
             const RDFlagsBuffer* flags = (*it)->flags;
 
             for(usize i = 0; i < flags->base.length;) {
-                if(rd_i_flagsbuffer_has_tail(flags, i)) {
+                if(rd_flagsbuffer_has_tail(flags, i)) {
                     i++;
                     continue;
                 }
 
-                bool is_candidate = rd_i_flagsbuffer_has_unknown(flags, i) ||
-                                    (rd_i_flagsbuffer_has_code(flags, i) &&
-                                     !rd_i_flagsbuffer_has_func(flags, i));
+                bool is_candidate = rd_flagsbuffer_has_unknown(flags, i) ||
+                                    (rd_flagsbuffer_has_code(flags, i) &&
+                                     !rd_flagsbuffer_has_func(flags, i));
 
                 if(is_candidate) {
                     if(rd_pattern_match(&pattern, flags, i)) {
@@ -109,7 +109,7 @@ static void _rd_worker_scan_prologues(RDContext* ctx) {
                     i++;
                 }
                 else {
-                    assert(!rd_i_flagsbuffer_has_tail(flags, i));
+                    assert(!rd_flagsbuffer_has_tail(flags, i));
                     i += rd_i_flagsbuffer_get_range_length(flags, i);
                 }
             }

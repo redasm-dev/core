@@ -69,12 +69,13 @@ static void _rd_renderer_calc_auto_column(RDRenderer* self) {
         rd_i_max(self->auto_columns, vect_length(vect_back(&self->rows_back)));
 }
 
-RDRenderer* rd_i_renderer_create(RDContext* ctx, usize flags) {
+RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags) {
     RDRenderer* self = malloc(sizeof(*self));
 
     *self = (RDRenderer){
         .context = ctx,
         .flags = flags,
+        .mode = RD_RM_NORMAL,
     };
 
     vect_reserve(&self->text_buf, RD_SURFACE_BUF_INITIAL_SIZE);
@@ -105,18 +106,15 @@ void rd_i_renderer_swap(RDRenderer* self) {
     mem_swap(RDRowVect, &self->rows_back, &self->rows_front);
 }
 
-void rd_i_renderer_set_rdil(RDRenderer* self, bool b) {
-    if(b)
-        self->flags |= RD_RENDERER_RDIL;
-    else
-        self->flags &= ~RD_RENDERER_RDIL;
+void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m) {
+    self->mode = m;
 }
 
 void rd_i_renderer_set_cursor_visible(RDRenderer* self, bool b) {
     if(b)
-        self->flags &= ~RD_RENDERER_NOCURSOR;
+        self->flags &= ~RD_RF_NO_CURSOR;
     else
-        self->flags |= RD_RENDERER_NOCURSOR;
+        self->flags |= RD_RF_NO_CURSOR;
 }
 
 void rd_i_renderer_fill_columns(RDRenderer* self) {
@@ -134,7 +132,7 @@ void rd_i_renderer_fill_columns(RDRenderer* self) {
 }
 
 void rd_i_renderer_highlight_row(RDRenderer* self, int row) {
-    if(rd_i_renderer_has_flag(self, RD_RENDERER_NOCURSORLINE) ||
+    if(rd_i_renderer_has_flag(self, RD_RF_NO_CURSOR_LINE) ||
        (row >= (int)self->rows_back.length))
         return;
 
@@ -147,7 +145,7 @@ void rd_i_renderer_highlight_row(RDRenderer* self, int row) {
 }
 
 void rd_i_renderer_highlight_cursor(RDRenderer* self, int row, int col) {
-    if(rd_i_renderer_has_flag(self, RD_RENDERER_NOCURSOR) ||
+    if(rd_i_renderer_has_flag(self, RD_RF_NO_CURSOR) ||
        vect_is_empty(&self->rows_back))
         return;
 
@@ -164,7 +162,7 @@ void rd_i_renderer_highlight_cursor(RDRenderer* self, int row, int col) {
 }
 
 void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col) {
-    if(rd_i_renderer_has_flag(self, RD_RENDERER_NOHIGHLIGHT)) return;
+    if(rd_i_renderer_has_flag(self, RD_RF_NO_HIGHLIGHT)) return;
 
     const char* word = self->hl_word;
     if(!word) word = _rd_renderer_word_at(self, &self->rows_back, row, col);
@@ -198,7 +196,7 @@ void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col) {
 
 void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
                                        int startcol, int endrow, int endcol) {
-    if(rd_i_renderer_has_flag(self, RD_RENDERER_NOSELECTION)) return;
+    if(rd_i_renderer_has_flag(self, RD_RF_NO_SELECTION)) return;
 
     for(int row = startrow;
         row < (int)vect_length(&self->rows_back) && row <= endrow; row++) {
@@ -227,25 +225,23 @@ void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
 
     if(self->columns) vect_reserve(vect_back(&self->rows_back), self->columns);
 
-    if(!rd_i_renderer_has_flag(self, RD_RENDERER_NOADDRESS)) {
-        const RDSegmentFull* s = rd_i_renderer_check_segment(self, item);
-
-        if(s) {
-            rd_renderer_norm(self, s->base.name);
-            rd_renderer_norm(self, ":");
-        }
+    if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
+        rd_renderer_norm(self, item->segment->base.name);
+        rd_renderer_norm(self, ":");
 
         const RDProcessorPlugin* p = self->context->processorplugin;
         assert(p && "invalid processor plugin");
 
-        const char* address = rd_i_to_hex(
-            item->address, s && s->base.unit ? s->base.unit : p->int_size);
+        int size =
+            item->segment->base.unit ? item->segment->base.unit : p->int_size;
+
+        const char* address = rd_i_to_hex(item->address, size);
 
         rd_renderer_norm(self, address);
         rd_renderer_ws(self, 2);
     }
 
-    if(!rd_i_renderer_has_flag(self, RD_RENDERER_NOINDENT))
+    if(!rd_i_renderer_has_flag(self, RD_RF_NO_INDENT))
         rd_renderer_ws(self, item->indent);
 }
 
@@ -311,6 +307,40 @@ void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item) {
     rd_i_il_render(self, &ctx->il_buf);
 }
 
+void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
+    static const struct {
+        bool (*pred)(const RDFlagsBuffer*, usize);
+        const char* name;
+        RDThemeKind fg;
+    } PREDS[] = {
+        {rd_flagsbuffer_has_func, "FUNC", RD_THEME_FUNCTION},
+        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_RET},
+        {rd_flagsbuffer_has_call, "CALL", RD_THEME_CALL},
+        {rd_flagsbuffer_has_jump, "JUMP", RD_THEME_JUMP},
+        {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},
+        {rd_flagsbuffer_has_flow, "FLOW", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_code, "CODE", RD_THEME_FLAG_CODE},
+        {rd_flagsbuffer_has_data, "DATA", RD_THEME_FLAG_DATA},
+        {rd_flagsbuffer_has_tail, "TAIL", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_name, "NAME", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_exported, "EXPORTED", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_imported, "IMPORTED", RD_THEME_FOREGROUND},
+    };
+
+    const int N_PREDS = sizeof(PREDS) / sizeof(*PREDS);
+    usize idx = rd_i_address2index(item->segment, item->address);
+
+    bool first = true;
+    for(int i = 0; i < N_PREDS; i++) {
+        if(!PREDS[i].pred(item->segment->flags, idx)) continue;
+        if(!first) rd_renderer_norm(self, " | ");
+        rd_renderer_text(self, PREDS[i].name, PREDS[i].fg, RD_THEME_BACKGROUND);
+        first = false;
+    }
+
+    if(first) rd_renderer_unkn(self);
+}
+
 void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item) {
     const RDProcessorPlugin* p = self->context->processorplugin;
     assert(p && "invalid processor plugin");
@@ -328,19 +358,6 @@ void rd_i_renderer_set_current_item(RDRenderer* self, LIndex idx,
                                     const RDListingItem* item) {
     self->curr_address = item->address;
     self->listing_idx = idx;
-    rd_i_renderer_check_segment(self, item);
-}
-
-const RDSegmentFull* rd_i_renderer_check_segment(RDRenderer* self,
-                                                 const RDListingItem* item) {
-    if(self->curr_segment) {
-        if(item->address >= self->curr_segment->base.start_address &&
-           item->address < self->curr_segment->base.end_address)
-            return self->curr_segment;
-    }
-
-    self->curr_segment = rd_i_find_segment(self->context, item->address);
-    return self->curr_segment;
 }
 
 void rd_renderer_norm(RDRenderer* self, const char* s) {
@@ -363,7 +380,7 @@ void rd_renderer_str(RDRenderer* self, const char* s, bool quoted) {
 }
 
 void rd_renderer_unkn(RDRenderer* self) {
-    rd_renderer_text(self, "???", RD_THEME_BACKGROUND, RD_THEME_FOREGROUND);
+    rd_renderer_text(self, "???", RD_THEME_MUTED, RD_THEME_FOREGROUND);
 }
 
 void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,

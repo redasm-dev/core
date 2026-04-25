@@ -52,7 +52,7 @@ static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
 
         if(seg) {
             usize idx = rd_i_address2index(seg, src_item->address);
-            is_dst_cond = rd_i_flagsbuffer_has_cond(seg->flags, idx);
+            is_dst_cond = rd_flagsbuffer_has_cond(seg->flags, idx);
         }
     }
 
@@ -106,7 +106,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
                 if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
 
                 usize ridx = rd_i_address2index(rseg, r->address);
-                if(!rd_i_flagsbuffer_has_code(rseg->flags, ridx)) continue;
+                if(!rd_flagsbuffer_has_code(rseg->flags, ridx)) continue;
 
                 int fromrow = _rd_surfacepath_calculate_index(start, rows, ctx,
                                                               r->address);
@@ -114,7 +114,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
             }
         }
 
-        if(rd_i_flagsbuffer_has_jump(seg->flags, idx)) {
+        if(rd_flagsbuffer_has_jump(seg->flags, idx)) {
             const RDXRefVect* xrefs = rd_i_get_xrefs_from_type_ex(
                 ctx, item->address, RD_CR_JUMP, &self->xrefs);
 

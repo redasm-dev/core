@@ -48,6 +48,7 @@ typedef struct RDListingFillByte {
 } RDListingFillByte;
 
 typedef struct RDListingItem {
+    const RDSegmentFull* segment;
     RDListingItemKind kind;
     RDListingModifier mod;
     int indent;
@@ -95,12 +96,16 @@ void rd_i_listing_push_indent(RDListing* self, int c);
 void rd_i_listing_pop_indent(RDListing* self, int c);
 LIndex rd_i_listing_lower_bound(const RDListing* self, RDAddress address);
 LIndex rd_i_listing_add_segment(RDListing* self, const RDSegmentFull* s);
-LIndex rd_i_listing_add_function(RDListing* self, const RDFunction* f);
-LIndex rd_i_listing_add_instruction(RDListing* self, RDAddress addr);
-LIndex rd_i_listing_add_label(RDListing* self, RDAddress addr);
-LIndex rd_i_listing_add_type(RDListing* self, RDAddress address,
-                             const RDType* t);
-LIndex rd_i_listing_add_hex_dump(RDListing* self, RDAddress startaddr,
-                                 RDAddress endaddr);
-LIndex rd_i_listing_add_fill(RDListing* self, RDAddress startaddr,
-                             RDAddress endaddr, RDListingFillByte fb);
+LIndex rd_i_listing_add_function(RDListing* self, const RDSegmentFull* s,
+                                 const RDFunction* f);
+LIndex rd_i_listing_add_instruction(RDListing* self, const RDSegmentFull* s,
+                                    RDAddress addr);
+LIndex rd_i_listing_add_label(RDListing* self, const RDSegmentFull* s,
+                              RDAddress addr);
+LIndex rd_i_listing_add_type(RDListing* self, const RDSegmentFull* s,
+                             RDAddress address, const RDType* t);
+LIndex rd_i_listing_add_hex_dump(RDListing* self, const RDSegmentFull* s,
+                                 RDAddress startaddr, RDAddress endaddr);
+LIndex rd_i_listing_add_fill(RDListing* self, const RDSegmentFull* s,
+                             RDAddress startaddr, RDAddress endaddr,
+                             RDListingFillByte fb);

@@ -150,8 +150,8 @@ void rd_i_find_strings(RDContext* ctx) {
 
         for(usize idx = 0; idx < flags->base.length; idx++) {
             u8 v;
-            bool skip = rd_i_flagsbuffer_has_code(flags, idx) ||
-                        rd_i_flagsbuffer_has_tail(flags, idx) ||
+            bool skip = rd_flagsbuffer_has_code(flags, idx) ||
+                        rd_flagsbuffer_has_tail(flags, idx) ||
                         !rd_flagsbuffer_get_value(flags, idx, &v);
 
             if(skip) {

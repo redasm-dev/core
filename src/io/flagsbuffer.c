@@ -48,7 +48,7 @@ usize rd_flagsbuffer_get_length(const RDFlagsBuffer* self) {
     return rd_i_buffer_get_length((const RDBuffer*)self);
 }
 
-bool rd_i_flagsbuffer_has_unknown(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_unknown(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_unknown(self->data[idx]);
 }
 
@@ -56,19 +56,19 @@ bool rd_i_flagsbuffer_has_info(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_info(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_code(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_code(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_code(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_data(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_data(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_data(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_tail(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_tail(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_tail(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_name(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_name(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_name(self->data[idx]);
 }
 
@@ -76,11 +76,11 @@ bool rd_i_flagsbuffer_has_comment(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_comment(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_flow(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_flow(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_flow(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_jump(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_jump(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_jump(self->data[idx]);
 }
 
@@ -88,19 +88,19 @@ bool rd_i_flagsbuffer_has_jmpdst(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_jmpdst(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_call(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_call(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_call(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_func(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_func(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_func(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_noret(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_noret(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_noret(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_cond(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_cond(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_cond(self->data[idx]);
 }
 
@@ -116,11 +116,11 @@ bool rd_i_flagsbuffer_has_xref_in(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_xref_in(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_imported(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_imported(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_imported(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_exported(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_exported(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_exported(self->data[idx]);
 }
 
