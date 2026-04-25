@@ -4,6 +4,7 @@
 
 #define RD_NOPERANDS 8
 #define RD_NMNEMONIC 32
+#define RD_IS_DSLOT 0xFF
 
 typedef enum {
     RD_OP_NULL = 0,
@@ -19,12 +20,13 @@ typedef enum {
 
 typedef enum {
     RD_IF_NONE = 0,
-    RD_IF_STOP = (1 << 0),  // Stops flow
-    RD_IF_JUMP = (1 << 1),  // Can branch
-    RD_IF_CALL = (1 << 2),  // Call a function
-    RD_IF_NOP = (1 << 3),   // No-Operation
-    RD_IF_DSLOT = (1 << 4), // Delay Slot
-} RDInstructionFeatures;
+    RD_IF_JUMP,
+    RD_IF_JUMP_COND,
+    RD_IF_CALL,
+    RD_IF_CALL_COND,
+    RD_IF_STOP,
+    RD_IF_NOP,
+} RDInstructionFlow;
 
 typedef struct RDPhraseOperand {
     int base;
@@ -81,7 +83,7 @@ typedef struct RDInstruction {
     RDAddress address;
     u32 id;
     u16 length;
-    u8 features;
+    u8 flow;
     u8 delay_slots;
     RDOperand operands[RD_NOPERANDS];
 
@@ -96,6 +98,48 @@ typedef struct RDInstruction {
         char mnemonic[RD_NMNEMONIC];
     };
 } RDInstruction;
+
+static inline bool rd_is_delay_slot(const RDInstruction* instr) {
+    return instr->delay_slots == RD_IS_DSLOT;
+}
+
+static inline bool rd_is_jump(const RDInstruction* instr) {
+    switch(instr->flow) {
+        case RD_IF_JUMP:
+        case RD_IF_JUMP_COND: return true;
+        default: break;
+    }
+
+    return false;
+}
+
+static inline bool rd_is_call(const RDInstruction* instr) {
+    switch(instr->flow) {
+        case RD_IF_CALL:
+        case RD_IF_CALL_COND: return true;
+        default: break;
+    }
+
+    return false;
+}
+
+static inline bool rd_is_branch(const RDInstruction* instr) {
+    return rd_is_jump(instr) || rd_is_call(instr);
+}
+
+static inline bool rd_can_flow(const RDInstruction* instr) {
+    return instr->flow != RD_IF_JUMP && instr->flow != RD_IF_STOP;
+}
+
+static inline bool rd_is_cond(const RDInstruction* instr) {
+    switch(instr->flow) {
+        case RD_IF_JUMP_COND:
+        case RD_IF_CALL_COND: return true;
+        default: break;
+    }
+
+    return false;
+}
 
 #define _rd_foreach_op_arg(x) x
 

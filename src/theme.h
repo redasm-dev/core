@@ -13,7 +13,7 @@ typedef struct RDTheme {
     RDColor segment, function, type;
     RDColor location, number, reg, string;
     RDColor comment;
-    RDColor ret, call, jump, jump_cond;
+    RDColor stop, jump, jump_cond, call, call_cond;
     RDColor success, fail, warning, muted;
     RDColor flag_code, flag_data;
 } RDTheme;

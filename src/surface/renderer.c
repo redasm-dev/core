@@ -314,7 +314,7 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         RDThemeKind fg;
     } PREDS[] = {
         {rd_flagsbuffer_has_func, "FUNC", RD_THEME_FUNCTION},
-        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_RET},
+        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_STOP},
         {rd_flagsbuffer_has_call, "CALL", RD_THEME_CALL},
         {rd_flagsbuffer_has_jump, "JUMP", RD_THEME_JUMP},
         {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},

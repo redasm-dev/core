@@ -301,7 +301,7 @@ static void _rdil_render_statement(RDRenderer* r, const RDILInstruction* il,
         }
 
         case RD_IL_RET: {
-            rd_renderer_text(r, "ret", RD_THEME_RET, RD_THEME_BACKGROUND);
+            rd_renderer_text(r, "ret", RD_THEME_STOP, RD_THEME_BACKGROUND);
             rd_renderer_norm(r, " ");
             _rdil_render_expr(r, il, cur); // target
             break;

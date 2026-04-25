@@ -107,7 +107,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         rd_i_address2index(ctx->worker.segment, ctx->worker.current.address);
 
     RDInstruction instr = {
-        .features = ctx->worker.dslot_info.n ? RD_IF_DSLOT : RD_IF_NONE,
+        .delay_slots = ctx->worker.dslot_info.n ? RD_IS_DSLOT : 0,
     };
 
     if(rd_flagsbuffer_has_code(ctx->worker.segment->flags, idx)) {
@@ -158,14 +158,12 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         assert(plugin->emulate);
         plugin->emulate(ctx, &instr, ctx->processor);
 
-        if(instr.features & RD_IF_JUMP)
+        if(instr.flow == RD_IF_JUMP || instr.flow == RD_IF_JUMP_COND)
             rd_i_flagsbuffer_set_jump(ctx->worker.segment->flags, idx);
-        if(instr.features & RD_IF_CALL)
+        if(instr.flow == RD_IF_CALL || instr.flow == RD_IF_CALL_COND)
             rd_i_flagsbuffer_set_call(ctx->worker.segment->flags, idx);
 
-        // derive FL_COND from absence of RD_IF_STOP
-        if((instr.features & (RD_IF_JUMP | RD_IF_STOP)) == RD_IF_JUMP ||
-           (instr.features & (RD_IF_CALL | RD_IF_STOP)) == RD_IF_CALL)
+        if(instr.flow == RD_IF_JUMP_COND || instr.flow == RD_IF_CALL_COND)
             rd_i_flagsbuffer_set_cond(ctx->worker.segment->flags, idx);
 
         if(ctx->worker.current.kind == RD_WI_FLOW)
@@ -181,7 +179,8 @@ u16 rd_i_engine_tick(RDContext* ctx) {
                           ctx->worker.current.confidence);
         }
 
-        if(instr.delay_slots) _rd_engine_execute_delay_slots(ctx, &instr);
+        if(instr.delay_slots && !rd_is_delay_slot(&instr))
+            _rd_engine_execute_delay_slots(ctx, &instr);
     }
 
 done:
