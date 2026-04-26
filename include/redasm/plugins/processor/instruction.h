@@ -60,7 +60,7 @@ typedef struct RDUserOperand {
 } RDUserOperand;
 
 typedef struct RDOperand {
-    u32 kind;
+    RDOperandKind kind;
     u16 size;
     u16 count;
 
