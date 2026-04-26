@@ -950,11 +950,6 @@ void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
 
     vect_push(&self->problems, p);
     rd_i_db_add_problem(self, &p);
-
-    if(p.from_address != p.address)
-        LOG_WARN("problem: %x -> %x: %s", p.from_address, p.address, p.message);
-    else
-        LOG_WARN("problem: %x: %s", p.address, p.message);
 }
 
 bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
