@@ -57,7 +57,7 @@ RDContextSlice rd_test(const char* filepath) {
         RDPlugin** it;
         vect_each(it, &rd_i_state.loaders) {
             const RDLoaderPlugin* p = (*it)->loader;
-            LOG_INFO("testing '%s' ...", p->name);
+            LOG_DEBUG("testing '%s' ...", p->name);
 
             RDLoader* ldr = p->create ? p->create(p) : NULL;
 

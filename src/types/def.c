@@ -243,7 +243,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
 
     rd_i_db_set_type_def(ctx, self);
     vect_push(&ctx->types, self);
-    LOG_INFO("definition '%s' registered", self->name);
+    LOG_DEBUG("definition '%s' registered", self->name);
     return true;
 }
 
