@@ -70,7 +70,13 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                                    endidx_exp - startidx_exp))
         return false;
 
-    rd_i_db_del_type_range(ctx, startidx_exp, endidx_exp);
+    // startidx_exp is always a valid HEAD index, safe to convert.
+    // endidx_exp is an exclusive upper bound, may equal flags->base.length,
+    // which equals end_address.
+    // Compute arithmetically to avoid the assertion.
+    RDAddress startaddr_exp = rd_i_index2address(seg, startidx_exp);
+    RDAddress endaddr_exp = startaddr_exp + (endidx_exp - startidx_exp);
+    rd_i_db_del_type_range(ctx, startaddr_exp, endaddr_exp);
 
     rd_i_flagsbuffer_undefine(seg->flags, startidx_exp,
                               endidx_exp - startidx_exp);

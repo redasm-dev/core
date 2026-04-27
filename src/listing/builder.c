@@ -176,7 +176,8 @@ static void _rd_listing_process_data(RDListingBuilder* b) {
     if(rd_i_flagsbuffer_has_type(b->flags, index)) {
         RDTypeFull t;
         bool ok = rd_i_db_get_type(b->context, b->address, &t);
-        panic_if(!ok, "type not found");
+        panic_if(!ok, "type not found @ %s:%x", b->segment->base.name,
+                 b->address);
         RDListingModifier mod = _rd_listing_check_modifiers(b, index);
         LIndex lidx = _rd_listing_process_type(b, &t.base, true);
         vect_at(&b->listing, lidx)->mod = mod;
