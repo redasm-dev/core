@@ -11,9 +11,6 @@ add_library(redasm::redasm ALIAS ${PROJECT_NAME})
 include(cmake/Compiler.cmake)
 setup_compiler(${PROJECT_NAME})
 
-include(CheckLibraryExists)
-check_library_exists(m log "" HAVE_LIBM)
-
 target_sources(${PROJECT_NAME} 
     PRIVATE
         src/core/db/db.c
@@ -73,10 +70,6 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         sqlite3
 )
-
-if(HAVE_LIBM)
-    target_link_libraries(${PROJECT_NAME} PRIVATE m)
-endif()
 
 include(GNUInstallDirs)
 
