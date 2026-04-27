@@ -50,17 +50,6 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
     usize newsz = rd_i_size_of(ctx, name, n, flags);
     if(!newsz) return false;
 
-    RDTypeFull oldt;
-    if(rd_i_db_get_type(ctx, address, &oldt)) {
-        usize oldsz =
-            rd_i_size_of(ctx, oldt.base.name, oldt.base.count, oldt.base.flags);
-
-        if(oldt.confidence > c) return false; // confidence wins over size
-
-        if(oldt.confidence == c && newsz <= oldsz)
-            return false; // no upgrade needed
-    }
-
     usize idx = rd_i_address2index(seg, address);
     usize startidx_exp = idx;
     usize endidx_exp = startidx_exp + newsz;
@@ -69,6 +58,33 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
     if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
                                    endidx_exp - startidx_exp))
         return false;
+
+    // Walk all type HEADs in the expanded range.
+    // Confidence of the range is the max confidence of any member, not just
+    // the head.
+    // Any single item outranking c blocks the whole operation.
+    usize i = startidx_exp;
+    while(i < endidx_exp) {
+        if(rd_i_flagsbuffer_has_type(seg->flags, i)) {
+            RDAddress a = rd_i_index2address(seg, i);
+            RDTypeFull oldt;
+            bool ok = rd_i_db_get_type(ctx, a, &oldt);
+            assert(ok && "type flag set but not in DB");
+
+            if(oldt.confidence > c) return false; // confidence wins over size
+
+            if(oldt.confidence == c && i == idx) {
+                usize oldsz = rd_i_size_of(ctx, oldt.base.name, oldt.base.count,
+                                           oldt.base.flags);
+                if(newsz <= oldsz) return false; // same head, no size upgrade
+            }
+
+            i += rd_i_flagsbuffer_get_range_length(seg->flags, i);
+        }
+        else {
+            i++;
+        }
+    }
 
     // startidx_exp is always a valid HEAD index, safe to convert.
     // endidx_exp is an exclusive upper bound, may equal flags->base.length,
