@@ -53,15 +53,6 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
     if(*str->data == '%' && !_rd_strings_check_format(str->data, len)) return;
 
     RDAddress addr = rd_i_index2address(seg, idx);
-
-    if(rd_i_flagsbuffer_has_type(seg->flags, idx)) {
-        RDTypeFull t;
-        if(rd_i_db_get_type(ctx, addr, &t)) {
-            if(t.confidence >= RD_CONFIDENCE_LIBRARY) return;
-            rd_undefine(ctx, addr);
-        }
-    }
-
     rd_auto_type(ctx, addr, "char", vect_length(str), RD_TYPE_NONE);
 }
 

@@ -3,6 +3,7 @@
 #include "io/flagsbuffer.h"
 #include "support/error.h"
 #include "types/def.h"
+#include <string.h>
 
 usize rd_size_of(const RDContext* ctx, const char* name, usize n) {
     return rd_i_size_of(ctx, name, n, RD_TYPE_NONE);
@@ -76,7 +77,11 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
             if(oldt.confidence == c && i == idx) {
                 usize oldsz = rd_i_size_of(ctx, oldt.base.name, oldt.base.count,
                                            oldt.base.flags);
-                if(newsz <= oldsz) return false; // same head, no size upgrade
+
+                if(newsz <= oldsz && !strcmp(name, oldt.base.name))
+                    return false;
+
+                // different type name or larger: allow replacement
             }
 
             i += rd_i_flagsbuffer_get_range_length(seg->flags, i);
