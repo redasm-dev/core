@@ -239,7 +239,7 @@ void rd_i_listing_build(RDContext* ctx) {
 
         while(b.address < b.segment->base.end_address) {
             usize i = rd_i_address2index(b.segment, b.address);
-            assert(!rd_flagsbuffer_has_tail(b.flags, i) && "tail detected");
+            panic_if(rd_flagsbuffer_has_tail(b.flags, i), "tail detected");
             rd_i_listing_push_indent(&b.listing, 2);
 
             if(rd_flagsbuffer_has_unknown(b.flags, i))
