@@ -13,6 +13,11 @@ typedef struct RDLoaderRequest {
     const char* ext;
 } RDLoaderRequest;
 
+typedef enum {
+    RD_LF_NONE = 0,
+    RD_LF_MANUAL = (1 << 0),
+} RDLoaderFlags;
+
 typedef struct RDLoaderPlugin {
     RD_PLUGIN_HEADER;
     void* userdata;

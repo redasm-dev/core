@@ -91,6 +91,12 @@ typedef struct RDDelaySlotInfo {
     u8 n;
 } RDDelaySlotInfo;
 
+typedef struct RDLoadAddressing {
+    RDAddress entrypoint;
+    RDAddress address;
+    RDOffset offset;
+} RDLoadAddressing;
+
 RD_API void rd_destroy(RDContext* self);
 RD_API bool rd_step(RDContext* self, const RDWorkerStatus** status);
 RD_API void rd_disassemble(RDContext* self);
@@ -104,6 +110,9 @@ RD_API RDAddressSlice rd_get_all_imported(const RDContext* self);
 RD_API RDSymbolSlice rd_get_all_symbols(const RDContext* self);
 RD_API RDSegmentSlice rd_get_all_segments(const RDContext* self);
 RD_API RDInputMappingSlice rd_get_all_mappings(const RDContext* self);
+RD_API RDLoadAddressing rd_get_load_addressing(const RDContext* self);
+RD_API unsigned int rd_get_min_string(const RDContext* self);
+RD_API void rd_set_min_string(RDContext* self, unsigned int l);
 RD_API const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr);
 RD_API const RDFunction* rd_find_function(const RDContext* self,
                                           RDAddress address);

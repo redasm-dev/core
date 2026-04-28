@@ -68,6 +68,9 @@ typedef struct RDContext {
     RDLoader* loader;
     RDProcessor* processor;
 
+    unsigned int min_string;
+    RDLoadAddressing addressing;
+
     RDDB db;
     RDListing listing;
 
@@ -103,7 +106,7 @@ typedef struct RDContext {
         RDWorkerItem current;
         RDWorkerStatus status;
         unsigned int step;
-    } worker;
+    } engine;
 
     struct {
         RDProblem* data;

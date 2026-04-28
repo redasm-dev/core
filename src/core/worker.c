@@ -121,17 +121,17 @@ static void _rd_worker_scan_prologues(RDContext* ctx) {
 
 static void _rd_worker_step_init(RDContext* ctx) {
     rd_i_listing_build(ctx); // Show pre-analysis listing
-    ctx->worker.status.is_listing_changed = true;
-    ctx->worker.step++;
+    ctx->engine.status.is_listing_changed = true;
+    ctx->engine.step++;
 }
 
 static void _rd_worker_step_emulate(RDContext* ctx) {
     if(rd_i_engine_has_pending_code(ctx)) {
         rd_i_engine_tick(ctx);
-        optional_set(&ctx->worker.status.address, ctx->worker.current.address);
+        optional_set(&ctx->engine.status.address, ctx->engine.current.address);
     }
     else
-        ctx->worker.step++;
+        ctx->engine.step++;
 }
 
 static void _rd_worker_step_analyze(RDContext* ctx) {
@@ -147,51 +147,51 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
         ai->plugin->execute(ctx);
     }
 
-    if(ctx->worker.step == RD_WS_ANALYZE2) _rd_worker_scan_prologues(ctx);
+    if(ctx->engine.step == RD_WS_ANALYZE2) _rd_worker_scan_prologues(ctx);
 
     if(rd_i_engine_has_pending_code(ctx)) {
-        if(ctx->worker.step == RD_WS_ANALYZE1)
-            ctx->worker.step = RD_WS_EMULATE1;
-        else if(ctx->worker.step == RD_WS_ANALYZE2)
-            ctx->worker.step = RD_WS_EMULATE2;
+        if(ctx->engine.step == RD_WS_ANALYZE1)
+            ctx->engine.step = RD_WS_EMULATE1;
+        else if(ctx->engine.step == RD_WS_ANALYZE2)
+            ctx->engine.step = RD_WS_EMULATE2;
         else
             unreachable();
     }
     else
-        ctx->worker.step++;
+        ctx->engine.step++;
 }
 
 static void _rd_worker_step_mergecode(RDContext* ctx) {
     _rd_worker_promote_refs(ctx);
-    ctx->worker.step++;
+    ctx->engine.step++;
 }
 
 static void _rd_worker_step_mergedata(RDContext* ctx) {
     rd_i_find_strings(ctx);
-    ctx->worker.step++;
+    ctx->engine.step++;
 }
 
-static void _rd_worker_step_signature(RDContext* ctx) { ctx->worker.step++; }
+static void _rd_worker_step_signature(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_finalize(RDContext* ctx) {
     rd_i_listing_build(ctx);
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
-    ctx->worker.status.is_listing_changed = true;
-    ctx->worker.step++;
+    ctx->engine.status.is_listing_changed = true;
+    ctx->engine.step++;
 }
 
 bool rd_step(RDContext* ctx, const RDWorkerStatus** status) {
-    assert(ctx->worker.step < RD_WS_COUNT);
-    ctx->worker.status.is_busy = ctx->worker.step < RD_WS_DONE;
-    ctx->worker.status.step = RD_STEP_NAMES[ctx->worker.step];
-    ctx->worker.status.segment = (const RDSegment*)ctx->worker.segment;
-    ctx->worker.status.is_listing_changed = false;
-    ctx->worker.status.pending_calls = queue_length(&ctx->worker.qcall);
-    ctx->worker.status.pending_jumps = queue_length(&ctx->worker.qjump);
-    optional_unset(&ctx->worker.status.address);
+    assert(ctx->engine.step < RD_WS_COUNT);
+    ctx->engine.status.is_busy = ctx->engine.step < RD_WS_DONE;
+    ctx->engine.status.step = RD_STEP_NAMES[ctx->engine.step];
+    ctx->engine.status.segment = (const RDSegment*)ctx->engine.segment;
+    ctx->engine.status.is_listing_changed = false;
+    ctx->engine.status.pending_calls = queue_length(&ctx->engine.qcall);
+    ctx->engine.status.pending_jumps = queue_length(&ctx->engine.qjump);
+    optional_unset(&ctx->engine.status.address);
 
-    if(ctx->worker.status.is_busy) {
-        switch(ctx->worker.step) {
+    if(ctx->engine.status.is_busy) {
+        switch(ctx->engine.step) {
             case RD_WS_INIT: _rd_worker_step_init(ctx); break;
 
             case RD_WS_EMULATE1:
@@ -213,8 +213,8 @@ bool rd_step(RDContext* ctx, const RDWorkerStatus** status) {
         }
     }
 
-    if(status) *status = &ctx->worker.status;
-    return ctx->worker.status.is_busy;
+    if(status) *status = &ctx->engine.status;
+    return ctx->engine.status.is_busy;
 }
 
 void rd_disassemble(RDContext* ctx) {

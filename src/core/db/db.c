@@ -22,6 +22,8 @@
     } while(0)
 
 static char* _rd_db_get_dbpath(RDContext* ctx) {
+    if(!ctx->filepath) return NULL;
+
     char* filestem = rd_i_get_file_stem(ctx->filepath);
     int filestem_len = strlen(filestem);
     int id_len = strlen(ctx->loaderplugin->id);
@@ -157,10 +159,15 @@ static bool _rd_db_get_info_str(RDContext* ctx, const char* key,
 
 bool rd_i_db_init(RDContext* ctx) {
     ctx->db.filepath = _rd_db_get_dbpath(ctx);
-    remove(ctx->db.filepath); // Remove old database (if exists)
 
-    if(sqlite3_open(ctx->db.filepath, &ctx->db.handle) != SQLITE_OK) {
-        panic("Cannot open database at %s", ctx->db.filepath);
+    if(ctx->db.filepath) // Remove old database (if exists)
+        remove(ctx->db.filepath);
+
+    // create an in memory DB if path is not set
+    const char* dbpath = ctx->db.filepath ? ctx->db.filepath : ":memory:";
+
+    if(sqlite3_open(dbpath, &ctx->db.handle) != SQLITE_OK) {
+        panic("Cannot open database at %s", dbpath);
         goto fail;
     }
 

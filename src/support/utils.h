@@ -18,6 +18,7 @@ typedef struct RDBaseParams {
     bool with_sign;
 } RDBaseParams;
 
+RDByteBuffer* rd_i_fromdata(const char* bytes, usize n);
 RDByteBuffer* rd_i_readfile(const char* filepath);
 const char* rd_i_tolower(char* s);
 const char* rd_i_get_file_name(const char* filepath);

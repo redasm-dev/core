@@ -51,6 +51,12 @@ static const RDBaseParams RD_BASE_DEFAULTS = {
     .fill = 0,
 };
 
+RDByteBuffer* rd_i_fromdata(const char* bytes, usize n) {
+    RDByteBuffer* b = rd_i_buffer_create(n);
+    memcpy(b->data, bytes, n);
+    return b;
+}
+
 RDByteBuffer* rd_i_readfile(const char* filepath) {
     FILE* fp = fopen(filepath, "rb");
     if(!fp) return NULL;

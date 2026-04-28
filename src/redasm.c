@@ -4,8 +4,10 @@
 #include "io/reader.h"
 #include "plugins/builtin/builtin.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "support/logging.h"
 #include "support/utils.h"
+#include "surface/renderer.h"
 #include <assert.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
@@ -14,7 +16,7 @@
 #include <stdlib.h>
 
 static bool _rd_part_loaders(const RDContext** ctx) {
-    return !((*ctx)->loaderplugin->flags & PF_LAST);
+    return !((*ctx)->loaderplugin->flags & RD_PF_LAST);
 }
 
 static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
@@ -98,7 +100,8 @@ RDContextSlice rd_test(const char* filepath) {
     return (RDContextSlice){0};
 }
 
-bool rd_accept(const RDContext* self, const RDProcessorPlugin* p) {
+bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
+               const RDLoadAddressing* la) {
     if(!self) return false;
 
     bool accepted = false;
@@ -113,8 +116,9 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p) {
             continue;
         }
 
-        if(p) ctx->processorplugin = p;
-        assert(ctx->processorplugin && "processor plugin not set");
+        if(la) ctx->addressing = *la;
+        ctx->processorplugin = p;
+        panic_if(!ctx->processorplugin, "processor plugin not set");
 
         if(ctx->processorplugin->create)
             ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
@@ -243,4 +247,71 @@ bool rd_register_command(const RDCommandPlugin* c) {
     plugin->command = c;
     vect_push(&rd_i_state.commands, plugin);
     return true;
+}
+
+RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
+                            const RDProcessorPlugin* p,
+                            RDDecodedInstruction* dec) {
+    if(!bytes || !n || !(*bytes) || !(*n) || !p || !dec) return false;
+
+    const RDLoaderPlugin* ldr = rd_loader_find(RD_BINARY_LOADER_ID);
+    assert(ldr && "binary loader not found");
+
+    RDByteBuffer* input = rd_i_fromdata(*bytes, *n);
+    RDContext* ctx = rd_i_context_create(ldr, NULL, NULL, input);
+    ctx->processorplugin = p;
+    ctx->addressing = (RDLoadAddressing){.address = *addr};
+
+    bool ok = ctx->loaderplugin->load(NULL, ctx);
+    assert(ok && "binary loader failed to load");
+
+    if(ctx->processorplugin->create)
+        ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
+
+    ok = rd_decode(ctx, *addr, &dec->instr);
+
+    if(ok) {
+        if(ctx->processorplugin->render_instruction) {
+            RDRenderer* r =
+                rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
+
+            // manually craft an item
+            RDListingItem item = {
+                .kind = RD_LK_INSTRUCTION,
+                .address = *addr,
+                .segment = *vect_front(&ctx->segments),
+            };
+
+            rd_i_renderer_new_row(r, &item);
+            ctx->processorplugin->render_instruction(r, &dec->instr,
+                                                     ctx->processor);
+
+            rd_i_renderer_swap(r);
+            rd_i_renderer_write_text(r, &rd_i_state.instr_text_buf);
+            rd_i_renderer_destroy(r);
+        }
+        else
+            str_clear(&rd_i_state.instr_text_buf);
+
+        dec->instr_text = rd_i_state.instr_text_buf.data;
+
+        const char* mnem = NULL;
+
+        if(ctx->processorplugin->get_mnemonic) {
+            mnem =
+                ctx->processorplugin->get_mnemonic(&dec->instr, ctx->processor);
+        }
+
+        str_clear(&rd_i_state.mnem_buf);
+        if(mnem) str_append(&rd_i_state.mnem_buf, mnem);
+
+        dec->mnemonic = rd_i_state.mnem_buf.data;
+
+        *bytes += dec->instr.length;
+        *n -= dec->instr.length;
+        *addr += dec->instr.length;
+    }
+
+    rd_destroy(ctx);
+    return ok;
 }

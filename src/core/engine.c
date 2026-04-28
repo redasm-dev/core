@@ -8,7 +8,7 @@ static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,
     if(!queue_is_empty(q) && queue_peek_back(q).address == address)
         return false;
 
-    const RDSegmentFull* seg = ctx->worker.segment;
+    const RDSegmentFull* seg = ctx->engine.segment;
 
     if(!seg || address < seg->base.start_address ||
        address >= seg->base.end_address)
@@ -19,27 +19,27 @@ static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,
 
 static void _rd_engine_execute_delay_slots(RDContext* ctx,
                                            const RDInstruction* instr) {
-    ctx->worker.dslot_info.instr = *instr;
-    ctx->worker.dslot_info.n = 1;
+    ctx->engine.dslot_info.instr = *instr;
+    ctx->engine.dslot_info.n = 1;
     RDAddress address = instr->address + instr->length;
 
-    while(ctx->worker.dslot_info.n <=
-          ctx->worker.dslot_info.instr.delay_slots) {
+    while(ctx->engine.dslot_info.n <=
+          ctx->engine.dslot_info.instr.delay_slots) {
         rd_flow(ctx, address);
         u32 len = rd_i_engine_tick(ctx);
 
         if(!len) {
             rd_i_add_problem(ctx, instr->address, address,
                              "cannot decode delay slot #%u",
-                             ctx->worker.dslot_info.n);
+                             ctx->engine.dslot_info.n);
             break;
         }
 
         address += len;
-        ctx->worker.dslot_info.n++;
+        ctx->engine.dslot_info.n++;
     }
 
-    ctx->worker.dslot_info = (RDDelaySlotInfo){0};
+    ctx->engine.dslot_info = (RDDelaySlotInfo){0};
 }
 
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
@@ -51,8 +51,8 @@ bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
 }
 
 bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress addr) {
-    if(_rd_engine_accept_address(ctx, addr, &ctx->worker.qjump)) {
-        queue_push(&ctx->worker.qjump, (RDWorkerItem){
+    if(_rd_engine_accept_address(ctx, addr, &ctx->engine.qjump)) {
+        queue_push(&ctx->engine.qjump, (RDWorkerItem){
                                            .kind = RD_WI_JUMP,
                                            .address = addr,
                                        });
@@ -64,8 +64,8 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress addr) {
 
 bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress addr, const char* name,
                               RDConfidence c) {
-    if(_rd_engine_accept_address(ctx, addr, &ctx->worker.qcall)) {
-        queue_push(&ctx->worker.qcall,
+    if(_rd_engine_accept_address(ctx, addr, &ctx->engine.qcall)) {
+        queue_push(&ctx->engine.qcall,
                    (RDWorkerItem){
                        .kind = RD_WI_CALL,
                        .confidence = c,
@@ -80,75 +80,75 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress addr, const char* name,
 
 bool rd_i_engine_has_pending_code(const RDContext* ctx) {
     return ctx->processorplugin->emulate &&
-           (ctx->worker.flow.kind == RD_WI_FLOW ||
-            !queue_is_empty(&ctx->worker.qjump) ||
-            !queue_is_empty(&ctx->worker.qcall));
+           (ctx->engine.flow.kind == RD_WI_FLOW ||
+            !queue_is_empty(&ctx->engine.qjump) ||
+            !queue_is_empty(&ctx->engine.qcall));
 }
 
 u16 rd_i_engine_tick(RDContext* ctx) {
-    if(ctx->worker.flow.kind == RD_WI_FLOW) {
-        ctx->worker.current = ctx->worker.flow;
-        ctx->worker.flow.kind = RD_WI_NONE;
+    if(ctx->engine.flow.kind == RD_WI_FLOW) {
+        ctx->engine.current = ctx->engine.flow;
+        ctx->engine.flow.kind = RD_WI_NONE;
     }
-    else if(!queue_is_empty(&ctx->worker.qcall)) {
-        queue_pop(&ctx->worker.qcall, &ctx->worker.current);
+    else if(!queue_is_empty(&ctx->engine.qcall)) {
+        queue_pop(&ctx->engine.qcall, &ctx->engine.current);
     }
-    else if(!queue_is_empty(&ctx->worker.qjump)) {
-        queue_pop(&ctx->worker.qjump, &ctx->worker.current);
+    else if(!queue_is_empty(&ctx->engine.qjump)) {
+        queue_pop(&ctx->engine.qjump, &ctx->engine.current);
     }
     else
         return 0;
 
-    ctx->worker.segment = rd_i_find_segment(ctx, ctx->worker.current.address);
-    assert(ctx->worker.segment && "program counter without segment");
-    if(!(ctx->worker.segment->base.perm & RD_SP_X)) goto done;
+    ctx->engine.segment = rd_i_find_segment(ctx, ctx->engine.current.address);
+    assert(ctx->engine.segment && "program counter without segment");
+    if(!(ctx->engine.segment->base.perm & RD_SP_X)) goto done;
 
     usize idx =
-        rd_i_address2index(ctx->worker.segment, ctx->worker.current.address);
+        rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
 
     RDInstruction instr = {
-        .delay_slots = ctx->worker.dslot_info.n ? RD_IS_DSLOT : 0,
+        .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
     };
 
-    if(rd_flagsbuffer_has_code(ctx->worker.segment->flags, idx)) {
+    if(rd_flagsbuffer_has_code(ctx->engine.segment->flags, idx)) {
         instr.length =
-            rd_i_flagsbuffer_get_range_length(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_get_range_length(ctx->engine.segment->flags, idx);
 
-        if(ctx->worker.current.kind == RD_WI_JUMP) {
+        if(ctx->engine.current.kind == RD_WI_JUMP) {
             // loops case: destination gets decoded before source
-            rd_i_flagsbuffer_set_jmpdst(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
         }
-        else if(ctx->worker.current.kind == RD_WI_CALL) {
+        else if(ctx->engine.current.kind == RD_WI_CALL) {
             // reclassified locations as function
-            rd_i_flagsbuffer_set_func(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_set_func(ctx->engine.segment->flags, idx);
         }
 
-        if(ctx->worker.current.name) {
-            rd_i_set_name(ctx, ctx->worker.current.address,
-                          ctx->worker.current.name,
-                          ctx->worker.current.confidence);
+        if(ctx->engine.current.name) {
+            rd_i_set_name(ctx, ctx->engine.current.address,
+                          ctx->engine.current.name,
+                          ctx->engine.current.confidence);
         }
 
         goto done;
     }
 
-    if(!rd_i_engine_decode(ctx, ctx->worker.current.address, &instr)) goto done;
+    if(!rd_i_engine_decode(ctx, ctx->engine.current.address, &instr)) goto done;
 
     if(instr.length) {
-        if(!rd_i_flagsbuffer_has_unknown_n(ctx->worker.segment->flags, idx,
+        if(!rd_i_flagsbuffer_has_unknown_n(ctx->engine.segment->flags, idx,
                                            instr.length)) {
-            rd_i_add_problem(ctx, ctx->worker.current.address,
-                             ctx->worker.current.address,
+            rd_i_add_problem(ctx, ctx->engine.current.address,
+                             ctx->engine.current.address,
                              "instruction overlaps existing item (length: %u)",
                              instr.length);
             instr.length = 0;
             goto done;
         }
 
-        if(!rd_i_flagsbuffer_set_code(ctx->worker.segment->flags, idx,
+        if(!rd_i_flagsbuffer_set_code(ctx->engine.segment->flags, idx,
                                       instr.length)) {
             rd_i_add_problem(
-                ctx, ctx->worker.current.address, ctx->worker.current.address,
+                ctx, ctx->engine.current.address, ctx->engine.current.address,
                 "failed to classify as code (length: %u)", instr.length);
             instr.length = 0;
             goto done;
@@ -159,24 +159,24 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         plugin->emulate(ctx, &instr, ctx->processor);
 
         if(instr.flow == RD_IF_JUMP || instr.flow == RD_IF_JUMP_COND)
-            rd_i_flagsbuffer_set_jump(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_set_jump(ctx->engine.segment->flags, idx);
         if(instr.flow == RD_IF_CALL || instr.flow == RD_IF_CALL_COND)
-            rd_i_flagsbuffer_set_call(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_set_call(ctx->engine.segment->flags, idx);
 
         if(instr.flow == RD_IF_JUMP_COND || instr.flow == RD_IF_CALL_COND)
-            rd_i_flagsbuffer_set_cond(ctx->worker.segment->flags, idx);
+            rd_i_flagsbuffer_set_cond(ctx->engine.segment->flags, idx);
 
-        if(ctx->worker.current.kind == RD_WI_FLOW)
-            rd_i_flagsbuffer_set_flow(ctx->worker.segment->flags, idx);
-        else if(ctx->worker.current.kind == RD_WI_CALL)
-            rd_i_flagsbuffer_set_func(ctx->worker.segment->flags, idx);
-        else if(ctx->worker.current.kind == RD_WI_JUMP)
-            rd_i_flagsbuffer_set_jmpdst(ctx->worker.segment->flags, idx);
+        if(ctx->engine.current.kind == RD_WI_FLOW)
+            rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
+        else if(ctx->engine.current.kind == RD_WI_CALL)
+            rd_i_flagsbuffer_set_func(ctx->engine.segment->flags, idx);
+        else if(ctx->engine.current.kind == RD_WI_JUMP)
+            rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
 
-        if(ctx->worker.current.name) {
-            rd_i_set_name(ctx, ctx->worker.current.address,
-                          ctx->worker.current.name,
-                          ctx->worker.current.confidence);
+        if(ctx->engine.current.name) {
+            rd_i_set_name(ctx, ctx->engine.current.address,
+                          ctx->engine.current.name,
+                          ctx->engine.current.confidence);
         }
 
         if(instr.delay_slots && !rd_is_delay_slot(&instr))
@@ -184,18 +184,18 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     }
 
 done:
-    if(ctx->worker.current.name) free(ctx->worker.current.name);
+    if(ctx->engine.current.name) rd_free(ctx->engine.current.name);
     return instr.length;
 }
 
 void rd_flow(RDContext* ctx, RDAddress address) {
-    const RDSegmentFull* seg = ctx->worker.segment;
+    const RDSegmentFull* seg = ctx->engine.segment;
 
     // avoid inter-segment flow
     if(address < seg->base.start_address || address >= seg->base.end_address)
         return;
 
-    ctx->worker.flow = (RDWorkerItem){
+    ctx->engine.flow = (RDWorkerItem){
         .kind = RD_WI_FLOW,
         .address = address,
     };
@@ -224,4 +224,15 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
 
     *instr = (RDInstruction){0};
     return rd_i_engine_decode(ctx, rd_i_index2address(seg, idx), instr);
+}
+
+void rd_i_engine_destroy(RDContext* ctx) {
+    while(!queue_is_empty(&ctx->engine.qcall)) {
+        RDWorkerItem item;
+        queue_pop(&ctx->engine.qcall, &item);
+        rd_free(item.name);
+    }
+
+    queue_destroy(&ctx->engine.qcall);
+    queue_destroy(&ctx->engine.qjump);
 }

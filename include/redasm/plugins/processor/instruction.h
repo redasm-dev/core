@@ -2,7 +2,7 @@
 
 #include <redasm/config.h>
 
-#define RD_NOPERANDS 8
+#define RD_MAX_OPERANDS 8
 #define RD_NMNEMONIC 32
 #define RD_IS_DSLOT 0xFF
 
@@ -85,7 +85,7 @@ typedef struct RDInstruction {
     u16 length;
     u8 flow;
     u8 delay_slots;
-    RDOperand operands[RD_NOPERANDS];
+    RDOperand operands[RD_MAX_OPERANDS];
 
     union {
         void* userdata1;
@@ -147,6 +147,6 @@ static inline bool rd_is_cond(const RDInstruction* instr) {
     for(int _rd_foreach_op_arg(i) = 0, _break_ = 1; _break_;                   \
         _break_ = !_break_)                                                    \
         for(const RDOperand* _rd_foreach_op_arg(op) = (instr)->operands;       \
-            ((op) < (instr)->operands + RD_NOPERANDS) &&                       \
+            ((op) < (instr)->operands + RD_MAX_OPERANDS) &&                       \
             ((op)->kind != RD_OP_NULL);                                        \
             (op)++, (i)++)

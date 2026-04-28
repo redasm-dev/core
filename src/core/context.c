@@ -2,6 +2,7 @@
 #include "core/engine.h"
 #include "core/mapping.h"
 #include "core/segment.h"
+#include "core/stringfinder.h"
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
 #include "io/reader.h"
@@ -42,13 +43,14 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
     self->input = input;
     self->input_reader = rd_i_reader_create((RDBuffer*)input);
     self->reader = rd_i_reader_create_flags(self);
+    self->min_string = RD_MIN_STRING_LENGTH;
 
     rd_i_listing_init(&self->listing, NULL);
     rd_i_register_primitives(self);
     rd_i_db_init(self);
 
-    queue_reserve(&self->worker.qcall, RD_WORKER_QUEUE_SIZE);
-    queue_reserve(&self->worker.qjump, RD_WORKER_QUEUE_SIZE);
+    queue_reserve(&self->engine.qcall, RD_WORKER_QUEUE_SIZE);
+    queue_reserve(&self->engine.qjump, RD_WORKER_QUEUE_SIZE);
     return self;
 }
 
@@ -411,7 +413,7 @@ bool rd_undefine(RDContext* ctx, RDAddress address) {
 }
 
 RDDelaySlotInfo rd_get_delay_slot_info(const RDContext* self) {
-    return self->worker.dslot_info;
+    return self->engine.dslot_info;
 }
 
 bool rd_auto_function(RDContext* self, RDAddress address, const char* name) {
@@ -507,10 +509,9 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->xrefs_from);
     vect_destroy(&self->xrefs_from_type);
     vect_destroy(&self->mappings);
-    queue_destroy(&self->worker.qcall);
-    queue_destroy(&self->worker.qjump);
     rd_i_il_deinit(&self->il_buf);
     rd_i_listing_deinit(&self->listing);
+    rd_i_engine_destroy(self);
 
     RDSegmentFull** s;
     vect_each(s, &self->segments) {
@@ -525,12 +526,12 @@ void rd_destroy(RDContext* self) {
     vect_each(def, &self->types) rd_i_typedef_destroy(*def);
     vect_destroy(&self->types);
 
-    assert(self->processorplugin && "invalid processor plugin");
-    assert(self->loaderplugin && "invalid loader plugin");
-
     RDAnalyzerItem** ai;
     vect_each(ai, &self->analyzerplugins) free(*ai);
     vect_destroy(&self->analyzerplugins);
+
+    assert(self->processorplugin && "invalid processor plugin");
+    assert(self->loaderplugin && "invalid loader plugin");
 
     if(self->processorplugin->destroy)
         self->processorplugin->destroy(self->processor);
@@ -1033,4 +1034,16 @@ RDXRefSlice rd_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
                                  usize type) {
     const RDXRefVect* refs = rd_i_get_xrefs_to_type(self, toaddr, type);
     return vect_to_slice(RDXRefSlice, refs);
+}
+
+RDLoadAddressing rd_get_load_addressing(const RDContext* self) {
+    return self->addressing;
+}
+
+unsigned int rd_get_min_string(const RDContext* self) {
+    return self->min_string;
+}
+
+void rd_set_min_string(RDContext* self, unsigned int l) {
+    self->min_string = l;
 }

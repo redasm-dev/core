@@ -10,8 +10,8 @@
 typedef struct RDProcessor RDProcessor;
 
 typedef enum {
-    RD_PROCESSOR_LE = 0,
-    RD_PROCESSOR_BE = (1 << 0),
+    RD_PF_LE = 0,
+    RD_PF_BE = (1 << 0),
 } RDProcessorFlags;
 
 // clang-format off

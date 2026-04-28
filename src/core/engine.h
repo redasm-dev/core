@@ -10,3 +10,4 @@ bool rd_i_engine_has_pending_code(const RDContext* ctx);
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
                         RDInstruction* instr);
 u16 rd_i_engine_tick(RDContext* ctx);
+void rd_i_engine_destroy(RDContext* ctx);

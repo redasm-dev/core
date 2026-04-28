@@ -8,7 +8,7 @@
     const char* id;                                                            \
     const char* name
 
-#define PF_LAST (1u << 31)
+#define RD_PF_LAST (1u << 31)
 
 typedef struct RDLoaderPlugin RDLoaderPlugin;
 typedef struct RDProcessorPlugin RDProcessorPlugin;

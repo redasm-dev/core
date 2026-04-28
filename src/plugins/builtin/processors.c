@@ -19,7 +19,7 @@ static void _null_emulate(RDContext* ctx, const RDInstruction* instr,
 static const RDProcessorPlugin BUILTIN_NULL = {
     .level = RD_API_LEVEL,
     .id = RD_NULL_PROCESSOR_ID,
-    .flags = PF_LAST,
+    .flags = RD_PF_LAST,
     .name = "Null",
     .int_size = sizeof(intmax_t),
     .ptr_size = sizeof(ptrdiff_t),

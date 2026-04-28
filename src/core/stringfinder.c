@@ -5,7 +5,6 @@
 #include <string.h>
 
 #define RD_STRING_BASE_CAPACITY 1024
-#define RD_MIN_STRING_LENGTH 4
 #define RD_MAX_CHARS 256
 
 static char const RD_VALID_CHARS[] = "\t\n\r !\"#$%&'()*+,-./"
@@ -49,7 +48,7 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
                                      usize idx, const RDCharVect* str) {
     usize len = vect_length(str) - 1;
 
-    if(len < RD_MIN_STRING_LENGTH) return;
+    if(len < ctx->min_string) return;
     if(*str->data == '%' && !_rd_strings_check_format(str->data, len)) return;
 
     RDAddress addr = rd_i_index2address(seg, idx);

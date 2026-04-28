@@ -417,7 +417,10 @@ void rd_renderer_nop(RDRenderer* self, const char* s) {
 void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
                      RDNumberFlags flags) {
     RDName n;
-    bool hasname = rd_i_get_name(self->context, address, true, &n);
+    bool hasname = false;
+
+    if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES))
+        hasname = rd_i_get_name(self->context, address, true, &n);
 
     if(hasname)
         rd_renderer_text(self, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);

@@ -25,7 +25,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     const RDProcessorPlugin* p = ctx->processorplugin;
     assert(p && "invalid processor plugin");
 
-    bool is_be = ctx->processorplugin->flags & RD_PROCESSOR_BE;
+    bool is_be = ctx->processorplugin->flags & RD_PF_BE;
     usize idx = rd_i_address2index(seg, address);
 
     // pointer

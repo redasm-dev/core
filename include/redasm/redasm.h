@@ -25,9 +25,20 @@ typedef struct RDContextSlice {
     usize length;
 } RDContextSlice;
 
+typedef struct RDDecodedInstruction {
+    RDInstruction instr;
+    const char* instr_text;
+    const char* mnemonic;
+} RDDecodedInstruction;
+
 RD_API void rd_init(void);
 RD_API void rd_deinit(void);
 RD_API RDContextSlice rd_test(const char* filepath);
 RD_API bool rd_module_load(const char* filepath);
-RD_API bool rd_accept(const RDContext* ctx, const RDProcessorPlugin* p);
+RD_API bool rd_accept(const RDContext* ctx, const RDProcessorPlugin* p,
+                      const RDLoadAddressing* la);
 RD_API void rd_reject(void);
+RD_API const char* rd_dump_instruction(const RDInstruction* instr);
+RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
+                            const RDProcessorPlugin* p,
+                            RDDecodedInstruction* dec);

@@ -8,6 +8,7 @@
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader.h>
+#include <redasm/plugins/processor/instruction.h>
 #include <redasm/plugins/processor/processor.h>
 #include <string.h>
 
@@ -53,6 +54,9 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.loaders);
     vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
+    vect_destroy(&rd_i_state.instr_text_buf);
+    vect_destroy(&rd_i_state.instr_dump_buf);
+    vect_destroy(&rd_i_state.mnem_buf);
     _rd_i_state_unload_modules();
 }
 
@@ -150,4 +154,81 @@ RDPluginSlice rd_get_all_command_plugins(void) {
         .data = (const RDPlugin**)rd_i_state.commands.data,
         .length = rd_i_state.commands.length,
     };
+}
+
+const char* rd_dump_instruction(const RDInstruction* instr) {
+    RDCharVect* d = &rd_i_state.instr_dump_buf;
+    str_clear(d);
+    if(!instr) return d->data;
+
+    RDCharVect buf = {0};
+    str_append(d, rd_i_format(&buf, "Address: %x\n", instr->address));
+    str_append(d, rd_i_format(&buf, "Id: %x\n", instr->id));
+    str_append(d, "Flow: ");
+
+    switch(instr->flow) {
+        case RD_IF_JUMP: str_append(d, "IF_JUMP"); break;
+        case RD_IF_JUMP_COND: str_append(d, "IF_JUMP_COND"); break;
+        case RD_IF_CALL: str_append(d, "IF_CALL"); break;
+        case RD_IF_CALL_COND: str_append(d, "IF_CALL_COND"); break;
+        case RD_IF_STOP: str_append(d, "IF_STOP"); break;
+        case RD_IF_NOP: str_append(d, "IF_NOP"); break;
+        default: str_append(d, "IF_NONE"); break;
+    }
+
+    if(rd_is_delay_slot(instr)) str_append(d, " | IS_DSLOT");
+    str_push(d, '\n');
+
+    int c = 0;
+    while(c < RD_MAX_OPERANDS && instr->operands[c].kind != RD_OP_NULL)
+        c++;
+
+    str_append(d, rd_i_format(&buf, "N. Operands: %x\n", c));
+
+    rd_foreach_operand(i, op, instr) {
+        str_append(d, rd_i_format(&buf, "  [%d].kind: ", i));
+
+        if(op->kind == RD_OP_REG) {
+            str_append(d, "OP_REG\n");
+            str_append(d, rd_i_format(&buf, "  [%d].reg: %x\n", i, op->reg));
+        }
+        else if(op->kind == RD_OP_IMM) {
+            str_append(d, "OP_IMM\n");
+            str_append(d, rd_i_format(&buf, "  [%d].imm: %x\n", i, op->imm));
+        }
+        else if(op->kind == RD_OP_ADDR) {
+            str_append(d, "OP_ADDR\n");
+            str_append(d, rd_i_format(&buf, "  [%d].addr: %x\n", i, op->addr));
+        }
+        else if(op->kind == RD_OP_MEM) {
+            str_append(d, "OP_MEM\n");
+            str_append(d, rd_i_format(&buf, "  [%d].mem: %x\n", i, op->mem));
+        }
+        else if(op->kind == RD_OP_PHRASE) {
+            str_append(d, "OP_PHRASE\n");
+            str_append(
+                d, rd_i_format(&buf, "  [%d].base: %x\n", i, op->phrase.base));
+            str_append(d, rd_i_format(&buf, "  [%d].index: %x\n", i,
+                                      op->phrase.index));
+        }
+        else if(op->kind == RD_OP_DISPL) {
+            str_append(d, "OP_DISPL\n");
+            str_append(
+                d, rd_i_format(&buf, "  [%d].base: %x\n", i, op->displ.base));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].index: %x\n", i, op->displ.index));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].displ: %x\n", i, op->displ.displ));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].scale: %x\n", i, op->displ.scale));
+        }
+        else {
+            str_append(d, rd_i_format(&buf, "%d", op->kind));
+            if(op->kind >= RD_OP_USERBASE) str_append(d, " (USER)");
+            str_push(d, '\n');
+        }
+    }
+
+    vect_destroy(&buf);
+    return d->data;
 }
