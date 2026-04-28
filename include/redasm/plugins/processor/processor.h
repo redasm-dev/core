@@ -25,9 +25,9 @@ typedef struct RDProcessorPlugin {
     RDProcessor* (*create)(const struct RDProcessorPlugin*);
     void (*destroy)(RDProcessor*);
 
-    void (*decode)(RDContext*, RDInstruction*, RDProcessor*);
+    void (*decode)(const RDContext*, RDInstruction*, RDProcessor*);
     void (*emulate)(RDContext*, const RDInstruction*, RDProcessor*);
-    void (*lift)(RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
+    void (*lift)(const RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
     const char* (*get_register)(int, RDProcessor*);

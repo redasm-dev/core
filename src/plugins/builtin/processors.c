@@ -2,7 +2,8 @@
 #include "plugins/builtin/builtin.h"
 #include <redasm/redasm.h>
 
-static void _null_decode(RDContext* ctx, RDInstruction* instr, RDProcessor* p) {
+static void _null_decode(const RDContext* ctx, RDInstruction* instr,
+                         RDProcessor* p) {
     RD_UNUSED(ctx);
     RD_UNUSED(instr);
     RD_UNUSED(p);
