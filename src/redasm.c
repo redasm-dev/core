@@ -116,9 +116,15 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
             continue;
         }
 
-        if(la) ctx->addressing = *la;
-        ctx->processorplugin = p;
-        panic_if(!ctx->processorplugin, "processor plugin not set");
+        if(la) ctx->addressing = *la;   // change only if set
+        if(p) ctx->processorplugin = p; // change only if set
+
+        if(!ctx->processorplugin) {
+            LOG_FAIL("processor plugin not set for loader '%s'",
+                     ctx->loaderplugin->id);
+            rd_destroy(ctx);
+            continue;
+        }
 
         if(ctx->processorplugin->create)
             ctx->processor = ctx->processorplugin->create(ctx->processorplugin);

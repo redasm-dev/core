@@ -530,13 +530,11 @@ void rd_destroy(RDContext* self) {
     vect_each(ai, &self->analyzerplugins) free(*ai);
     vect_destroy(&self->analyzerplugins);
 
-    assert(self->processorplugin && "invalid processor plugin");
-    assert(self->loaderplugin && "invalid loader plugin");
-
-    if(self->processorplugin->destroy)
+    if(self->processorplugin && self->processorplugin->destroy)
         self->processorplugin->destroy(self->processor);
 
-    if(self->loaderplugin->destroy) self->loaderplugin->destroy(self->loader);
+    if(self->loaderplugin && self->loaderplugin->destroy)
+        self->loaderplugin->destroy(self->loader);
 
     rd_i_reader_destroy(self->input_reader);
     rd_i_reader_destroy(self->reader);
