@@ -28,7 +28,7 @@ bool rd_i_processor_resolve(RDContext* ctx) {
             return false;
         }
 
-        // cycle detection 1: check agains root
+        // cycle detection 1: check if root is mentioned again
         if(p == ctx->processor.plugin) {
             LOG_FAIL("cycle detected in processor chain '%s'", p->id);
             return false;
