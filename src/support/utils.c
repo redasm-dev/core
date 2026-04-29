@@ -86,6 +86,16 @@ char* rd_strdup(const char* s) {
     return memcpy(d, s, n);
 }
 
+int rd_stricmp(const char* a, const char* b) {
+    while(*a && *b) {
+        int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
+        if(d) return d;
+        a++;
+        b++;
+    }
+    return tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+
 void rd_free(void* p) { free(p); }
 
 const char* rd_i_get_file_name(const char* filepath) {
