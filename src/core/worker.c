@@ -144,8 +144,11 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
             continue;
 
         ai->n_runs++;
+        rd_reader_seek(ctx->input_reader, 0);
         ai->plugin->execute(ctx);
     }
+
+    rd_reader_seek(ctx->input_reader, 0);
 
     if(ctx->engine.step == RD_WS_ANALYZE2) _rd_worker_scan_prologues(ctx);
 

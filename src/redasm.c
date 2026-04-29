@@ -128,8 +128,12 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
         if(ctx->processorplugin->create)
             ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
 
-        if(ctx->loaderplugin->load &&
-           ctx->loaderplugin->load(ctx->loader, ctx)) {
+        rd_reader_seek(ctx->input_reader, 0);
+
+        bool load_ok = ctx->loaderplugin->load &&
+                       ctx->loaderplugin->load(ctx->loader, ctx);
+
+        if(load_ok) {
             RDPlugin** it;
             vect_each(it, &rd_i_state.analyzers) {
                 const RDAnalyzerPlugin* p = (*it)->analyzer;
@@ -149,6 +153,8 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
 
             accepted = true;
         }
+
+        rd_reader_seek(ctx->input_reader, 0);
     }
 
     vect_clear(&rd_i_state.tests);
