@@ -78,6 +78,7 @@ bool rd_reader_read(RDReader* self, void* v, usize n) {
         return true;
     }
 
+    self->error = true;
     return false;
 }
 
