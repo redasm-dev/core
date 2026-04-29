@@ -34,9 +34,10 @@ target_sources(${PROJECT_NAME}
         src/plugins/builtin/analyzers.c
         src/plugins/builtin/loaders.c
         src/plugins/builtin/processors.c
+        src/plugins/processor/instruction.c
+        src/plugins/processor/processor.c
         src/plugins/command.c
         src/plugins/module.c
-        src/plugins/processor.c
         src/rdil/rdil.c
         src/support/byteorder.c
         src/support/containers.c

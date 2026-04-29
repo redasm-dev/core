@@ -1,7 +1,7 @@
 #include "engine.h"
 #include "core/context.h"
 #include "io/flagsbuffer.h"
-#include "plugins/processor.h"
+#include "plugins/processor/processor.h"
 #include "support/containers.h"
 
 static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,

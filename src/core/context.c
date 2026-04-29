@@ -6,7 +6,6 @@
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
 #include "io/reader.h"
-#include "plugins/processor.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"

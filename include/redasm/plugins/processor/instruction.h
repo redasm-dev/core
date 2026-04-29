@@ -1,5 +1,6 @@
 #pragma once
 
+#include <redasm/common.h>
 #include <redasm/config.h>
 
 #define RD_MAX_OPERANDS 8
@@ -99,6 +100,10 @@ typedef struct RDInstruction {
     };
 } RDInstruction;
 
+RD_API bool rd_instruction_equals(const RDContext* ctx,
+                                  const RDInstruction* instr,
+                                  const char* mnemonic);
+
 static inline bool rd_is_delay_slot(const RDInstruction* instr) {
     return instr->delay_slots == RD_IS_DSLOT;
 }
@@ -147,6 +152,6 @@ static inline bool rd_is_cond(const RDInstruction* instr) {
     for(int _rd_foreach_op_arg(i) = 0, _break_ = 1; _break_;                   \
         _break_ = !_break_)                                                    \
         for(const RDOperand* _rd_foreach_op_arg(op) = (instr)->operands;       \
-            ((op) < (instr)->operands + RD_MAX_OPERANDS) &&                       \
+            ((op) < (instr)->operands + RD_MAX_OPERANDS) &&                    \
             ((op)->kind != RD_OP_NULL);                                        \
             (op)++, (i)++)

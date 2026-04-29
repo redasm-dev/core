@@ -128,6 +128,11 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
                        ctx->loaderplugin->load(ctx->loader, ctx);
 
         if(load_ok) {
+            rd_i_processor_resolve(ctx);
+
+            LOG_INFO("selected loader '%s' and processor '%s'",
+                     ctx->loaderplugin->id, ctx->processor.plugin->id);
+
             RDPlugin** it;
             vect_each(it, &rd_i_state.analyzers) {
                 const RDAnalyzerPlugin* p = (*it)->analyzer;

@@ -4,7 +4,7 @@
 #include "core/segment.h"
 #include "io/buffer.h"
 #include "listing/listing.h"
-#include "plugins/processor.h"
+#include "plugins/processor/processor.h"
 #include "rdil/rdil.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
