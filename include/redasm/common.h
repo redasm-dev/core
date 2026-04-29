@@ -1,8 +1,9 @@
 #pragma once
 
-#define RD_UNUSED(x) (void)(x)
-
 typedef struct RDContext RDContext;
+
+#define RD_UNUSED(x) (void)(x)
+#define rd_count_of(x) (sizeof(x) / sizeof(*(x)))
 
 #define rd_slice_at(slice, n)                                                  \
     (assert((usize)(n) < (slice).length &&                                     \
