@@ -4,7 +4,6 @@
 #include "io/reader.h"
 #include "plugins/builtin/builtin.h"
 #include "support/containers.h"
-#include "support/error.h"
 #include "support/logging.h"
 #include "support/utils.h"
 #include "surface/renderer.h"
