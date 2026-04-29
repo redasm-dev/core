@@ -282,7 +282,7 @@ bool rd_fire_render_mnemonic_hook(RDContext* ctx, const char* name,
         return true;
     }
 
-    return true;
+    return false;
 }
 
 bool rd_fire_render_operand_hook(RDContext* ctx, const char* name,
@@ -303,5 +303,5 @@ bool rd_fire_render_operand_hook(RDContext* ctx, const char* name,
         return true;
     }
 
-    return true;
+    return false;
 }
