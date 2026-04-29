@@ -37,7 +37,6 @@ typedef struct RDRenderer {
     RDCharVect text_buf;
     RDXRefVect xrefs;
     char* hl_word;
-    bool has_prev_mnem;
 } RDRenderer;
 
 static inline bool rd_i_renderer_has_flag(RDRenderer* self, usize f) {

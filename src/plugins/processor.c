@@ -69,6 +69,18 @@ const char* rd_processor_get_name(const RDContext* ctx) {
     return ctx->processor.plugin->name;
 }
 
+const char* rd_processor_get_operand_sep(const RDContext* ctx) {
+    if(ctx->processor.plugin->operand_sep)
+        return ctx->processor.plugin->operand_sep;
+
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->operand_sep) return cp->plugin->operand_sep;
+    }
+
+    return ", ";
+}
+
 unsigned int rd_processor_get_code_ptr_size(const RDContext* ctx) {
     if(ctx->processor.plugin->code_ptr_size)
         return ctx->processor.plugin->code_ptr_size;
@@ -147,67 +159,123 @@ bool rd_i_processor_has_render_function(const RDContext* ctx) {
     return false;
 }
 
-bool rd_i_processor_has_render_instruction(const RDContext* ctx) {
-    if(ctx->processor.plugin->render_instruction) return true;
-
-    RDContextProcessor* cp;
-    vect_each(cp, &ctx->processor_chain) {
-        if(cp->plugin->render_instruction) return true;
-    }
-
-    return false;
-}
-
 void rd_i_processor_decode(const RDContext* ctx, RDInstruction* instr) {
     if(ctx->processor.plugin->decode)
         ctx->processor.plugin->decode(ctx, instr, ctx->processor.instance);
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->decode) {
-                cp->plugin->decode(ctx, instr, cp->instance);
-                break;
-            }
-        }
-    }
+    else
+        rd_processor_parent_decode(ctx, instr);
 }
 
 void rd_i_processor_emulate(RDContext* ctx, const RDInstruction* instr) {
     if(ctx->processor.plugin->emulate)
         ctx->processor.plugin->emulate(ctx, instr, ctx->processor.instance);
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->emulate) {
-                cp->plugin->emulate(ctx, instr, cp->instance);
-                break;
-            }
-        }
-    }
+    else
+        rd_processor_parent_emulate(ctx, instr);
 }
 
 void rd_i_processor_lift(const RDContext* ctx, const RDInstruction* instr,
                          RDILInstruction* il) {
     if(ctx->processor.plugin->lift)
         ctx->processor.plugin->lift(ctx, instr, il, ctx->processor.instance);
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->lift) {
-                cp->plugin->lift(ctx, instr, il, cp->instance);
-                break;
-            }
-        }
-    }
+    else
+        rd_processor_parent_lift(ctx, instr, il);
 }
 
-const char* rd_i_processor_get_mnemonic(RDContext* ctx,
+const char* rd_i_processor_get_mnemonic(const RDContext* ctx,
                                         const RDInstruction* instr) {
     if(ctx->processor.plugin->get_mnemonic) {
         return ctx->processor.plugin->get_mnemonic(instr,
                                                    ctx->processor.instance);
     }
 
+    return rd_processor_parent_get_mnemonic(ctx, instr);
+}
+
+const char* rd_i_processor_get_register(RDContext* ctx, int r) {
+    if(ctx->processor.plugin->get_register)
+        return ctx->processor.plugin->get_register(r, ctx->processor.instance);
+
+    return rd_processor_parent_get_register(ctx, r);
+}
+
+const char** rd_i_processor_get_prologues(RDContext* ctx) {
+    if(ctx->processor.plugin->get_prologues) {
+        return ctx->processor.plugin->get_prologues(ctx->processor.instance,
+                                                    ctx);
+    }
+
+    return rd_processor_parent_get_prologues(ctx);
+}
+
+void rd_i_processor_render_segment(RDContext* ctx, RDRenderer* r,
+                                   const RDSegment* s) {
+    if(ctx->processor.plugin->render_segment)
+        ctx->processor.plugin->render_segment(r, s, ctx->processor.instance);
+    else
+        rd_processor_parent_render_segment(ctx, r, s);
+}
+
+void rd_i_processor_render_function(RDContext* ctx, RDRenderer* r,
+                                    const RDFunction* f) {
+    if(ctx->processor.plugin->render_function)
+        ctx->processor.plugin->render_function(r, f, ctx->processor.instance);
+    else
+        rd_processor_parent_render_function(ctx, r, f);
+}
+
+void rd_i_processor_render_mnemonic(RDContext* ctx, RDRenderer* r,
+                                    const RDInstruction* instr) {
+    if(ctx->processor.plugin->render_mnemonic) {
+        ctx->processor.plugin->render_mnemonic(r, instr,
+                                               ctx->processor.instance);
+    }
+    else
+        rd_processor_parent_render_mnemonic(ctx, r, instr);
+}
+
+void rd_i_processor_render_operand(RDContext* ctx, RDRenderer* r,
+                                   const RDInstruction* instr, usize idx) {
+    if(ctx->processor.plugin->render_operand) {
+        ctx->processor.plugin->render_operand(r, instr, idx,
+                                              ctx->processor.instance);
+    }
+    else
+        rd_processor_parent_render_operand(ctx, r, instr, idx);
+}
+
+void rd_processor_parent_decode(const RDContext* ctx, RDInstruction* instr) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->decode) {
+            cp->plugin->decode(ctx, instr, cp->instance);
+            break;
+        }
+    }
+}
+
+void rd_processor_parent_emulate(RDContext* ctx, const RDInstruction* instr) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->emulate) {
+            cp->plugin->emulate(ctx, instr, cp->instance);
+            break;
+        }
+    }
+}
+
+void rd_processor_parent_lift(const RDContext* ctx, const RDInstruction* instr,
+                              RDILInstruction* il) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->lift) {
+            cp->plugin->lift(ctx, instr, il, cp->instance);
+            break;
+        }
+    }
+}
+
+const char* rd_processor_parent_get_mnemonic(const RDContext* ctx,
+                                             const RDInstruction* instr) {
     RDContextProcessor* cp;
     vect_each(cp, &ctx->processor_chain) {
         if(cp->plugin->get_mnemonic)
@@ -217,10 +285,7 @@ const char* rd_i_processor_get_mnemonic(RDContext* ctx,
     return NULL;
 }
 
-const char* rd_i_processor_get_register(RDContext* ctx, int r) {
-    if(ctx->processor.plugin->get_register)
-        return ctx->processor.plugin->get_register(r, ctx->processor.instance);
-
+const char* rd_processor_parent_get_register(const RDContext* ctx, int r) {
     RDContextProcessor* cp;
     vect_each(cp, &ctx->processor_chain) {
         if(cp->plugin->get_register)
@@ -230,12 +295,7 @@ const char* rd_i_processor_get_register(RDContext* ctx, int r) {
     return NULL;
 }
 
-const char** rd_i_processor_get_prologues(RDContext* ctx) {
-    if(ctx->processor.plugin->get_prologues) {
-        return ctx->processor.plugin->get_prologues(ctx->processor.instance,
-                                                    ctx);
-    }
-
+const char** rd_processor_parent_get_prologues(const RDContext* ctx) {
     RDContextProcessor* cp;
     vect_each(cp, &ctx->processor_chain) {
         if(cp->plugin->get_prologues)
@@ -245,49 +305,47 @@ const char** rd_i_processor_get_prologues(RDContext* ctx) {
     return NULL;
 }
 
-void rd_i_processor_render_segment(RDContext* ctx, RDRenderer* r,
-                                   const RDSegment* s) {
-    if(ctx->processor.plugin->render_segment)
-        ctx->processor.plugin->render_segment(r, s, ctx->processor.instance);
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->render_segment) {
-                cp->plugin->render_segment(r, s, cp->instance);
-                break;
-            }
+void rd_processor_parent_render_segment(RDContext* ctx, RDRenderer* r,
+                                        const RDSegment* s) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->render_segment) {
+            cp->plugin->render_segment(r, s, cp->instance);
+            break;
         }
     }
 }
 
-void rd_i_processor_render_function(RDContext* ctx, RDRenderer* r,
-                                    const RDFunction* f) {
-    if(ctx->processor.plugin->render_function)
-        ctx->processor.plugin->render_function(r, f, ctx->processor.instance);
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->render_function) {
-                cp->plugin->render_function(r, f, cp->instance);
-                break;
-            }
+void rd_processor_parent_render_function(RDContext* ctx, RDRenderer* r,
+                                         const RDFunction* f) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->render_function) {
+            cp->plugin->render_function(r, f, cp->instance);
+            break;
         }
     }
 }
 
-void rd_i_processor_render_instruction(RDContext* ctx, RDRenderer* r,
-                                       const RDInstruction* instr) {
-    if(ctx->processor.plugin->render_instruction) {
-        ctx->processor.plugin->render_instruction(r, instr,
-                                                  ctx->processor.instance);
+void rd_processor_parent_render_mnemonic(RDContext* ctx, RDRenderer* r,
+                                         const RDInstruction* instr) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->render_mnemonic) {
+            cp->plugin->render_mnemonic(r, instr, cp->instance);
+            break;
+        }
     }
-    else {
-        RDContextProcessor* cp;
-        vect_each(cp, &ctx->processor_chain) {
-            if(cp->plugin->render_instruction) {
-                cp->plugin->render_instruction(r, instr, cp->instance);
-                break;
-            }
+}
+
+RD_API void rd_processor_parent_render_operand(RDContext* ctx, RDRenderer* r,
+                                               const RDInstruction* instr,
+                                               usize idx) {
+    RDContextProcessor* cp;
+    vect_each(cp, &ctx->processor_chain) {
+        if(cp->plugin->render_operand) {
+            cp->plugin->render_operand(r, instr, idx, cp->instance);
+            break;
         }
     }
 }

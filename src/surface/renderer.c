@@ -215,7 +215,6 @@ void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
 }
 
 void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
-    self->has_prev_mnem = false;
     _rd_renderer_calc_auto_column(self);
 
     vect_push(&self->rows_back, (RDCellVect){
@@ -247,11 +246,6 @@ void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
 void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                       RDThemeKind bg) {
     assert(s && "invalid chunk string");
-
-    if(self->has_prev_mnem) {
-        self->has_prev_mnem = false;
-        rd_renderer_ws(self, 1);
-    }
 
     RDCellVect* cells = vect_back(&self->rows_back);
 
@@ -341,8 +335,15 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
 void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item) {
     RDInstruction instr = {0};
 
-    if(rd_i_engine_decode(self->context, item->address, &instr))
-        rd_i_processor_render_instruction(self->context, self, &instr);
+    if(rd_i_engine_decode(self->context, item->address, &instr)) {
+        rd_i_processor_render_mnemonic(self->context, self, &instr);
+        rd_renderer_ws(self, 1);
+
+        rd_foreach_operand(i, op, &instr) {
+            if(i > 0) rd_renderer_norm(self, ", ");
+            rd_i_processor_render_operand(self->context, self, &instr, i);
+        }
+    }
     else
         rd_renderer_unkn(self);
 }
@@ -380,9 +381,7 @@ void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
                       RDThemeKind fg) {
     const char* mnem = rd_i_processor_get_mnemonic(self->context, instr);
     if(!mnem) mnem = rd_i_to_dec(instr->id);
-
     rd_renderer_text(self, mnem, fg, RD_THEME_BACKGROUND);
-    self->has_prev_mnem = true;
 }
 
 void rd_renderer_reg(RDRenderer* self, int reg) {

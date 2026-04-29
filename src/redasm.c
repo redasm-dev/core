@@ -263,25 +263,20 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
     ok = rd_decode(ctx, *addr, &dec->instr);
 
     if(ok) {
-        if(rd_i_processor_has_render_instruction(ctx)) {
-            RDRenderer* r =
-                rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
+        RDRenderer* r = rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
 
-            // manually craft an item
-            RDListingItem item = {
-                .kind = RD_LK_INSTRUCTION,
-                .address = *addr,
-                .segment = *vect_front(&ctx->segments),
-            };
+        // manually craft an item
+        RDListingItem item = {
+            .kind = RD_LK_INSTRUCTION,
+            .address = *addr,
+            .segment = *vect_front(&ctx->segments),
+        };
 
-            rd_i_renderer_new_row(r, &item);
-            rd_i_processor_render_instruction(ctx, r, &dec->instr);
-            rd_i_renderer_swap(r);
-            rd_i_renderer_write_text(r, &rd_i_state.instr_text_buf);
-            rd_i_renderer_destroy(r);
-        }
-        else
-            str_clear(&rd_i_state.instr_text_buf);
+        rd_i_renderer_new_row(r, &item);
+        rd_i_processor_render_mnemonic(ctx, r, &dec->instr);
+        rd_i_renderer_swap(r);
+        rd_i_renderer_write_text(r, &rd_i_state.instr_text_buf);
+        rd_i_renderer_destroy(r);
 
         dec->instr_text = rd_i_state.instr_text_buf.data;
 
