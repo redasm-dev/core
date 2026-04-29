@@ -4,6 +4,7 @@
 #include "core/segment.h"
 #include "io/buffer.h"
 #include "listing/listing.h"
+#include "plugins/processor.h"
 #include "rdil/rdil.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
@@ -39,7 +40,14 @@ typedef struct RDAnalyzerItem {
 
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
-    const RDProcessorPlugin* processorplugin;
+    RDLoader* loader;
+    RDContextProcessor processor;
+
+    struct {
+        RDContextProcessor* data;
+        usize length;
+        usize capacity;
+    } processor_chain;
 
     struct {
         RDAnalyzerItem** data;
@@ -64,9 +72,6 @@ typedef struct RDContext {
     RDByteBuffer* input;
     RDReader* input_reader;
     RDReader* reader;
-
-    RDLoader* loader;
-    RDProcessor* processor;
 
     unsigned int min_string;
     RDLoadAddressing addressing;

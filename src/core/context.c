@@ -6,6 +6,7 @@
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
 #include "io/reader.h"
+#include "plugins/processor.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"
@@ -167,16 +168,11 @@ const RDLoaderPlugin* rd_get_loader_plugin(const RDContext* self) {
     return self->loaderplugin;
 }
 
-const RDProcessorPlugin* rd_get_processor_plugin(const RDContext* self) {
-    return self->processorplugin;
-}
-
 RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self) {
     return vect_to_slice(RDAnalyzerItemSlice, &self->analyzerplugins);
 }
 
 RDLoader* rd_get_loader(const RDContext* self) { return self->loader; }
-RDProcessor* rd_get_processor(const RDContext* self) { return self->processor; }
 
 bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                     RDAddress endaddr, u32 perm) {
@@ -369,8 +365,8 @@ const char* rd_get_name(RDContext* self, RDAddress address) {
 }
 
 const char* rd_to_hex(const RDContext* self, usize v) {
-    assert(self->processorplugin && "invalid processor plugin");
-    return rd_i_to_hex((isize)v, self->processorplugin->ptr_size);
+    const unsigned int PTR_SIZE = rd_processor_get_ptr_size(self);
+    return rd_i_to_hex((isize)v, PTR_SIZE);
 }
 
 const char* rd_render_text(RDContext* self, RDAddress address) {
@@ -530,8 +526,11 @@ void rd_destroy(RDContext* self) {
     vect_each(ai, &self->analyzerplugins) free(*ai);
     vect_destroy(&self->analyzerplugins);
 
-    if(self->processorplugin && self->processorplugin->destroy)
-        self->processorplugin->destroy(self->processor);
+    RDContextProcessor* cp;
+    vect_each(cp, &self->processor_chain) rd_i_processor_destroy(cp);
+    vect_destroy(&self->processor_chain);
+
+    rd_i_processor_destroy(&self->processor);
 
     if(self->loaderplugin && self->loaderplugin->destroy)
         self->loaderplugin->destroy(self->loader);
@@ -836,8 +835,8 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
         rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
     }
 
-    const char* ptrtype =
-        rd_integral_from_size(self->processorplugin->ptr_size);
+    const unsigned int PTR_SIZE = rd_processor_get_ptr_size(self);
+    const char* ptrtype = rd_integral_from_size(PTR_SIZE);
 
     rd_i_set_type(self, address, ptrtype, 0, RD_TYPE_ISPOINTER,
                   RD_CONFIDENCE_AUTO);

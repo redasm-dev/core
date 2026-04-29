@@ -73,11 +73,8 @@ static void _rd_worker_promote_refs(RDContext* ctx) {
 }
 
 static void _rd_worker_scan_prologues(RDContext* ctx) {
-    if(!ctx->processorplugin->get_prologues) return;
-
-    const char** prologues =
-        ctx->processorplugin->get_prologues(ctx->processor, ctx);
-    if(!prologues || !(*prologues)) return;
+    const char** prologues = rd_i_processor_get_prologues(ctx);
+    if(!prologues) return;
 
     RDPattern pattern = {0};
 

@@ -17,6 +17,7 @@ typedef enum {
 // clang-format off
 typedef struct RDProcessorPlugin {
     RD_PLUGIN_HEADER;
+    const char* parent;
     void* userdata;
     unsigned int code_ptr_size;
     unsigned int ptr_size;
@@ -40,3 +41,9 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
+RD_API u32 rd_processor_get_flags(const RDContext* ctx);
+RD_API const char* rd_processor_get_id(const RDContext* ctx);
+RD_API const char* rd_processor_get_name(const RDContext* ctx);
+RD_API unsigned int rd_processor_get_code_ptr_size(const RDContext* ctx);
+RD_API unsigned int rd_processor_get_ptr_size(const RDContext* ctx);
+RD_API unsigned int rd_processor_get_int_size(const RDContext* ctx);

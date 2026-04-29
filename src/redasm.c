@@ -57,10 +57,10 @@ RDContextSlice rd_test(const char* filepath) {
     if(!rd_i_buffer_is_empty((RDBuffer*)input)) {
         RDPlugin** it;
         vect_each(it, &rd_i_state.loaders) {
-            const RDLoaderPlugin* p = (*it)->loader;
-            LOG_DEBUG("testing '%s' ...", p->name);
+            const RDLoaderPlugin* plugin = (*it)->loader;
+            LOG_DEBUG("testing '%s' ...", plugin->name);
 
-            RDLoader* ldr = p->create ? p->create(p) : NULL;
+            RDLoader* ldr = plugin->create ? plugin->create(plugin) : NULL;
 
             RDLoaderRequest req = {
                 .filepath = filepath,
@@ -69,24 +69,24 @@ RDContextSlice rd_test(const char* filepath) {
                 .ext = rd_i_get_file_ext(filepath),
             };
 
-            if(p->parse(ldr, &req)) {
-                RDContext* ctx = rd_i_context_create(p, ldr, filepath, input);
+            if(plugin->parse(ldr, &req)) {
+                RDContext* ctx =
+                    rd_i_context_create(plugin, ldr, filepath, input);
+                const RDProcessorPlugin* p = NULL;
 
-                if(p->get_processor) {
-                    const char* procid = p->get_processor(ldr, ctx);
-                    if(procid) ctx->processorplugin = rd_processor_find(procid);
+                if(plugin->get_processor) {
+                    const char* procid = plugin->get_processor(ldr, ctx);
+                    if(procid) p = rd_processor_find(procid);
                 }
 
-                if(!ctx->processorplugin) {
-                    ctx->processorplugin =
-                        rd_processor_find(RD_NULL_PROCESSOR_ID);
-                }
+                if(!p) p = rd_processor_find(RD_NULL_PROCESSOR_ID);
+                assert(p && "invalid processor plugin");
 
-                assert(ctx->processorplugin && "invalid processor plugin");
+                ctx->processor = rd_i_processor_create(p);
                 vect_push(&rd_i_state.tests, ctx);
             }
-            else if(p->destroy)
-                p->destroy(ldr);
+            else if(plugin->destroy)
+                plugin->destroy(ldr);
 
             rd_i_reader_destroy(req.input);
         }
@@ -115,18 +115,12 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
             continue;
         }
 
-        if(la) ctx->addressing = *la;   // change only if set
-        if(p) ctx->processorplugin = p; // change only if set
+        if(la) ctx->addressing = *la; // change only if set
 
-        if(!ctx->processorplugin) {
-            LOG_FAIL("processor plugin not set for loader '%s'",
-                     ctx->loaderplugin->id);
-            rd_destroy(ctx);
-            continue;
+        if(p) { // change only if set
+            rd_i_processor_destroy(&ctx->processor);
+            ctx->processor = rd_i_processor_create(p);
         }
-
-        if(ctx->processorplugin->create)
-            ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
 
         rd_reader_seek(ctx->input_reader, 0);
 
@@ -197,16 +191,6 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
 bool rd_register_processor(const RDProcessorPlugin* p) {
     if(!_rd_validate_plugin(p->level, p->id, p->name)) return false;
 
-    if(!p->decode) {
-        LOG_FAIL("processor '%s' does not have a decoder", p->id);
-        return false;
-    }
-
-    if(!p->emulate) {
-        LOG_FAIL("processor '%s' does not have an emulator", p->id);
-        return false;
-    }
-
     if(rd_processor_find(p->id)) {
         LOG_WARN("processor '%s' already registered", p->id);
         return false;
@@ -270,19 +254,16 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
 
     RDByteBuffer* input = rd_i_fromdata(*bytes, *n);
     RDContext* ctx = rd_i_context_create(ldr, NULL, NULL, input);
-    ctx->processorplugin = p;
+    ctx->processor = rd_i_processor_create(p);
     ctx->addressing = (RDLoadAddressing){.address = *addr};
 
     bool ok = ctx->loaderplugin->load(NULL, ctx);
     assert(ok && "binary loader failed to load");
 
-    if(ctx->processorplugin->create)
-        ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
-
     ok = rd_decode(ctx, *addr, &dec->instr);
 
     if(ok) {
-        if(ctx->processorplugin->render_instruction) {
+        if(rd_i_processor_has_render_instruction(ctx)) {
             RDRenderer* r =
                 rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
 
@@ -294,9 +275,7 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
             };
 
             rd_i_renderer_new_row(r, &item);
-            ctx->processorplugin->render_instruction(r, &dec->instr,
-                                                     ctx->processor);
-
+            rd_i_processor_render_instruction(ctx, r, &dec->instr);
             rd_i_renderer_swap(r);
             rd_i_renderer_write_text(r, &rd_i_state.instr_text_buf);
             rd_i_renderer_destroy(r);
@@ -306,13 +285,7 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
 
         dec->instr_text = rd_i_state.instr_text_buf.data;
 
-        const char* mnem = NULL;
-
-        if(ctx->processorplugin->get_mnemonic) {
-            mnem =
-                ctx->processorplugin->get_mnemonic(&dec->instr, ctx->processor);
-        }
-
+        const char* mnem = rd_i_processor_get_mnemonic(ctx, &dec->instr);
         str_clear(&rd_i_state.mnem_buf);
         if(mnem) str_append(&rd_i_state.mnem_buf, mnem);
 

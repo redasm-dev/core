@@ -20,21 +20,18 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     const RDSegmentFull* seg = rd_i_find_segment(r->context, address);
     panic_if(!seg, "_rd_surface_render_value: invalid segment");
 
-    RDContext* ctx = r->context;
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
-    const RDProcessorPlugin* p = ctx->processorplugin;
-    assert(p && "invalid processor plugin");
-
-    bool is_be = ctx->processorplugin->flags & RD_PF_BE;
+    const unsigned int PTR_SIZE = rd_processor_get_ptr_size(r->context);
+    bool is_be = rd_processor_get_flags(r->context) & RD_PF_BE;
     usize idx = rd_i_address2index(seg, address);
 
     // pointer
     if(t->flags & RD_TYPE_ISPOINTER) {
-        const char* ptrtype = rd_integral_from_size(p->ptr_size);
+        const char* ptrtype = rd_integral_from_size(PTR_SIZE);
         u64 v;
 
         if(rd_i_buffer_read_primitive(flags, idx, ptrtype, is_be, &v)) {
-            const unsigned int F = p->ptr_size * 2;
+            const unsigned int F = PTR_SIZE * 2;
             rd_renderer_loc(r, v, F, RD_NUM_DEFAULT);
         }
         else
@@ -126,7 +123,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     // numeric primitive
     u64 v;
     if(rd_i_buffer_read_primitive(flags, idx, t->name, is_be, &v)) {
-        usize sz = rd_i_size_of(ctx, t->name, 0, t->flags);
+        usize sz = rd_i_size_of(r->context, t->name, 0, t->flags);
         rd_renderer_cnst(r, v, 16, sz * 2, RD_NUM_DEFAULT);
     }
     else
@@ -242,19 +239,15 @@ static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
 static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return;
 
-    const RDContext* ctx = r->context;
-    const RDProcessorPlugin* p = ctx->processorplugin;
-    assert(p && "invalid processor plugin");
-
     const RDSegmentFull* seg = item->segment;
-
     rd_i_renderer_new_row(r, item);
 
-    if(p->render_segment) {
-        p->render_segment(r, (const RDSegment*)seg, ctx->processor);
+    if(rd_i_processor_has_render_segment(r->context)) {
+        rd_i_processor_render_segment(r->context, r, (const RDSegment*)seg);
     }
     else {
-        const unsigned int B = seg->base.unit ? seg->base.unit : p->int_size;
+        const unsigned int PROC_INT = rd_processor_get_int_size(r->context);
+        const unsigned int B = seg->base.unit ? seg->base.unit : PROC_INT;
         const unsigned int F = B * 2;
 
         rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
@@ -271,18 +264,14 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
 static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
 
-    RDContext* ctx = r->context;
-    const RDProcessorPlugin* p = ctx->processorplugin;
-    assert(p && "invalid processor plugin");
-
     rd_i_renderer_new_row(r, item);
 
-    if(p->render_function) {
-        p->render_function(r, item->func, ctx->processor);
+    if(rd_i_processor_has_render_function(r->context)) {
+        rd_i_processor_render_function(r->context, r, item->func);
     }
     else {
         RDName n;
-        bool hasname = rd_i_get_name(ctx, item->address, true, &n);
+        bool hasname = rd_i_get_name(r->context, item->address, true, &n);
         assert(hasname && "cannot get function name");
 
         _rd_render_modifiers(r, item, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
