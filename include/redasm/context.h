@@ -167,7 +167,7 @@ RD_API bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
 RD_API bool rd_map_input_n(RDContext* self, RDOffset off, RDAddress addr,
                            usize n);
 RD_API bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
-                        usize type);
+                        RDXRefType type);
 
 RD_API RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr);
 RD_API RDXRefSlice rd_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,

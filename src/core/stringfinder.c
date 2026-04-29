@@ -52,7 +52,8 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
     if(*str->data == '%' && !_rd_strings_check_format(str->data, len)) return;
 
     RDAddress addr = rd_i_index2address(seg, idx);
-    rd_auto_type(ctx, addr, "char", vect_length(str), RD_TYPE_NONE);
+    if(rd_auto_type(ctx, addr, "char", vect_length(str), RD_TYPE_NONE))
+        rd_fire_address_hook(ctx, "redasm.string_found", addr);
 }
 
 void rd_i_find_strings(RDContext* ctx) {

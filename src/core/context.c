@@ -495,7 +495,13 @@ bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
     // conflict checks
     if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
     if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
-    return rd_i_engine_enqueue_call(self, address, name, c);
+
+    if(rd_i_engine_enqueue_call(self, address, name, c)) {
+        rd_fire_address_hook(self, "redasm.function_found", address);
+        return true;
+    }
+
+    return false;
 }
 
 void rd_destroy(RDContext* self) {
@@ -956,7 +962,7 @@ void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
 }
 
 bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
-                 usize type) {
+                 RDXRefType type) {
     const RDSegmentFull* fromseg = rd_i_find_segment(self, fromaddr);
     const RDSegmentFull* toseg = rd_i_find_segment(self, toaddr);
     if(!fromseg || !toseg) return false;
@@ -1013,6 +1019,7 @@ bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
         default: return false;
     }
 
+    rd_fire_xref_hook(self, "redasm.xref_added", fromaddr, toaddr, type);
     return true;
 }
 
