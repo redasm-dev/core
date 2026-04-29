@@ -11,15 +11,16 @@ usize rd_size_of(const RDContext* ctx, const char* name, usize n) {
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeFlags flags) {
+    const RDProcessorPlugin* p = ctx->processorplugin;
     RDTypeDef* tdef = rd_i_typedef_find(ctx, name, true);
     usize sz;
 
     if(tdef->kind == RD_TKIND_FUNC) {
-        sz = rd_processor_get_code_ptr_size(ctx);
-        if(!sz) sz = rd_processor_get_ptr_size(ctx);
+        sz = p->code_ptr_size;
+        if(!sz) sz = p->ptr_size;
     }
     else if(flags & RD_TYPE_ISPOINTER) {
-        sz = rd_processor_get_ptr_size(ctx);
+        sz = p->ptr_size;
     }
     else {
         if(!tdef->size) rd_i_typedef_resolve_size(ctx, tdef);

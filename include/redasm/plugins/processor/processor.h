@@ -18,7 +18,6 @@ typedef enum {
 typedef struct RDProcessorPlugin {
     RD_PLUGIN_HEADER;
     void* userdata;
-    const char* parent;
     const char* operand_sep;
     unsigned int code_ptr_size;
     unsigned int ptr_size;
@@ -27,9 +26,9 @@ typedef struct RDProcessorPlugin {
     RDProcessor* (*create)(const struct RDProcessorPlugin*);
     void (*destroy)(RDProcessor*);
 
-    void (*decode)(const RDContext*, RDInstruction*, RDProcessor*);
+    void (*decode)(RDContext*, RDInstruction*, RDProcessor*);
     void (*emulate)(RDContext*, const RDInstruction*, RDProcessor*);
-    void (*lift)(const RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
+    void (*lift)(RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
     const char* (*get_register)(int, RDProcessor*);
@@ -43,33 +42,3 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
-RD_API u32 rd_processor_get_flags(const RDContext* ctx);
-RD_API const char* rd_processor_get_id(const RDContext* ctx);
-RD_API const char* rd_processor_get_name(const RDContext* ctx);
-RD_API const char* rd_processor_get_operand_sep(const RDContext* ctx);
-RD_API unsigned int rd_processor_get_code_ptr_size(const RDContext* ctx);
-RD_API unsigned int rd_processor_get_ptr_size(const RDContext* ctx);
-RD_API unsigned int rd_processor_get_int_size(const RDContext* ctx);
-
-RD_API void rd_processor_parent_decode(const RDContext* ctx,
-                                       RDInstruction* instr);
-RD_API void rd_processor_parent_emulate(RDContext* ctx,
-                                        const RDInstruction* instr);
-RD_API void rd_processor_parent_lift(const RDContext* ctx,
-                                     const RDInstruction* instr,
-                                     RDILInstruction* il);
-RD_API const char* rd_processor_parent_get_operand_sep(const RDContext* ctx);
-RD_API const char* rd_processor_parent_get_mnemonic(const RDContext* ctx,
-                                                    const RDInstruction* instr);
-RD_API const char* rd_processor_parent_get_register(const RDContext* ctx,
-                                                    int r);
-RD_API const char** rd_processor_parent_get_prologues(const RDContext* ctx);
-RD_API void rd_processor_parent_render_segment(RDContext* ctx, RDRenderer* r,
-                                               const RDSegment* s);
-RD_API void rd_processor_parent_render_function(RDContext* ctx, RDRenderer* r,
-                                                const RDFunction* f);
-RD_API void rd_processor_parent_render_mnemonic(RDContext* ctx, RDRenderer* r,
-                                                const RDInstruction* instr);
-RD_API void rd_processor_parent_render_operand(RDContext* ctx, RDRenderer* r,
-                                               const RDInstruction* instr,
-                                               usize idx);

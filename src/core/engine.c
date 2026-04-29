@@ -1,7 +1,6 @@
 #include "engine.h"
 #include "core/context.h"
 #include "io/flagsbuffer.h"
-#include "plugins/processor/processor.h"
 #include "support/containers.h"
 
 static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,
@@ -46,7 +45,7 @@ static void _rd_engine_execute_delay_slots(RDContext* ctx,
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
                         RDInstruction* instr) {
     instr->address = address;
-    rd_i_processor_decode(ctx, instr);
+    ctx->processorplugin->decode(ctx, instr, ctx->processor);
     return instr->length > 0;
 }
 
@@ -79,8 +78,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress addr, const char* name,
 }
 
 bool rd_i_engine_has_pending_code(const RDContext* ctx) {
-    return rd_i_processor_has_emulate(ctx) &&
-           (ctx->engine.flow.kind == RD_WI_FLOW ||
+    return (ctx->engine.flow.kind == RD_WI_FLOW ||
             !queue_is_empty(&ctx->engine.qjump) ||
             !queue_is_empty(&ctx->engine.qcall));
 }
@@ -154,7 +152,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
             goto done;
         }
 
-        rd_i_processor_emulate(ctx, &instr);
+        ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
 
         if(instr.flow == RD_IF_JUMP || instr.flow == RD_IF_JUMP_COND)
             rd_i_flagsbuffer_set_jump(ctx->engine.segment->flags, idx);

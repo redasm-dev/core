@@ -4,6 +4,7 @@
 #include <redasm/function.h>
 #include <redasm/graph/graph.h>
 #include <redasm/graph/layout.h>
+#include <redasm/hooks.h>
 #include <redasm/mapping.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>

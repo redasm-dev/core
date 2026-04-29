@@ -16,40 +16,6 @@ void _vect_reserve(void** data, size_t* currcap, size_t newcap, size_t itemsz) {
     *data = realloc(*data, itemsz * newcap);
 }
 
-size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
-                         VectPredicate pred) {
-    if(!len) return 0;
-
-    char* tmp_data = (char*)malloc(len * itemsz);
-    char* in_data = (char*)data;
-    size_t i = 0;
-
-    // Copy matching elements first
-    for(size_t j = 0; j < len; ++j) {
-        char* elem = in_data + (j * itemsz);
-        if(pred(elem)) {
-            memcpy(tmp_data + (i * itemsz), elem, itemsz);
-            i++;
-        }
-    }
-
-    size_t split = i;
-
-    // Then copy non-matching
-    for(size_t j = 0; j < len; ++j) {
-        void* elem = in_data + (j * itemsz);
-        if(!pred(elem)) {
-            memcpy(tmp_data + (i * itemsz), elem, itemsz);
-            i++;
-        }
-    }
-
-    // Copy back to original data
-    memcpy(in_data, tmp_data, len * itemsz);
-    free(tmp_data);
-    return split;
-}
-
 void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
                  size_t itemsz) {
     if(*head + len < *cap) return;
@@ -100,4 +66,70 @@ void _str_push(char** data, size_t* cap, size_t* len, char c) {
 
     (*data)[(*len)++] = c;
     (*data)[*len] = '\0';
+}
+
+size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
+                         VectPredicate pred) {
+    if(!len) return 0;
+
+    char* tmp_data = (char*)malloc(len * itemsz);
+    char* in_data = (char*)data;
+    size_t i = 0;
+
+    // Copy matching elements first
+    for(size_t j = 0; j < len; ++j) {
+        char* elem = in_data + (j * itemsz);
+        if(pred(elem)) {
+            memcpy(tmp_data + (i * itemsz), elem, itemsz);
+            i++;
+        }
+    }
+
+    size_t split = i;
+
+    // Then copy non-matching
+    for(size_t j = 0; j < len; ++j) {
+        void* elem = in_data + (j * itemsz);
+        if(!pred(elem)) {
+            memcpy(tmp_data + (i * itemsz), elem, itemsz);
+            i++;
+        }
+    }
+
+    // Copy back to original data
+    memcpy(in_data, tmp_data, len * itemsz);
+    free(tmp_data);
+    return split;
+}
+
+size_t _vect_lower_bound(const void* key, void* data, size_t len, size_t itemsz,
+                         VectCompare cb) {
+    size_t lo = 0, hi = len;
+
+    while(lo < hi) {
+        size_t mid = lo + ((hi - lo) / 2);
+        void* elem = (char*)data + (mid * itemsz);
+        if(cb(key, elem) > 0)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+
+    return lo; // == len if all elements are less than key
+}
+
+size_t _vect_upper_bound(const void* key, void* data, size_t len, size_t itemsz,
+                         VectCompare cb) {
+    size_t lo = 0, hi = len;
+
+    while(lo < hi) {
+        size_t mid = lo + ((hi - lo) / 2);
+        void* elem = (char*)data + (mid * itemsz);
+        if(cb(key, elem) >= 0)
+            lo = mid + 1;
+        else
+            hi = mid;
+    }
+
+    return lo; // == len if all elements are <= key
 }

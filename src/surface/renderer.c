@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "core/context.h"
 #include "core/engine.h"
+#include "plugins/processor/processor.h"
 #include "rdil/rdil.h"
 #include "support/containers.h"
 #include "support/utils.h"
@@ -228,12 +229,12 @@ void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
         rd_renderer_norm(self, item->segment->base.name);
         rd_renderer_norm(self, ":");
 
-        unsigned int proc_int = rd_processor_get_int_size(self->context);
+        const unsigned int INT_SIZE = self->context->processorplugin->int_size;
 
-        unsigned int size =
-            item->segment->base.unit ? item->segment->base.unit : proc_int;
+        const unsigned int SIZE =
+            item->segment->base.unit ? item->segment->base.unit : INT_SIZE;
 
-        const char* address = rd_i_to_hex(item->address, size);
+        const char* address = rd_i_to_hex(item->address, SIZE);
 
         rd_renderer_norm(self, address);
         rd_renderer_ws(self, 2);
@@ -287,12 +288,13 @@ void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
 
 void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item) {
     RDContext* ctx = self->context;
+    const RDProcessorPlugin* p = ctx->processorplugin;
+
     RDInstruction instr = {0};
     rd_i_il_init(&ctx->il_buf);
 
-    if(rd_i_processor_has_lift(ctx) &&
-       rd_i_engine_decode(self->context, item->address, &instr))
-        rd_i_processor_lift(ctx, &instr, &ctx->il_buf);
+    if(p->lift && rd_i_engine_decode(self->context, item->address, &instr))
+        p->lift(ctx, &instr, &ctx->il_buf, ctx->processor);
 
     // render 'unknown' if empty
     rd_i_il_render(self, &ctx->il_buf);
@@ -335,15 +337,8 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
 void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item) {
     RDInstruction instr = {0};
 
-    if(rd_i_engine_decode(self->context, item->address, &instr)) {
-        rd_i_processor_render_mnemonic(self->context, self, &instr);
-        rd_renderer_ws(self, 1);
-
-        rd_foreach_operand(i, op, &instr) {
-            if(i > 0) rd_renderer_norm(self, ", ");
-            rd_i_processor_render_operand(self->context, self, &instr, i);
-        }
-    }
+    if(rd_i_engine_decode(self->context, item->address, &instr))
+        rd_i_processor_render_instruction(self, &instr);
     else
         rd_renderer_unkn(self);
 }
@@ -379,13 +374,22 @@ void rd_renderer_unkn(RDRenderer* self) {
 
 void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
                       RDThemeKind fg) {
-    const char* mnem = rd_i_processor_get_mnemonic(self->context, instr);
+    const RDProcessorPlugin* p = self->context->processorplugin;
+    const char* mnem = NULL;
+
+    if(p->get_mnemonic) mnem = p->get_mnemonic(instr, self->context->processor);
     if(!mnem) mnem = rd_i_to_dec(instr->id);
+
     rd_renderer_text(self, mnem, fg, RD_THEME_BACKGROUND);
 }
 
 void rd_renderer_reg(RDRenderer* self, int reg) {
-    const char* regname = rd_i_processor_get_register(self->context, reg);
+    const RDProcessorPlugin* p = self->context->processorplugin;
+    const char* regname = NULL;
+
+    if(p->get_register)
+        regname = p->get_register(reg, self->context->processor);
+
     if(!regname) regname = rd_i_to_dec(reg);
 
     rd_renderer_text(self, regname, RD_THEME_REG, RD_THEME_BACKGROUND);

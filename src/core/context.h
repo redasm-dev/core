@@ -4,12 +4,13 @@
 #include "core/segment.h"
 #include "io/buffer.h"
 #include "listing/listing.h"
-#include "plugins/processor/processor.h"
 #include "rdil/rdil.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
 #include <redasm/redasm.h>
 #include <redasm/types/def.h>
+
+typedef struct RDHooks RDHooks;
 
 typedef enum {
     RD_WI_NONE = 0,
@@ -40,14 +41,9 @@ typedef struct RDAnalyzerItem {
 
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
+    const RDProcessorPlugin* processorplugin;
     RDLoader* loader;
-    RDContextProcessor processor;
-
-    struct {
-        RDContextProcessor* data;
-        usize length;
-        usize capacity;
-    } processor_chain;
+    RDProcessor* processor;
 
     struct {
         RDAnalyzerItem** data;
@@ -78,6 +74,7 @@ typedef struct RDContext {
 
     RDDB db;
     RDListing listing;
+    RDHooks* hooks;
 
     struct {
         RDTypeDef** data;

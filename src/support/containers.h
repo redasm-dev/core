@@ -75,6 +75,14 @@ typedef bool (*VectPredicate)(const void*);
     _vect_stable_part((void*)(self)->data, (self)->length,                     \
                       sizeof(*(self)->data), (VectPredicate)(pred));
 
+#define vect_lower_bound(key, self, cb)                                        \
+    _vect_lower_bound((const void*)(key), (void*)(self)->data, (self)->length, \
+                      sizeof(*(self)->data), (VectCompare)(cb))
+
+#define vect_upper_bound(key, self, cb)                                        \
+    _vect_upper_bound((const void*)(key), (void*)(self)->data, (self)->length, \
+                      sizeof(*(self)->data), (VectCompare)(cb))
+
 #define vect_front(self)                                                       \
     (assert((self)->length && "vect_front: container is empty"),               \
      &(self)->data[0])
@@ -228,10 +236,14 @@ typedef bool (*VectPredicate)(const void*);
 
 void _vect_grow(void** data, size_t* cap, size_t len, size_t itemsz);
 void _vect_reserve(void** data, size_t* currcap, size_t newcap, size_t itemsz);
-size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
-                         VectPredicate pred);
 void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
                  size_t itemsz);
 void _queue_reserve(void** data, size_t* currcap, size_t newcap, size_t itemsz);
 void _str_append(char** data, size_t* cap, size_t* len, const char* cstr);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
+size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
+                         VectPredicate pred);
+size_t _vect_lower_bound(const void* key, void* data, size_t len, size_t itemsz,
+                         VectCompare cb);
+size_t _vect_upper_bound(const void* key, void* data, size_t len, size_t itemsz,
+                         VectCompare cb);

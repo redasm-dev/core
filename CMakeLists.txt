@@ -55,6 +55,7 @@ target_sources(${PROJECT_NAME}
         src/surface/surface.c
         src/types/def.c
         src/types/type.c
+        src/hooks.c
         src/redasm.c
         src/theme.c
 )

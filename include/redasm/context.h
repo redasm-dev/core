@@ -30,7 +30,7 @@ typedef enum {
 
     RD_CR_CALL,
     RD_CR_JUMP,
-} RDRefType;
+} RDXRefType;
 
 typedef struct RDProblem {
     RDAddress from_address;
@@ -118,6 +118,8 @@ RD_API const RDFunction* rd_find_function(const RDContext* self,
                                           RDAddress address);
 RD_API RDLoader* rd_get_loader(const RDContext* self);
 RD_API const RDLoaderPlugin* rd_get_loader_plugin(const RDContext* self);
+RD_API RDProcessor* rd_get_processor(const RDContext* self);
+RD_API const RDProcessorPlugin* rd_get_processor_plugin(const RDContext* self);
 RD_API RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self);
 RD_API bool rd_is_address(const RDContext* self, RDAddress address);
 RD_API const char* rd_get_comment(RDContext* self, RDAddress address);

@@ -21,8 +21,8 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     panic_if(!seg, "_rd_surface_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
-    const unsigned int PTR_SIZE = rd_processor_get_ptr_size(r->context);
-    bool is_be = rd_processor_get_flags(r->context) & RD_PF_BE;
+    const unsigned int PTR_SIZE = r->context->processorplugin->ptr_size;
+    bool is_be = r->context->processorplugin->flags & RD_PF_BE;
     usize idx = rd_i_address2index(seg, address);
 
     // pointer
@@ -239,15 +239,16 @@ static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
 static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return;
 
+    const RDProcessorPlugin* p = r->context->processorplugin;
     const RDSegmentFull* seg = item->segment;
     rd_i_renderer_new_row(r, item);
 
-    if(rd_i_processor_has_render_segment(r->context)) {
-        rd_i_processor_render_segment(r->context, r, (const RDSegment*)seg);
+    if(p->render_segment) {
+        p->render_segment(r, (const RDSegment*)seg, r->context->processor);
     }
     else {
-        const unsigned int PROC_INT = rd_processor_get_int_size(r->context);
-        const unsigned int B = seg->base.unit ? seg->base.unit : PROC_INT;
+        const unsigned int INT_SIZE = r->context->processorplugin->int_size;
+        const unsigned int B = seg->base.unit ? seg->base.unit : INT_SIZE;
         const unsigned int F = B * 2;
 
         rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
@@ -264,10 +265,11 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
 static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
 
+    const RDProcessorPlugin* p = r->context->processorplugin;
     rd_i_renderer_new_row(r, item);
 
-    if(rd_i_processor_has_render_function(r->context)) {
-        rd_i_processor_render_function(r->context, r, item->func);
+    if(p->render_function) {
+        p->render_function(r, item->func, r->context->processor);
     }
     else {
         RDName n;
