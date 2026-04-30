@@ -290,11 +290,11 @@ bool rd_i_db_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
 void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       usize type) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_XREF, "\
-            INSERT INTO XRefs \
-                 VALUES (:fromaddr, :toaddr, :type) \
-             ON CONFLICT DO \
-                 UPDATE SET type = EXCLUDED.type \
-            ");
+        INSERT INTO XRefs \
+                VALUES (:fromaddr, :toaddr, :type) \
+            ON CONFLICT DO \
+                UPDATE SET type = EXCLUDED.type \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
     _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
@@ -309,7 +309,7 @@ void rd_i_db_get_xrefs_from_type(RDContext* ctx, RDAddress from, usize t,
             SELECT to_address, type  \
             FROM XRefs \
             WHERE from_address = :fromaddr AND type = :type \
-            ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
     _rd_db_bind_param_int(ctx, stmt, ":type", t);
@@ -324,10 +324,10 @@ void rd_i_db_get_xrefs_from_type(RDContext* ctx, RDAddress from, usize t,
 
 void rd_i_db_get_xrefs_from(RDContext* ctx, RDAddress from, RDXRefVect* refs) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_FROM, "\
-            SELECT to_address, type  \
-            FROM XRefs \
-            WHERE from_address = :fromaddr \
-            ");
+        SELECT to_address, type  \
+        FROM XRefs \
+        WHERE from_address = :fromaddr \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
 
@@ -346,7 +346,7 @@ void rd_i_db_get_xrefs_to_type(RDContext* ctx, RDAddress to, usize t,
             SELECT from_address, type  \
             FROM XRefs \
             WHERE to_address = :toaddr AND type = :type \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
     _rd_db_bind_param_int(ctx, stmt, ":type", t);
@@ -361,10 +361,10 @@ void rd_i_db_get_xrefs_to_type(RDContext* ctx, RDAddress to, usize t,
 
 void rd_i_db_get_xrefs_to(RDContext* ctx, RDAddress to, RDXRefVect* refs) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_TO, "\
-            SELECT from_address, type  \
-            FROM XRefs \
-            WHERE to_address = :toaddr \
-            ");
+        SELECT from_address, type  \
+        FROM XRefs \
+        WHERE to_address = :toaddr \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
 
@@ -384,7 +384,7 @@ bool rd_i_db_get_address(RDContext* ctx, const char* name, RDAddress* address) {
         SELECT address \
         FROM Names \
         WHERE name = :name \
-        ");
+    ");
 
     _rd_db_bind_param_str(ctx, stmt, ":name", name);
 
@@ -401,7 +401,7 @@ bool rd_i_db_get_name(RDContext* ctx, RDAddress address, RDName* n) {
         SELECT name, confidence \
         FROM Names \
         WHERE address = :address \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
 
@@ -422,7 +422,7 @@ void rd_i_db_set_name(RDContext* ctx, RDAddress address, const char* name,
         ON CONFLICT DO  \
             UPDATE SET name = EXCLUDED.name, \
                        confidence = EXCLUDED.confidence\
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_str(ctx, stmt, ":name", name);
@@ -434,7 +434,7 @@ void rd_i_db_del_name(RDContext* ctx, RDAddress address) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_NAME, "\
         DELETE FROM Names \
         WHERE address = :address \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_step(ctx, stmt);
@@ -557,7 +557,7 @@ bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
         SELECT name, count, flags, confidence  \
         FROM Types \
         WHERE address = :address \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
 
@@ -577,7 +577,7 @@ void rd_i_db_del_type(RDContext* ctx, RDAddress address) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_TYPE, "\
         DELETE FROM Types \
             WHERE address = :address \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_step(ctx, stmt);
@@ -588,7 +588,7 @@ void rd_i_db_del_type_range(RDContext* ctx, RDAddress startaddr,
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_TYPE_RANGE, "\
         DELETE FROM Types \
             WHERE address >= :start AND address < :end \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":start", startaddr);
     _rd_db_bind_param_int(ctx, stmt, ":end", endaddr);
@@ -616,7 +616,7 @@ void rd_i_db_set_comment(RDContext* ctx, RDAddress address, const char* cmt) {
             VALUES (:address, :comment) \
         ON CONFLICT DO  \
             UPDATE SET comment = EXCLUDED.comment \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_str(ctx, stmt, ":comment", cmt);
@@ -627,7 +627,7 @@ void rd_i_db_del_comment(RDContext* ctx, RDAddress address) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_COMMENT, "\
         DELETE FROM Comments \
         WHERE address = :address \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_step(ctx, stmt);
@@ -653,7 +653,7 @@ bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud) {
         SELECT v \
         FROM UserData \
         WHERE k = :k \
-        ");
+    ");
 
     _rd_db_bind_param_str(ctx, stmt, ":k", key);
 
@@ -671,7 +671,7 @@ void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud) {
             VALUES (:k, :v) \
         ON CONFLICT DO  \
             UPDATE SET v = EXCLUDED.v \
-        ");
+    ");
 
     _rd_db_bind_param_str(ctx, stmt, ":k", key);
     _rd_db_bind_param_int(ctx, stmt, ":v", ud);
@@ -686,7 +686,7 @@ void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
         ON CONFLICT DO  \
             UPDATE SET value = EXCLUDED.value, \
                        confidence = EXCLUDED.confidence \
-        ");
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_int(ctx, stmt, ":reg", reg);
@@ -701,7 +701,29 @@ bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
         SELECT value, confidence FROM TrackedRegisters \
         WHERE reg = :reg AND address <= :address \
         ORDER BY address DESC LIMIT 1 \
-        ");
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    _rd_db_bind_param_int(ctx, stmt, ":reg", reg);
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        if(r) {
+            r->value = (u64)sqlite3_column_int64(stmt, 0);
+            r->confidence = (RDConfidence)sqlite3_column_int64(stmt, 1);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
+                              RDRegister* r) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL_EXACT, "\
+        SELECT value, confidence FROM TrackedRegisters \
+        WHERE address = :address AND reg = :reg \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_int(ctx, stmt, ":reg", reg);
