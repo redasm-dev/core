@@ -678,8 +678,8 @@ void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud) {
     _rd_db_step(ctx, stmt);
 }
 
-void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
-                        RDConfidence c) {
+void rd_i_db_set_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                        RDRegValue val, RDConfidence c) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_REGVAL, "\
         INSERT INTO TrackedRegisters \
             VALUES (:address, :reg, :value, :confidence) \
@@ -695,8 +695,8 @@ void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
     _rd_db_step(ctx, stmt);
 }
 
-bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
-                        RDRegisterValue* r) {
+bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                        RDRegValueFull* r) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL, "\
         SELECT value, confidence FROM TrackedRegisters \
         WHERE reg = :reg AND address <= :address \
@@ -708,7 +708,7 @@ bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
 
     if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         if(r) {
-            r->value = (u64)sqlite3_column_int64(stmt, 0);
+            r->value = (RDRegValue)sqlite3_column_int64(stmt, 0);
             r->confidence = (RDConfidence)sqlite3_column_int64(stmt, 1);
         }
 
@@ -718,8 +718,8 @@ bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
     return false;
 }
 
-bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
-                              RDRegisterValue* r) {
+bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, RDReg reg,
+                              RDRegValueFull* r) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL_EXACT, "\
         SELECT value, confidence FROM TrackedRegisters \
         WHERE address = :address AND reg = :reg \
@@ -730,7 +730,7 @@ bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
 
     if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         if(r) {
-            r->value = (u64)sqlite3_column_int64(stmt, 0);
+            r->value = (RDRegValue)sqlite3_column_int64(stmt, 0);
             r->confidence = (RDConfidence)sqlite3_column_int64(stmt, 1);
         }
 
@@ -740,8 +740,7 @@ bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
     return false;
 }
 
-RDTrackedRegisterVect* rd_i_db_get_reg_all(RDContext* ctx,
-                                           RDTrackedRegisterVect* regs) {
+RDTrackedRegVect* rd_i_db_get_reg_all(RDContext* ctx, RDTrackedRegVect* regs) {
     vect_clear(regs);
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REG_ALL, "\
@@ -751,10 +750,10 @@ RDTrackedRegisterVect* rd_i_db_get_reg_all(RDContext* ctx,
     ");
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        vect_push(regs, (RDTrackedRegister){
+        vect_push(regs, (RDTrackedReg){
                             .address = (RDAddress)sqlite3_column_int64(stmt, 0),
-                            .reg = (int)sqlite3_column_int64(stmt, 1),
-                            .value = (u64)sqlite3_column_int64(stmt, 2),
+                            .reg = (RDReg)sqlite3_column_int64(stmt, 1),
+                            .value = (RDRegValue)sqlite3_column_int64(stmt, 2),
                         });
     }
 

@@ -3,11 +3,12 @@
 #include "support/containers.h"
 #include <redasm/registers.h>
 
-static bool _rd_i_set_regval(RDContext* ctx, RDAddress address, int reg,
+static bool _rd_i_set_regval(RDContext* ctx, RDAddress address, RDReg reg,
                              u64 value, RDConfidence c) {
-    if(!rd_i_find_segment(ctx, address)) return false;
+    if(!rd_i_find_segment(ctx, address) || reg == RD_REGID_UNKNOWN)
+        return false;
 
-    RDRegisterValue oldr;
+    RDRegValueFull oldr;
     if(rd_i_db_get_regval_exact(ctx, address, reg, &oldr)) {
         if(c < oldr.confidence) return false;
         if(c == oldr.confidence && value == oldr.value) return false;
@@ -17,23 +18,27 @@ static bool _rd_i_set_regval(RDContext* ctx, RDAddress address, int reg,
     return true;
 }
 
-bool rd_auto_regval(RDContext* ctx, RDAddress address, int reg, u64 value) {
+bool rd_auto_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                    RDRegValue value) {
     return _rd_i_set_regval(ctx, address, reg, value, RD_CONFIDENCE_AUTO);
 }
 
-bool rd_library_regval(RDContext* ctx, RDAddress address, int reg, u64 value) {
+bool rd_library_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                       RDRegValue value) {
     return _rd_i_set_regval(ctx, address, reg, value, RD_CONFIDENCE_LIBRARY);
 }
 
-bool rd_user_regval(RDContext* ctx, RDAddress address, int reg, u64 value) {
+bool rd_user_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                    RDRegValue value) {
     return _rd_i_set_regval(ctx, address, reg, value, RD_CONFIDENCE_USER);
 }
 
-bool rd_get_regval(RDContext* ctx, RDAddress address, int reg, u64* val) {
-    if(!rd_i_find_segment(ctx, address)) return false;
+bool rd_get_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                   RDRegValue* val) {
+    if(!rd_i_find_segment(ctx, address) || reg == RD_REGID_UNKNOWN)
+        return false;
 
-    RDRegisterValue r;
-
+    RDRegValueFull r;
     if(rd_i_db_get_regval(ctx, address, reg, &r)) {
         if(val) *val = r.value;
         return true;
@@ -42,7 +47,7 @@ bool rd_get_regval(RDContext* ctx, RDAddress address, int reg, u64* val) {
     return false;
 }
 
-RDTrackedRegisterSlice rd_get_all_registers(RDContext* ctx) {
-    RDTrackedRegisterVect* regs = rd_i_db_get_reg_all(ctx, &ctx->tregs_buf);
-    return vect_to_slice(RDTrackedRegisterSlice, regs);
+RDTrackedRegSlice rd_get_all_reg(RDContext* ctx) {
+    RDTrackedRegVect* regs = rd_i_db_get_reg_all(ctx, &ctx->tregs_buf);
+    return vect_to_slice(RDTrackedRegSlice, regs);
 }

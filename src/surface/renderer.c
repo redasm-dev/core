@@ -387,8 +387,8 @@ void rd_renderer_reg(RDRenderer* self, int reg) {
     const RDProcessorPlugin* p = self->context->processorplugin;
     const char* regname = NULL;
 
-    if(p->get_register)
-        regname = p->get_register(reg, self->context->processor);
+    if(p->get_register_name)
+        regname = p->get_register_name(reg, self->context->processor);
 
     if(!regname) regname = rd_i_to_dec(reg);
 

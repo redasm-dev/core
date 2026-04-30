@@ -14,13 +14,13 @@ typedef struct RDName {
     RDConfidence confidence;
 } RDName;
 
-typedef struct RDRegisterValue {
-    u64 value;
+typedef struct RDRegValueFull {
+    RDRegValue value;
     RDConfidence confidence;
-} RDRegisterValue;
+} RDRegValueFull;
 
-typedef struct RDTrackedRegisterVect {
-    RDTrackedRegister* data;
+typedef struct RDTrackedRegVect {
+    RDTrackedReg* data;
     usize length;
     usize capacity;
-} RDTrackedRegisterVect;
+} RDTrackedRegVect;

@@ -107,11 +107,10 @@ void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p);
 bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud);
 void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud);
 
-void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
-                        RDConfidence c);
-bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
-                        RDRegisterValue* r);
-bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
-                              RDRegisterValue* r);
-RDTrackedRegisterVect* rd_i_db_get_reg_all(RDContext* ctx,
-                                           RDTrackedRegisterVect* regs);
+void rd_i_db_set_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                        RDRegValue val, RDConfidence c);
+bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, RDReg reg,
+                        RDRegValueFull* r);
+bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, RDReg reg,
+                              RDRegValueFull* r);
+RDTrackedRegVect* rd_i_db_get_reg_all(RDContext* ctx, RDTrackedRegVect* regs);

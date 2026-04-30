@@ -2,6 +2,7 @@
 
 #include <redasm/common.h>
 #include <redasm/config.h>
+#include <redasm/registers.h>
 
 #define RD_MAX_OPERANDS 8
 #define RD_NMNEMONIC 32
@@ -30,31 +31,31 @@ typedef enum {
 } RDInstructionFlow;
 
 typedef struct RDPhraseOperand {
-    int base;
-    int index;
+    RDReg base;
+    RDReg index;
 } RDPhraseOperand;
 
 typedef struct RDDisplOperand {
-    int base;
-    int index;
+    RDReg base;
+    RDReg index;
     i64 displ;
     u8 scale;
 } RDDisplOperand;
 
 typedef struct RDUserOperand {
     union {
-        int reg1;
+        RDReg reg1;
         usize val1;
         isize s_val1;
     };
 
     union {
-        int reg2;
+        RDReg reg2;
         usize val2;
         isize s_val2;
     };
     union {
-        int reg3;
+        RDReg reg3;
         usize val3;
         isize s_val3;
     };
@@ -66,7 +67,7 @@ typedef struct RDOperand {
     u16 count;
 
     union {
-        int reg;
+        RDReg reg;
         u64 addr;
         u64 imm;
         i64 s_imm;

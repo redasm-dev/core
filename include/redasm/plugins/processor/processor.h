@@ -4,6 +4,7 @@
 #include <redasm/plugins/plugin.h>
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/plugins/processor/rdil.h>
+#include <redasm/registers.h>
 #include <redasm/segment.h>
 #include <redasm/surface/renderer.h>
 
@@ -31,7 +32,8 @@ typedef struct RDProcessorPlugin {
     void (*lift)(RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
-    const char* (*get_register)(int, RDProcessor*);
+    const char* (*get_register_name)(RDReg, RDProcessor*);
+    RDReg (*get_register_id)(const char*, RDProcessor*);
     const char** (*get_prologues)(RDProcessor*, const RDContext*);
 
     void (*render_segment)(RDRenderer*, const RDSegment*, RDProcessor*);
@@ -42,4 +44,5 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
-RD_API const char* rd_get_register_name(const RDContext* ctx, int r);
+RD_API const char* rd_get_register_name(const RDContext* ctx, RDReg r);
+RD_API RDReg rd_get_register_id(const RDContext* ctx, const char* name);
