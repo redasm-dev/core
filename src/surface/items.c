@@ -43,7 +43,8 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     // char array - render as string
     if(!strcmp(t->name, "char") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
-        for(usize i = 0; i < t->count; i++) {
+        usize i = 0;
+        for(; i < t->count - 1; i++) {
             u8 v;
 
             if(!rd_i_buffer_read_u8(flags, idx + i, &v)) {
@@ -57,9 +58,21 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                              RD_THEME_BACKGROUND);
         }
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
-        if(term) {
+
+        if(term) { // render string terminator
             rd_renderer_norm(r, ",");
-            rd_renderer_cnst(r, 0, 10, 0, RD_NUM_DEFAULT);
+            u8 v;
+
+            if(rd_i_buffer_read_u8(flags, idx + i, &v)) {
+                if(v) {
+                    rd_renderer_text(r, rd_i_escape_char(v, true),
+                                     RD_THEME_STRING, RD_THEME_BACKGROUND);
+                }
+                else
+                    rd_renderer_cnst(r, 0, 10, 0, RD_NUM_DEFAULT);
+            }
+            else
+                rd_renderer_nop(r, "?");
         }
         return;
     }
