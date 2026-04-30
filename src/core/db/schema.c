@@ -86,12 +86,12 @@ CREATE TABLE Imported ( \
     module  TEXT \
 ); \
 \
-CREATE TABLE SegmentRegisters ( \
+CREATE TABLE TrackedRegisters ( \
     address  INTEGER NOT NULL, \
     reg      INTEGER NOT NULL, \
-    value    INTEGER, \
-    fromaddr INTEGER, \
-    UNIQUE(address, reg, fromaddr) \
+    value    INTEGER NOT NULL, \
+    confidence INTEGER NOT NULL, \
+    PRIMARY KEY(address, reg) \
 ); \
 \
 CREATE TABLE Problems ( \

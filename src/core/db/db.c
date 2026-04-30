@@ -652,7 +652,7 @@ bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_USERDATA, "\
         SELECT v \
         FROM UserData \
-        Where k = :k \
+        WHERE k = :k \
         ");
 
     _rd_db_bind_param_str(ctx, stmt, ":k", key);
@@ -676,4 +676,44 @@ void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud) {
     _rd_db_bind_param_str(ctx, stmt, ":k", key);
     _rd_db_bind_param_int(ctx, stmt, ":v", ud);
     _rd_db_step(ctx, stmt);
+}
+
+void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
+                        RDConfidence c) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_REGVAL, "\
+        INSERT INTO TrackedRegisters \
+            VALUES (:reg, :address, :value, :confidence) \
+        ON CONFLICT DO  \
+            UPDATE SET value = EXCLUDED.value, \
+                       confidence = EXCLUDED.confidence \
+        ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    _rd_db_bind_param_int(ctx, stmt, ":reg", reg);
+    _rd_db_bind_param_int(ctx, stmt, ":value", val);
+    _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
+    _rd_db_step(ctx, stmt);
+}
+
+bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
+                        RDRegister* r) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL, "\
+        SELECT value, confidence FROM TrackedRegisters \
+        WHERE reg = :reg AND address <= :address \
+        ORDER BY address DESC LIMIT 1 \
+        ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    _rd_db_bind_param_int(ctx, stmt, ":reg", reg);
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        if(r) {
+            r->value = (u64)sqlite3_column_int64(stmt, 0);
+            r->confidence = (RDConfidence)sqlite3_column_int64(stmt, 1);
+        }
+
+        return true;
+    }
+
+    return false;
 }

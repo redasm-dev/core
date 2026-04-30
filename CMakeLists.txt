@@ -19,6 +19,7 @@ target_sources(${PROJECT_NAME}
         src/core/engine.c
         src/core/function.c
         src/core/mapping.c
+        src/core/registers.c
         src/core/segment.c
         src/core/state.c
         src/core/stringfinder.c

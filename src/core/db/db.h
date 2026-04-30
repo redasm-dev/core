@@ -40,11 +40,8 @@ enum {
     RD_QUERY_ADD_MAPPING,
     RD_QUERY_SET_IMPORTED,
     RD_QUERY_GET_IMPORTED,
-    // RD_QUERY_SET_SREG,
-    // RD_QUERY_GET_SREG,
-    // RD_QUERY_GET_SREGS_FROM_ADDR,
-    // RD_QUERY_GET_SREG_CHANGES,
-    // RD_QUERY_GET_SREGS,
+    RD_QUERY_SET_REGVAL,
+    RD_QUERY_GET_REGVAL,
     RD_QUERY_ADD_PROBLEM,
     RD_QUERY_SET_USERDATA,
     RD_QUERY_GET_USERDATA,
@@ -107,3 +104,8 @@ void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p);
 
 bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud);
 void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud);
+
+void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
+                        RDConfidence c);
+bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
+                        RDRegister* r);

@@ -12,3 +12,8 @@ typedef struct RDName {
     const char* value;
     RDConfidence confidence;
 } RDName;
+
+typedef struct RDRegister {
+    u64 value;
+    RDConfidence confidence;
+} RDRegister;
