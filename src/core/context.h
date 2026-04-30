@@ -62,6 +62,7 @@ typedef struct RDContext {
     RDCharVect sym_buf;
     RDCharVect imp_buf;
     RDCharVect problem_buf;
+    RDTrackedRegisterVect tregs_buf;
     RDILInstruction il_buf;
 
     char* filepath;

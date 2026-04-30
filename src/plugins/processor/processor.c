@@ -20,3 +20,10 @@ void rd_i_processor_render_instruction(RDRenderer* r,
         }
     }
 }
+
+const char* rd_get_register_name(const RDContext* ctx, int r) {
+    if(ctx->processorplugin->get_register)
+        return ctx->processorplugin->get_register(r, ctx->processor);
+
+    return NULL;
+}

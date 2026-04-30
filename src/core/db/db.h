@@ -43,6 +43,7 @@ enum {
     RD_QUERY_SET_REGVAL,
     RD_QUERY_GET_REGVAL,
     RD_QUERY_GET_REGVAL_EXACT,
+    RD_QUERY_GET_REG_ALL,
     RD_QUERY_ADD_PROBLEM,
     RD_QUERY_SET_USERDATA,
     RD_QUERY_GET_USERDATA,
@@ -109,6 +110,8 @@ void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud);
 void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
                         RDConfidence c);
 bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
-                        RDRegister* r);
+                        RDRegisterValue* r);
 bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
-                              RDRegister* r);
+                              RDRegisterValue* r);
+RDTrackedRegisterVect* rd_i_db_get_reg_all(RDContext* ctx,
+                                           RDTrackedRegisterVect* regs);

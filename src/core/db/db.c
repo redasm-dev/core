@@ -682,7 +682,7 @@ void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
                         RDConfidence c) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_REGVAL, "\
         INSERT INTO TrackedRegisters \
-            VALUES (:reg, :address, :value, :confidence) \
+            VALUES (:address, :reg, :value, :confidence) \
         ON CONFLICT DO  \
             UPDATE SET value = EXCLUDED.value, \
                        confidence = EXCLUDED.confidence \
@@ -696,7 +696,7 @@ void rd_i_db_set_regval(RDContext* ctx, RDAddress address, int reg, u64 val,
 }
 
 bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
-                        RDRegister* r) {
+                        RDRegisterValue* r) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL, "\
         SELECT value, confidence FROM TrackedRegisters \
         WHERE reg = :reg AND address <= :address \
@@ -719,7 +719,7 @@ bool rd_i_db_get_regval(RDContext* ctx, RDAddress address, int reg,
 }
 
 bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
-                              RDRegister* r) {
+                              RDRegisterValue* r) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REGVAL_EXACT, "\
         SELECT value, confidence FROM TrackedRegisters \
         WHERE address = :address AND reg = :reg \
@@ -738,4 +738,25 @@ bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address, int reg,
     }
 
     return false;
+}
+
+RDTrackedRegisterVect* rd_i_db_get_reg_all(RDContext* ctx,
+                                           RDTrackedRegisterVect* regs) {
+    vect_clear(regs);
+
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_REG_ALL, "\
+        SELECT address, reg, value \
+        FROM TrackedRegisters \
+        ORDER BY address ASC, reg ASC \
+    ");
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        vect_push(regs, (RDTrackedRegister){
+                            .address = (RDAddress)sqlite3_column_int64(stmt, 0),
+                            .reg = (int)sqlite3_column_int64(stmt, 1),
+                            .value = (u64)sqlite3_column_int64(stmt, 2),
+                        });
+    }
+
+    return regs;
 }

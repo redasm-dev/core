@@ -512,6 +512,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->str_buf);
     vect_destroy(&self->imp_buf);
     vect_destroy(&self->name_buf);
+    vect_destroy(&self->tregs_buf);
     vect_destroy(&self->problems);
     vect_destroy(&self->xrefs_to);
     vect_destroy(&self->xrefs_to_type);

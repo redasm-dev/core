@@ -42,3 +42,4 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
+RD_API const char* rd_get_register_name(const RDContext* ctx, int r);

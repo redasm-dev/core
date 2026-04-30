@@ -1,6 +1,7 @@
 #pragma once
 
 #include <redasm/context.h>
+#include <redasm/registers.h>
 
 typedef enum {
     RD_CONFIDENCE_AUTO = 0,
@@ -13,7 +14,13 @@ typedef struct RDName {
     RDConfidence confidence;
 } RDName;
 
-typedef struct RDRegister {
+typedef struct RDRegisterValue {
     u64 value;
     RDConfidence confidence;
-} RDRegister;
+} RDRegisterValue;
+
+typedef struct RDTrackedRegisterVect {
+    RDTrackedRegister* data;
+    usize length;
+    usize capacity;
+} RDTrackedRegisterVect;

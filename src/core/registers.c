@@ -1,12 +1,13 @@
 #include "core/context.h"
 #include "core/db/types.h"
+#include "support/containers.h"
 #include <redasm/registers.h>
 
 static bool _rd_i_set_regval(RDContext* ctx, RDAddress address, int reg,
                              u64 value, RDConfidence c) {
     if(!rd_i_find_segment(ctx, address)) return false;
 
-    RDRegister oldr;
+    RDRegisterValue oldr;
     if(rd_i_db_get_regval_exact(ctx, address, reg, &oldr)) {
         if(c < oldr.confidence) return false;
         if(c == oldr.confidence && value == oldr.value) return false;
@@ -31,7 +32,7 @@ bool rd_user_regval(RDContext* ctx, RDAddress address, int reg, u64 value) {
 bool rd_get_regval(RDContext* ctx, RDAddress address, int reg, u64* val) {
     if(!rd_i_find_segment(ctx, address)) return false;
 
-    RDRegister r;
+    RDRegisterValue r;
 
     if(rd_i_db_get_regval(ctx, address, reg, &r)) {
         if(val) *val = r.value;
@@ -39,4 +40,9 @@ bool rd_get_regval(RDContext* ctx, RDAddress address, int reg, u64* val) {
     }
 
     return false;
+}
+
+RDTrackedRegisterSlice rd_get_all_registers(RDContext* ctx) {
+    RDTrackedRegisterVect* regs = rd_i_db_get_reg_all(ctx, &ctx->tregs_buf);
+    return vect_to_slice(RDTrackedRegisterSlice, regs);
 }
