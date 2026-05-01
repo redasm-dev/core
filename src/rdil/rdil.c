@@ -200,13 +200,13 @@ static void _rdil_render_expr(RDRenderer* r, const RDILInstruction* il,
 
         case RD_IL_UINT: {
             u64 v = _rdil_read_uleb(il, cur);
-            rd_renderer_cnst(r, v, 16, 0, RD_NUM_DEFAULT);
+            rd_renderer_num(r, v, 16, 0, RD_NUM_DEFAULT);
             break;
         }
 
         case RD_IL_SINT: {
             i64 v = _rdil_read_sleb(il, cur);
-            rd_renderer_cnst(r, v < 0 ? -v : v, 16, 0, RD_NUM_DEFAULT);
+            rd_renderer_num(r, v < 0 ? -v : v, 16, 0, RD_NUM_DEFAULT);
             break;
         }
 

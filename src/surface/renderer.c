@@ -21,18 +21,6 @@ static void _rd_rows_destroy(RDRowVect* rv) {
     vect_each(cells, rv) vect_destroy(cells);
 }
 
-static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
-                             usize fill, RDNumberFlags flags, RDThemeKind fg) {
-    RDBaseParams p = {
-        .base = base ? base : 16,
-        .with_prefix = flags & RD_NUM_PREFIX,
-        .with_sign = flags & RD_NUM_SIGNED,
-        .fill = fill,
-    };
-
-    rd_renderer_text(self, rd_i_to_base(c, &p), fg, RD_THEME_BACKGROUND);
-}
-
 static bool _rd_is_char_skippable(char ch) {
     if(ch == '_' || ch == '@' || ch == '.') return false;
     return isspace((int)ch) || ispunct((int)ch);
@@ -387,8 +375,8 @@ void rd_renderer_reg(RDRenderer* self, int reg) {
     const RDProcessorPlugin* p = self->context->processorplugin;
     const char* regname = NULL;
 
-    if(p->get_register_name)
-        regname = p->get_register_name(reg, self->context->processor);
+    if(p->get_reg_name)
+        regname = p->get_reg_name(reg, self->context->processor);
 
     if(!regname) regname = rd_i_to_dec(reg);
 
@@ -403,19 +391,28 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
                      RDNumberFlags flags) {
     RDName n;
     bool hasname = false;
-
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES))
         hasname = rd_i_get_name(self->context, address, true, &n);
 
-    if(hasname)
+    if(hasname) {
         rd_renderer_text(self, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
-    else
-        _rd_renderer_num(self, address, 16, fill, flags, RD_THEME_LOCATION);
+        return;
+    }
+
+    rd_renderer_num(self, (i64)address, 16, fill, flags);
 }
 
-void rd_renderer_cnst(RDRenderer* self, i64 c, unsigned int base, usize fill,
-                      RDNumberFlags flags) {
-    _rd_renderer_num(self, c, base, fill, flags, RD_THEME_NUMBER);
+void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base, usize fill,
+                     RDNumberFlags flags) {
+    RDBaseParams p = {
+        .base = base ? base : 16,
+        .with_prefix = flags & RD_NUM_PREFIX,
+        .with_sign = flags & RD_NUM_SIGNED,
+        .fill = fill,
+    };
+
+    rd_renderer_text(self, rd_i_to_base(c, &p), RD_THEME_NUMBER,
+                     RD_THEME_BACKGROUND);
 }
 
 RDContext* rd_renderer_get_context(RDRenderer* self) { return self->context; }

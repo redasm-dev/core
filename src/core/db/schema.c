@@ -88,8 +88,8 @@ CREATE TABLE Imported ( \
 \
 CREATE TABLE TrackedRegisters ( \
     address  INTEGER NOT NULL, \
-    reg      INTEGER NOT NULL, \
-    value    INTEGER NOT NULL, \
+    reg      TEXT NOT NULL, \
+    value    INTEGER, \
     confidence INTEGER NOT NULL, \
     PRIMARY KEY(address, reg) \
 ); \

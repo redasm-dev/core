@@ -21,16 +21,9 @@ void rd_i_processor_render_instruction(RDRenderer* r,
     }
 }
 
-const char* rd_get_register_name(const RDContext* ctx, RDReg r) {
-    if(ctx->processorplugin->get_register_name)
-        return ctx->processorplugin->get_register_name(r, ctx->processor);
+const char* rd_get_reg_name(const RDContext* ctx, RDReg r) {
+    if(ctx->processorplugin->get_reg_name)
+        return ctx->processorplugin->get_reg_name(r, ctx->processor);
 
     return NULL;
-}
-
-RDReg rd_get_register_id(const RDContext* ctx, const char* name) {
-    if(name && ctx->processorplugin->get_register_id)
-        return ctx->processorplugin->get_register_id(name, ctx->processor);
-
-    return RD_REGID_UNKNOWN;
 }

@@ -32,9 +32,10 @@ typedef struct RDProcessorPlugin {
     void (*lift)(RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
-    const char* (*get_register_name)(RDReg, RDProcessor*);
-    RDReg (*get_register_id)(const char*, RDProcessor*);
     const char** (*get_prologues)(RDProcessor*, const RDContext*);
+
+    const char* (*get_reg_name)(RDReg, RDProcessor*);
+    bool (*get_reg_mask)(const char* name, RDRegMask*, RDProcessor*);
 
     void (*render_segment)(RDRenderer*, const RDSegment*, RDProcessor*);
     void (*render_function)(RDRenderer*, const RDFunction*, RDProcessor*);
@@ -44,5 +45,4 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
-RD_API const char* rd_get_register_name(const RDContext* ctx, RDReg r);
-RD_API RDReg rd_get_register_id(const RDContext* ctx, const char* name);
+RD_API const char* rd_get_reg_name(const RDContext* ctx, RDReg r);

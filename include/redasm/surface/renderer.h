@@ -19,8 +19,8 @@ RD_API void rd_renderer_str(RDRenderer* self, const char* s, bool quoted);
 RD_API void rd_renderer_unkn(RDRenderer* self);
 RD_API void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
                             RDNumberFlags flags);
-RD_API void rd_renderer_cnst(RDRenderer* self, i64 c, unsigned int base,
-                             usize fill, RDNumberFlags flags);
+RD_API void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
+                            usize fill, RDNumberFlags flags);
 RD_API void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
                              RDThemeKind fg);
 RD_API void rd_renderer_reg(RDRenderer* self, int reg);
