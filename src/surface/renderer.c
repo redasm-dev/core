@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "core/context.h"
 #include "core/engine.h"
+#include "io/flagsbuffer.h"
 #include "plugins/processor/processor.h"
 #include "rdil/rdil.h"
 #include "support/containers.h"
@@ -389,14 +390,28 @@ void rd_renderer_nop(RDRenderer* self, const char* s) {
 
 void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
                      RDNumberFlags flags) {
-    RDName n;
-    bool hasname = false;
-    if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES))
-        hasname = rd_i_get_name(self->context, address, true, &n);
+    if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES)) {
+        RDName n;
+        bool hasname = rd_i_get_name(self->context, address, false, &n);
 
-    if(hasname) {
-        rd_renderer_text(self, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
-        return;
+        if(!hasname) {
+            const RDSegmentFull* seg =
+                rd_i_find_segment(self->context, address);
+
+            if(seg) {
+                usize idx = rd_i_address2index(seg, address);
+
+                // auto-generated name with inbound references
+                if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
+                    hasname = rd_i_get_name(self->context, address, true, &n);
+            }
+        }
+
+        if(hasname) {
+            rd_renderer_text(self, n.value, RD_THEME_LOCATION,
+                             RD_THEME_BACKGROUND);
+            return;
+        }
     }
 
     rd_renderer_num(self, (i64)address, 16, fill, flags);
