@@ -3,26 +3,10 @@
 #include "core/db/db.h"
 #include "listing/listing.h"
 #include "support/utils.h"
+#include "surface/row.h"
 #include <redasm/config.h>
-#include <redasm/listing.h>
 #include <redasm/surface/common.h>
 #include <redasm/surface/renderer.h>
-
-typedef struct RDCellVect {
-    RDCell* data;
-    usize length; // padded length
-    usize capacity;
-
-    LIndex index;
-    RDAddress address;
-    usize content_length; // length before padding (number of valid cells)
-} RDCellVect;
-
-typedef struct RDRowVect {
-    RDCellVect* data;
-    usize length;
-    usize capacity;
-} RDRowVect;
 
 typedef struct RDRenderer {
     RDContext* context;
@@ -82,6 +66,8 @@ bool rd_i_renderer_get_address_under_pos(RDRenderer* self,
 bool rd_i_renderer_get_address(const RDRenderer* self, RDSurfacePos pos,
                                RDAddress* address);
 RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx);
+RDCellMeta* rd_i_renderer_get_current_meta(const RDRenderer* self);
+void rd_i_renderer_set_current_meta(RDRenderer* self, RDCellMeta m);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);

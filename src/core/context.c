@@ -65,7 +65,6 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
         return rd_i_db_get_name(self, address, n);
 
     if(!autoname) return false;
-
     n->confidence = RD_CONFIDENCE_AUTO;
 
     usize idx = rd_i_address2index(seg, address);
@@ -1056,4 +1055,29 @@ unsigned int rd_get_min_string(const RDContext* self) {
 
 void rd_set_min_string(RDContext* self, unsigned int l) {
     self->min_string = l;
+}
+
+bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
+    if(index >= RD_MAX_OPERANDS) return false;
+
+    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+
+    if(!rd_flagsbuffer_has_code(seg->flags, idx) ||
+       rd_flagsbuffer_has_tail(seg->flags, idx))
+        return false;
+
+    RDInstruction instr;
+    if(!rd_decode(self, address, &instr)) return false;
+
+    const RDOperand* op = &instr.operands[idx];
+    if(op->kind != RD_OP_IMM) return false;
+    if(!rd_is_address(self, op->imm)) return false;
+
+    rd_i_flagsbuffer_set_op_over(seg->flags, idx);
+    rd_i_db_set_promoted_operand(self, address, idx);
+    rd_add_xref(self, address, op->imm, RD_DR_ADDRESS);
+    return true;
 }

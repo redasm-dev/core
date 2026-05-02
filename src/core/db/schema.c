@@ -93,10 +93,15 @@ CREATE TABLE TrackedRegisters ( \
     confidence INTEGER NOT NULL, \
     PRIMARY KEY(address, reg) \
 ); \
+CREATE TABLE OperandOverrides ( \
+    address  INTEGER NOT NULL, \
+    idx      INTEGER NOT NULL, \
+    PRIMARY KEY (address, idx) \
+); \
 \
 CREATE TABLE Problems ( \
     from_address INTEGER NOT NULL, \
-    address  INTEGER NOT NULL, \
-    message  TEXT NOT NULL \
+    address      INTEGER NOT NULL, \
+    message      TEXT NOT NULL \
 ); \
 ";

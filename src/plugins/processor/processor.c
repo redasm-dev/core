@@ -12,11 +12,14 @@ void rd_i_processor_render_instruction(RDRenderer* r,
 
     if(p->render_operand) {
         rd_foreach_operand(i, op, instr) {
-            if(i > 0) {
+            if(i > 0)
                 rd_renderer_norm(r, p->operand_sep ? p->operand_sep : ", ");
-            }
 
+            RDCellMeta* meta = rd_i_renderer_get_current_meta(r);
+
+            meta->operand_idx = i;
             p->render_operand(r, instr, i, ctx->processor);
+            meta->operand_idx = -1;
         }
     }
 }

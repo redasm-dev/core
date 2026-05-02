@@ -38,6 +38,7 @@ typedef enum {
     RD_NUM_DEFAULT = 0,
     RD_NUM_SIGNED = 1U << 0,
     RD_NUM_PREFIX = 1U << 1,
+    RD_NUM_NOADDR = 1U << 1,
 } RDNumberFlags;
 
 typedef struct RDCell {

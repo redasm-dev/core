@@ -18,6 +18,7 @@ bool rd_i_flagsbuffer_has_info(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_comment(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_xref_out(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_xref_in(const RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_has_op_over(const RDFlagsBuffer* self, usize idx);
 
 bool rd_i_flagsbuffer_has_type(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_jmpdst(const RDFlagsBuffer* self, usize idx);
@@ -37,6 +38,7 @@ bool rd_i_flagsbuffer_set_call(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_func(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_noret(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_cond(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_op_over(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_type(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_name(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_comment(RDFlagsBuffer* self, usize idx);

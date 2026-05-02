@@ -44,6 +44,7 @@ RD_API bool rd_surface_jump_to(RDSurface* self, RDAddress address);
 RD_API bool rd_surface_get_current_address(const RDSurface* self, RDAddress* address);
 RD_API bool rd_surface_get_address_under_pos(const RDSurface* self, const RDSurfacePos* pos, RDAddress* address);
 RD_API bool rd_surface_get_address_under_cursor(const RDSurface* self, RDAddress* address);
+RD_API int rd_surface_get_operand_under_cursor(const RDSurface* self);
 RD_API int rd_surface_index_of(const RDSurface* self, RDAddress address);
 RD_API int rd_surface_last_index_of(const RDSurface* self, RDAddress address);
 RD_API usize rd_surface_get_row_start(const RDSurface* self);

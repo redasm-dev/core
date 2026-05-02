@@ -176,6 +176,9 @@ RD_API RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr);
 RD_API RDXRefSlice rd_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
                                         usize type);
 
+RD_API bool rd_operand_as_address(RDContext* self, RDAddress address,
+                                  int index);
+
 RD_API RDReader* rd_get_reader(const RDContext* self);
 RD_API RDReader* rd_get_input_reader(const RDContext* self);
 RD_API bool rd_read_u8(const RDContext* self, RDAddress address, u8* v);

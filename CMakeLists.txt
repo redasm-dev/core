@@ -52,6 +52,7 @@ target_sources(${PROJECT_NAME}
         src/surface/items.c
         src/surface/path.c
         src/surface/renderer.c
+        src/surface/row.c
         src/surface/state.c
         src/surface/surface.c
         src/types/def.c

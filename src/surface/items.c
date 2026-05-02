@@ -268,9 +268,9 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
         rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT,
                          RD_THEME_BACKGROUND);
         rd_renderer_text(r, " (start: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, seg->base.start_address, 16, F, RD_NUM_DEFAULT);
+        rd_renderer_num(r, seg->base.start_address, 16, F, RD_NUM_NOADDR);
         rd_renderer_text(r, ", end: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, seg->base.end_address, 16, F, RD_NUM_DEFAULT);
+        rd_renderer_num(r, seg->base.end_address, 16, F, RD_NUM_NOADDR);
         rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
     }
 }

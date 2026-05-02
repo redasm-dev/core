@@ -45,6 +45,8 @@ enum {
     RD_QUERY_DEL_REGVAL,
     RD_QUERY_GET_REGVAL_EXACT,
     RD_QUERY_GET_REG_ALL,
+    RD_QUERY_SET_PROMOTED_OPERAND,
+    RD_QUERY_IS_PROMOTED_OPERAND,
     RD_QUERY_ADD_PROBLEM,
     RD_QUERY_SET_USERDATA,
     RD_QUERY_GET_USERDATA,
@@ -117,3 +119,6 @@ void rd_i_db_del_regval(RDContext* ctx, RDAddress address, const char* regname,
 bool rd_i_db_get_regval_exact(RDContext* ctx, RDAddress address,
                               const char* regname, RDRegEntry* e);
 RDTrackedRegVect* rd_i_db_get_reg_all(RDContext* ctx, RDTrackedRegVect* regs);
+
+void rd_i_db_set_promoted_operand(RDContext* ctx, RDAddress address, int idx);
+bool rd_i_db_is_promoted_operand(RDContext* ctx, RDAddress address, int idx);

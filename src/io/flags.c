@@ -31,6 +31,7 @@ static const RDFlags FL_CALL = 1U << 21;
 static const RDFlags FL_FUNC = 1U << 22;
 static const RDFlags FL_NORET = 1U << 23;
 static const RDFlags FL_COND = 1U << 24;
+static const RDFlags FL_OPOVER = 1U << 25;
 
 // [DATA] bits
 static const RDFlags FL_TYPE = 1U << 18;
@@ -76,6 +77,10 @@ bool rd_i_flags_has_noret(RDFlags self) {
 
 bool rd_i_flags_has_cond(RDFlags self) {
     return (self & FL_CODE) && (self & FL_COND);
+}
+
+bool rd_i_flags_has_op_over(RDFlags self) {
+    return (self & FL_CODE) && (self & FL_OPOVER);
 }
 
 bool rd_i_flags_has_type(RDFlags self) {
@@ -151,6 +156,11 @@ void rd_i_flags_set_noret(RDFlags* self) {
 void rd_i_flags_set_cond(RDFlags* self) {
     assert(rd_i_flags_has_jump(*self) || rd_i_flags_has_call(*self));
     *self |= FL_COND;
+}
+
+void rd_i_flags_set_op_over(RDFlags* self) {
+    assert(rd_i_flags_has_code(*self));
+    *self |= FL_OPOVER;
 }
 
 void rd_i_flags_set_type(RDFlags* self) {

@@ -791,3 +791,29 @@ RDTrackedRegVect* rd_i_db_get_reg_all(RDContext* ctx, RDTrackedRegVect* regs) {
 
     return regs;
 }
+
+void rd_i_db_set_promoted_operand(RDContext* ctx, RDAddress address, int idx) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_SET_PROMOTED_OPERAND, "\
+            INSERT OR IGNORE \
+            INTO OperandOverrides \
+            VALUES(:address, :index) \
+        ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    _rd_db_bind_param_int(ctx, stmt, ":index", idx);
+    _rd_db_step(ctx, stmt);
+}
+
+bool rd_i_db_is_promoted_operand(RDContext* ctx, RDAddress address, int idx) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_IS_PROMOTED_OPERAND, "\
+            SELECT 1 FROM OperandOverrides \
+            WHERE address = :address \
+              AND idx = :index \
+        ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    _rd_db_bind_param_int(ctx, stmt, ":index", idx);
+    return _rd_db_step(ctx, stmt) == SQLITE_ROW;
+}
