@@ -66,7 +66,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             if(rd_i_buffer_read_u8(flags, idx + i, &v)) {
                 if(v) {
                     rd_renderer_text(r, rd_i_escape_char(v, true),
-                                     RD_THEME_STRING, RD_THEME_BACKGROUND);
+                                     RD_THEME_MUTED, RD_THEME_BACKGROUND);
                 }
                 else
                     rd_renderer_num(r, 0, 10, 0, RD_NUM_DEFAULT);
