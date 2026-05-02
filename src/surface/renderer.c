@@ -483,6 +483,8 @@ void rd_i_renderer_set_highlight_word(RDRenderer* self, const char* w) {
     self->hl_word = w && *w ? rd_strdup(w) : NULL;
 }
 
+#include <stdio.h>
+
 void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col) {
     if(vect_is_empty(&self->rows_front)) {
         *row = 0;
@@ -491,10 +493,13 @@ void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col) {
     }
 
     int nrows = (int)vect_length(&self->rows_front);
-    if(*row >= nrows) *row = nrows - 1;
+    if(*row >= nrows)
+        *row = nrows - 1;
+    else if(*row < 0)
+        *row = 0;
 
     int ncols = (int)vect_length(vect_at(&self->rows_front, *row));
-    if(!ncols)
+    if(!ncols || *col < 0)
         *col = 0;
     else if(*col >= ncols)
         *col = ncols - 1;
