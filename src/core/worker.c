@@ -66,7 +66,7 @@ static void _rd_worker_promote_refs(RDContext* ctx) {
             const RDXRefVect* refs =
                 rd_i_get_xrefs_to_type(ctx, addr, RD_DR_ADDRESS);
 
-            if(refs)
+            if(!vect_is_empty(refs))
                 rd_i_engine_enqueue_call(ctx, addr, NULL, RD_CONFIDENCE_AUTO);
         }
     }
