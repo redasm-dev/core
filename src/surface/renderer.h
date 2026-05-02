@@ -58,6 +58,9 @@ int rd_i_renderer_last_index_of(const RDRenderer* self, RDAddress address);
 void rd_i_renderer_set_highlight_word(RDRenderer* self, const char* w);
 void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col);
 bool rd_i_renderer_is_index_visible(const RDRenderer* self, LIndex index);
+bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,
+                                           const RDSurfacePos* pos,
+                                           RDCellData* cd);
 const char* rd_i_renderer_get_word_under_pos(RDRenderer* self,
                                              const RDSurfacePos* pos);
 bool rd_i_renderer_get_address_under_pos(RDRenderer* self,
@@ -66,8 +69,8 @@ bool rd_i_renderer_get_address_under_pos(RDRenderer* self,
 bool rd_i_renderer_get_address(const RDRenderer* self, RDSurfacePos pos,
                                RDAddress* address);
 RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx);
-RDCellMeta* rd_i_renderer_get_current_meta(const RDRenderer* self);
-void rd_i_renderer_set_current_meta(RDRenderer* self, RDCellMeta m);
+RDCellData* rd_i_renderer_get_current_cell_data(const RDRenderer* self);
+void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);

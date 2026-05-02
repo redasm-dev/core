@@ -381,3 +381,30 @@ bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx) {
 
     return false;
 }
+
+bool rd_i_flagsbuffer_undefine_xref_out(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_xref_out(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_undefine_xref_in(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_xref_in(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_undefine_op_over(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_op_over(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}

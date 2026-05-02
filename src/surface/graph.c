@@ -212,10 +212,22 @@ bool rd_surfacegraph_get_address_under_cursor(RDSurfaceGraph* self,
                                                address);
 }
 
+bool rd_surfacegraph_get_cell_data_under_cursor(const RDSurfaceGraph* self,
+                                                RDCellData* cd) {
+    return rd_i_renderer_get_cell_data_under_pos(self->renderer,
+                                                 &self->state.pos, cd);
+}
+
 bool rd_surfacegraph_get_address_under_pos(RDSurfaceGraph* self,
                                            const RDSurfacePos* pos,
                                            RDAddress* address) {
     return rd_i_renderer_get_address_under_pos(self->renderer, pos, address);
+}
+
+bool rd_surfacegraph_get_cell_data_under_pos(const RDSurfaceGraph* self,
+                                             const RDSurfacePos* pos,
+                                             RDCellData* cd) {
+    return rd_i_renderer_get_cell_data_under_pos(self->renderer, pos, cd);
 }
 
 int rd_surfacegraph_index_of(const RDSurfaceGraph* self, RDAddress address) {

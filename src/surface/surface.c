@@ -133,19 +133,20 @@ bool rd_surface_get_address_under_pos(const RDSurface* self,
     return rd_i_renderer_get_address_under_pos(self->renderer, pos, address);
 }
 
+bool rd_surface_get_cell_data_under_pos(const RDSurface* self,
+                                        const RDSurfacePos* pos,
+                                        RDCellData* cd) {
+    return rd_i_renderer_get_cell_data_under_pos(self->renderer, pos, cd);
+}
+
 bool rd_surface_get_address_under_cursor(const RDSurface* self,
                                          RDAddress* address) {
     return rd_surface_get_address_under_pos(self, &self->state.pos, address);
 }
 
-int rd_surface_get_operand_under_cursor(const RDSurface* self) {
-    RDRowVect* rows = &self->renderer->rows_front;
-    if(self->state.pos.row >= (int)vect_length(rows)) return -1;
-
-    RDRow* r = vect_at(rows, self->state.pos.row);
-    if(self->state.pos.col >= (int)rd_i_row_length(r)) return -1;
-
-    return rd_i_row_meta_at(r, self->state.pos.col)->operand_idx;
+bool rd_surface_get_cell_data_under_cursor(const RDSurface* self,
+                                           RDCellData* cd) {
+    return rd_surface_get_cell_data_under_pos(self, &self->state.pos, cd);
 }
 
 void rd_surface_render(RDSurface* self, usize n) {

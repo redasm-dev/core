@@ -10,6 +10,7 @@
 
 typedef enum {
     RD_OP_NULL = 0,
+    RD_OP_CNST,
     RD_OP_REG,
     RD_OP_IMM,
     RD_OP_ADDR,   // Address immediate
@@ -67,6 +68,8 @@ typedef struct RDOperand {
     u16 count;
 
     union {
+        u64 cnst;
+        i64 s_cnst;
         RDReg reg;
         u64 addr;
         u64 imm;

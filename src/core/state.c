@@ -188,7 +188,11 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
     rd_foreach_operand(i, op, instr) {
         str_append(d, rd_i_format(&buf, "  [%d].kind: ", i));
 
-        if(op->kind == RD_OP_REG) {
+        if(op->kind == RD_OP_CNST) {
+            str_append(d, "OP_CNST\n");
+            str_append(d, rd_i_format(&buf, "  [%d].cnst: %x\n", i, op->cnst));
+        }
+        else if(op->kind == RD_OP_REG) {
             str_append(d, "OP_REG\n");
             str_append(d, rd_i_format(&buf, "  [%d].reg: %x\n", i, op->reg));
         }

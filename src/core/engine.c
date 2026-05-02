@@ -2,6 +2,7 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
+#include "support/error.h"
 
 static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,
                                       RDWorkerQueue* q) {
@@ -43,10 +44,37 @@ static void _rd_engine_execute_delay_slots(RDContext* ctx,
 }
 
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
+                        const RDSegmentFull* seg, usize index,
                         RDInstruction* instr) {
     instr->address = address;
     ctx->processorplugin->decode(ctx, instr, ctx->processor);
-    return instr->length > 0;
+
+    if(instr->length > 0) {
+        if(rd_i_flagsbuffer_has_op_over(seg->flags, index)) {
+            const RDOvrOperandVect* ovr_ops =
+                rd_i_db_get_all_ovr_operand(ctx, address);
+
+            const RDOvrOperand* ovr_op;
+            vect_each(ovr_op, ovr_ops) {
+                assert(ovr_op->index < RD_MAX_OPERANDS);
+
+                RDOperand* op = &instr->operands[ovr_op->index];
+
+                if(op->kind == RD_OP_IMM) {
+                    op->kind = RD_OP_ADDR;
+                    op->addr = op->imm;
+                }
+                else {
+                    panic("instruction @ %x operand %d, invalid override",
+                          ovr_op->index, address);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    return false;
 }
 
 bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress addr) {
@@ -130,7 +158,9 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         goto done;
     }
 
-    if(!rd_i_engine_decode(ctx, ctx->engine.current.address, &instr)) goto done;
+    if(!rd_i_engine_decode(ctx, ctx->engine.current.address,
+                           ctx->engine.segment, idx, &instr))
+        goto done;
 
     if(instr.length) {
         if(!rd_i_flagsbuffer_has_unknown_n(ctx->engine.segment->flags, idx,
@@ -201,8 +231,9 @@ bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 
+    usize idx = rd_i_address2index(seg, address);
     *instr = (RDInstruction){0};
-    return rd_i_engine_decode(ctx, address, instr);
+    return rd_i_engine_decode(ctx, address, seg, idx, instr);
 }
 
 bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
@@ -219,7 +250,8 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
 
     *instr = (RDInstruction){0};
-    return rd_i_engine_decode(ctx, rd_i_index2address(seg, idx), instr);
+    return rd_i_engine_decode(ctx, rd_i_index2address(seg, idx), seg, idx,
+                              instr);
 }
 
 void rd_i_engine_destroy(RDContext* ctx) {

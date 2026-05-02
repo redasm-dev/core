@@ -63,6 +63,7 @@ typedef struct RDContext {
     RDCharVect imp_buf;
     RDCharVect problem_buf;
     RDTrackedRegVect tregs_buf;
+    RDOvrOperandVect ovr_ops_buf;
     RDILInstruction il_buf;
 
     char* filepath;
@@ -130,6 +131,11 @@ bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
                        RDConfidence c);
 bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
                        const RDImported* imp);
+
+bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+                   RDXRefType type, RDConfidence c);
+bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+                   RDConfidence c);
 
 const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr);
 const RDXRefVect* rd_i_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,

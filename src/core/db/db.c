@@ -288,21 +288,54 @@ bool rd_i_db_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
 }
 
 void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                      usize type) {
+                      RDXRefType type, RDConfidence c) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_XREF, "\
         INSERT INTO XRefs \
-                VALUES (:fromaddr, :toaddr, :type) \
+                VALUES (:fromaddr, :toaddr, :type, :confidence) \
             ON CONFLICT DO \
-                UPDATE SET type = EXCLUDED.type \
+                UPDATE SET type = EXCLUDED.type, \
+                           confidence = EXCLUDED.confidence \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
     _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
     _rd_db_bind_param_int(ctx, stmt, ":type", type);
+    _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
     _rd_db_step(ctx, stmt);
 }
 
-void rd_i_db_get_xrefs_from_type(RDContext* ctx, RDAddress from, usize t,
+void rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_XREF, "\
+            DELETE FROM XRefs \
+            WHERE from_address = :fromaddr \
+            AND to_address = :toaddr \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
+    _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
+    _rd_db_step(ctx, stmt);
+}
+
+RDConfidence rd_i_db_get_xref_confidence(RDContext* ctx, RDAddress from,
+                                         RDAddress to) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_XREF_CONFIDENCE, "\
+            SELECT confidence  \
+            FROM XRefs \
+            WHERE from_address = :fromaddr \
+            AND to_address = :toaddr \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":fromaddr", from);
+    _rd_db_bind_param_int(ctx, stmt, ":toaddr", to);
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW)
+        return (RDConfidence)sqlite3_column_int64(stmt, 0);
+
+    return RD_CONFIDENCE_AUTO;
+}
+
+void rd_i_db_get_xrefs_from_type(RDContext* ctx, RDAddress from, RDXRefType t,
                                  RDXRefVect* refs) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_FROM_TYPE, "\
@@ -339,7 +372,7 @@ void rd_i_db_get_xrefs_from(RDContext* ctx, RDAddress from, RDXRefVect* refs) {
     }
 }
 
-void rd_i_db_get_xrefs_to_type(RDContext* ctx, RDAddress to, usize t,
+void rd_i_db_get_xrefs_to_type(RDContext* ctx, RDAddress to, RDXRefType t,
                                RDXRefVect* refs) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_TO_TYPE, "\
@@ -374,6 +407,32 @@ void rd_i_db_get_xrefs_to(RDContext* ctx, RDAddress to, RDXRefVect* refs) {
                             .type = (usize)sqlite3_column_int64(stmt, 1),
                         });
     }
+}
+
+bool rd_i_db_has_xrefs_from(RDContext* ctx, RDAddress address) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(
+        ctx, RD_QUERY_HAS_XREFS_FROM, "SELECT EXISTS(SELECT 1 FROM XRefs \
+                                WHERE from_address = :address)");
+
+    if(!stmt) return false;
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+
+    bool r = false;
+    if(sqlite3_step(stmt) == SQLITE_ROW) r = sqlite3_column_int(stmt, 0);
+    return r;
+}
+
+bool rd_i_db_has_xrefs_to(RDContext* ctx, RDAddress address) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(
+        ctx, RD_QUERY_HAS_XREFS_TO,
+        "SELECT EXISTS(SELECT 1 FROM XRefs WHERE to_address = :address)");
+
+    if(!stmt) return false;
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+
+    bool r = false;
+    if(sqlite3_step(stmt) == SQLITE_ROW) r = sqlite3_column_int(stmt, 0);
+    return r;
 }
 
 bool rd_i_db_get_address(RDContext* ctx, const char* name, RDAddress* address) {
@@ -792,9 +851,8 @@ RDTrackedRegVect* rd_i_db_get_reg_all(RDContext* ctx, RDTrackedRegVect* regs) {
     return regs;
 }
 
-void rd_i_db_set_promoted_operand(RDContext* ctx, RDAddress address, int idx) {
-    sqlite3_stmt* stmt =
-        _rd_db_prepare_query(ctx, RD_QUERY_SET_PROMOTED_OPERAND, "\
+void rd_i_db_set_ovr_operand(RDContext* ctx, RDAddress address, int idx) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_OVR_OPERAND, "\
             INSERT OR IGNORE \
             INTO OperandOverrides \
             VALUES(:address, :index) \
@@ -805,15 +863,48 @@ void rd_i_db_set_promoted_operand(RDContext* ctx, RDAddress address, int idx) {
     _rd_db_step(ctx, stmt);
 }
 
-bool rd_i_db_is_promoted_operand(RDContext* ctx, RDAddress address, int idx) {
-    sqlite3_stmt* stmt =
-        _rd_db_prepare_query(ctx, RD_QUERY_IS_PROMOTED_OPERAND, "\
-            SELECT 1 FROM OperandOverrides \
+void rd_i_db_del_ovr_operand(RDContext* ctx, RDAddress address, int idx) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_OVR_OPERAND, "\
+            DELETE FROM OperandOverrides \
             WHERE address = :address \
-              AND idx = :index \
-        ");
+            AND idx = :index \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_int(ctx, stmt, ":index", idx);
-    return _rd_db_step(ctx, stmt) == SQLITE_ROW;
+    _rd_db_step(ctx, stmt);
+}
+
+bool rd_i_db_has_ovr_operand(RDContext* ctx, RDAddress address) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_HAS_OVR_OPERAND,
+                             "SELECT EXISTS(SELECT 1 FROM OperandOverrides \
+                                WHERE address = :address)");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+    bool r = false;
+    if(sqlite3_step(stmt) == SQLITE_ROW) r = sqlite3_column_int(stmt, 0);
+    return r;
+}
+
+RDOvrOperandVect* rd_i_db_get_all_ovr_operand(RDContext* ctx,
+                                              RDAddress address) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_OVR_OPERAND, "\
+            SELECT address, idx FROM OperandOverrides \
+            WHERE address = :address \
+        ");
+
+    vect_clear(&ctx->ovr_ops_buf);
+    _rd_db_bind_param_int(ctx, stmt, ":address", address);
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        vect_push(&ctx->ovr_ops_buf,
+                  (RDOvrOperand){
+                      .address = (RDAddress)sqlite3_column_int64(stmt, 0),
+                      .index = (int)sqlite3_column_int64(stmt, 1),
+                  });
+    }
+
+    return &ctx->ovr_ops_buf;
 }

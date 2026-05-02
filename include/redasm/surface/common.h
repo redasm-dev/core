@@ -1,6 +1,7 @@
 #pragma once
 
 #include <redasm/config.h>
+#include <redasm/plugins/processor/instruction.h>
 #include <redasm/theme.h>
 
 typedef enum {
@@ -38,7 +39,7 @@ typedef enum {
     RD_NUM_DEFAULT = 0,
     RD_NUM_SIGNED = 1U << 0,
     RD_NUM_PREFIX = 1U << 1,
-    RD_NUM_NOADDR = 1U << 1,
+    RD_NUM_NOADDR = 1U << 2,
 } RDNumberFlags;
 
 typedef struct RDCell {
@@ -46,6 +47,13 @@ typedef struct RDCell {
     RDThemeKind fg;
     RDThemeKind bg;
 } RDCell;
+
+typedef struct RDCellData {
+    struct {
+        int index;
+        RDOperand value;
+    } operand;
+} RDCellData;
 
 typedef struct RDRowSlice {
     const RDCell* data;

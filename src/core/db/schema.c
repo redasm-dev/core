@@ -39,6 +39,7 @@ CREATE TABLE XRefs ( \
     from_address INTEGER NOT NULL, \
     to_address   INTEGER NOT NULL, \
     type         INTEGER NOT NULL, \
+    confidence   INTEGER NOT NULL, \
     UNIQUE(from_address, to_address) \
 ); \
 \

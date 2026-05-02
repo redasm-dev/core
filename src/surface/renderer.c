@@ -278,7 +278,10 @@ void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item) {
     RDInstruction instr = {0};
     rd_i_il_init(&ctx->il_buf);
 
-    if(p->lift && rd_i_engine_decode(self->context, item->address, &instr))
+    usize idx = rd_i_address2index(item->segment, item->address);
+
+    if(p->lift && rd_i_engine_decode(self->context, item->address,
+                                     item->segment, idx, &instr))
         p->lift(ctx, &instr, &ctx->il_buf, ctx->processor);
 
     // render 'unknown' if empty
@@ -321,9 +324,12 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
 
 void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item) {
     RDInstruction instr = {0};
+    usize idx = rd_i_address2index(item->segment, item->address);
 
-    if(rd_i_engine_decode(self->context, item->address, &instr))
+    if(rd_i_engine_decode(self->context, item->address, item->segment, idx,
+                          &instr)) {
         rd_i_processor_render_instruction(self, &instr);
+    }
     else
         rd_renderer_unkn(self);
 }
@@ -340,13 +346,13 @@ void rd_renderer_norm(RDRenderer* self, const char* s) {
 
 void rd_renderer_ws(RDRenderer* self, int n) {
     // un-meta whitespaces
-    RDCellMeta oldmeta = *rd_i_renderer_get_current_meta(self);
-    rd_i_renderer_set_current_meta(self, rd_i_default_cell_meta());
+    RDCellData oldmeta = *rd_i_renderer_get_current_cell_data(self);
+    rd_i_renderer_set_current_cell_data(self, rd_i_default_cell_data());
 
     for(int i = 0; i < n; i++)
         rd_renderer_norm(self, " ");
 
-    rd_i_renderer_set_current_meta(self, oldmeta);
+    rd_i_renderer_set_current_cell_data(self, oldmeta);
 }
 
 void rd_renderer_str(RDRenderer* self, const char* s, bool quoted) {
@@ -512,6 +518,18 @@ bool rd_i_renderer_is_index_visible(const RDRenderer* self, LIndex index) {
     return index >= first->index && index < last->index;
 }
 
+bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,
+                                           const RDSurfacePos* pos,
+                                           RDCellData* cd) {
+    if(pos->row >= (int)vect_length(&self->rows_front)) return false;
+
+    RDRow* r = vect_at(&self->rows_front, pos->row);
+    if(pos->col >= (int)rd_i_row_length(r)) return false;
+
+    if(cd) *cd = *rd_i_row_meta_at(r, pos->col);
+    return true;
+}
+
 const char* rd_i_renderer_get_word_under_pos(RDRenderer* self,
                                              const RDSurfacePos* pos) {
     if(!pos) return NULL;
@@ -546,12 +564,12 @@ RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx) {
     };
 }
 
-RDCellMeta* rd_i_renderer_get_current_meta(const RDRenderer* self) {
+RDCellData* rd_i_renderer_get_current_cell_data(const RDRenderer* self) {
     RDRow* r = vect_back(&self->rows_back);
     return &r->curr_meta;
 }
 
-void rd_i_renderer_set_current_meta(RDRenderer* self, RDCellMeta m) {
+void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m) {
     RDRow* r = vect_back(&self->rows_back);
     r->curr_meta = m;
 }

@@ -27,3 +27,14 @@ typedef struct RDTrackedRegVect {
     usize length;
     usize capacity;
 } RDTrackedRegVect;
+
+typedef struct RDOvrOperand {
+    RDAddress address;
+    usize index;
+} RDOvrOperand;
+
+typedef struct RDOvrOperandVect {
+    RDOvrOperand* data;
+    usize length;
+    usize capacity;
+} RDOvrOperandVect;

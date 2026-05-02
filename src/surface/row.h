@@ -5,32 +5,27 @@
 #include <assert.h>
 #include <redasm/surface/common.h>
 
-// currently used to store operand index only
-typedef struct RDCellMeta {
-    int operand_idx;
-} RDCellMeta;
-
 typedef struct RDCellVect {
     RDCell* data;
     usize length; // padded length
     usize capacity;
 } RDCellVect;
 
-typedef struct RDCellMetaVect {
-    RDCellMeta* data;
+typedef struct RDCellDataVect {
+    RDCellData* data;
     usize length;
     usize capacity;
-} RDCellMetaVect;
+} RDCellDataVect;
 
 typedef struct RDRow {
     RDCellVect cells;
-    RDCellMetaVect meta; // parallel array of 'cells'
+    RDCellDataVect data; // parallel array of 'cells'
 
     LIndex index;
     RDAddress address;
     usize content_length; // length before padding (number of valid cells)
 
-    RDCellMeta curr_meta;
+    RDCellData curr_meta;
 } RDRow;
 
 typedef struct RDRowVect {
@@ -39,9 +34,9 @@ typedef struct RDRowVect {
     usize capacity;
 } RDRowVect;
 
-static inline RDCellMeta rd_i_default_cell_meta(void) {
-    return (RDCellMeta){
-        .operand_idx = -1,
+static inline RDCellData rd_i_default_cell_data(void) {
+    return (RDCellData){
+        .operand = {.index = -1},
     };
 }
 
@@ -55,16 +50,16 @@ static inline RDCell* rd_i_row_cell_at(RDRow* self, usize idx) {
     return vect_at(&self->cells, idx);
 }
 
-static inline RDCellMeta* rd_i_row_meta_at(RDRow* self, usize idx) {
-    return vect_at(&self->meta, idx);
+static inline RDCellData* rd_i_row_meta_at(RDRow* self, usize idx) {
+    return vect_at(&self->data, idx);
 }
 
 static inline usize rd_i_row_is_empty(const RDRow* self) {
-    assert(vect_length(&self->cells) == (vect_length(&self->meta)));
+    assert(vect_length(&self->cells) == (vect_length(&self->data)));
     return vect_is_empty(&self->cells);
 }
 
 static inline usize rd_i_row_length(const RDRow* self) {
-    assert(vect_length(&self->cells) == (vect_length(&self->meta)));
+    assert(vect_length(&self->cells) == (vect_length(&self->data)));
     return vect_length(&self->cells);
 }

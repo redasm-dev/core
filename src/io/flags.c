@@ -209,3 +209,18 @@ void rd_i_flags_undefine_comment(RDFlags* self) {
     assert(!rd_i_flags_has_tail(*self));
     *self &= ~FL_COMMENT;
 }
+
+void rd_i_flags_undefine_xref_out(RDFlags* self) {
+    assert(!rd_i_flags_has_tail(*self));
+    *self &= ~FL_XREFOUT;
+}
+
+void rd_i_flags_undefine_xref_in(RDFlags* self) {
+    assert(!rd_i_flags_has_tail(*self));
+    *self &= ~FL_XREFIN;
+}
+
+void rd_i_flags_undefine_op_over(RDFlags* self) {
+    assert(rd_i_flags_has_code(*self));
+    *self &= ~FL_OPOVER;
+}
