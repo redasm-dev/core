@@ -96,6 +96,16 @@ int rd_stricmp(const char* a, const char* b) {
     return tolower((unsigned char)*a) - tolower((unsigned char)*b);
 }
 
+int rd_strnicmp(const char* a, const char* b, int n) {
+    while(n-- && *a && *b) {
+        int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
+        if(d) return d;
+        a++;
+        b++;
+    }
+    return n <= 0 ? 0 : tolower((unsigned char)*a) - tolower((unsigned char)*b);
+}
+
 void rd_free(void* p) { free(p); }
 
 const char* rd_i_get_file_name(const char* filepath) {
