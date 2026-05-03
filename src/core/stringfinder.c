@@ -48,8 +48,11 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
                                      usize idx, const RDCharVect* str) {
     usize len = vect_length(str) - 1;
 
-    if(len < ctx->min_string) return;
-    if(*str->data == '%' && !_rd_strings_check_format(str->data, len)) return;
+    bool valid =
+        (*str->data == '%' && _rd_strings_check_format(str->data, len)) ||
+        len >= ctx->min_string;
+
+    if(!valid) return;
 
     RDAddress addr = rd_i_index2address(seg, idx);
     if(rd_auto_type(ctx, addr, "char", vect_length(str), RD_TYPE_NONE))
