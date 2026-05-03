@@ -13,7 +13,7 @@ static bool _rd_reg_getmask(RDContext* ctx, const char* regname, RDRegMask* m) {
         return ctx->processorplugin->get_reg_name(m->reg, ctx->processor);
     }
 
-    return true;
+    return false;
 }
 
 static bool _rd_set_regval(RDContext* ctx, RDAddress address,
