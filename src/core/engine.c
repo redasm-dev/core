@@ -192,6 +192,9 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         if(instr.flow == RD_IF_JUMP_COND || instr.flow == RD_IF_CALL_COND)
             rd_i_flagsbuffer_set_cond(ctx->engine.segment->flags, idx);
 
+        if(instr.delay_slots == RD_IS_DSLOT)
+            rd_i_flagsbuffer_set_dslot(ctx->engine.segment->flags, idx);
+
         if(ctx->engine.current.kind == RD_WI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
         else if(ctx->engine.current.kind == RD_WI_CALL)

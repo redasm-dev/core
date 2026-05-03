@@ -2,6 +2,11 @@
 
 #include <redasm/hooks.h>
 
+typedef struct RDHookItem {
+    const char* name;
+    RDHook hook;
+} RDHookItem;
+
 typedef struct RDInstructionHookItem {
     const char* name;
     RDInstructionHook hook;
@@ -24,6 +29,12 @@ typedef struct RDRenderHookItem {
 } RDRenderHookItem;
 
 typedef struct RDHooks {
+    struct {
+        RDHookItem* data;
+        usize length;
+        usize capacity;
+    } general;
+
     struct {
         RDInstructionHookItem* data;
         usize length;

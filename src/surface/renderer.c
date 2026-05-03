@@ -294,14 +294,15 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         const char* name;
         RDThemeKind fg;
     } PREDS[] = {
+        {rd_flagsbuffer_has_code, "CODE", RD_THEME_FLAG_CODE},
+        {rd_flagsbuffer_has_data, "DATA", RD_THEME_FLAG_DATA},
         {rd_flagsbuffer_has_func, "FUNC", RD_THEME_FUNCTION},
-        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_STOP},
         {rd_flagsbuffer_has_call, "CALL", RD_THEME_CALL},
         {rd_flagsbuffer_has_jump, "JUMP", RD_THEME_JUMP},
         {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},
+        {rd_flagsbuffer_has_dslot, "DSLOT", RD_THEME_MUTED},
         {rd_flagsbuffer_has_flow, "FLOW", RD_THEME_FOREGROUND},
-        {rd_flagsbuffer_has_code, "CODE", RD_THEME_FLAG_CODE},
-        {rd_flagsbuffer_has_data, "DATA", RD_THEME_FLAG_DATA},
+        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_STOP},
         {rd_flagsbuffer_has_tail, "TAIL", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_name, "NAME", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_exported, "EXPORTED", RD_THEME_FOREGROUND},

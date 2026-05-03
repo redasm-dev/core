@@ -57,6 +57,8 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
     RDFunctionWorkVect w = {0};
     RDXRefVect refs = {0};
 
+    self->n_instructions = 0;
+
     // set function entry
     RDGraphNode root = _rd_function_get_or_add_block(g, self->address,
                                                      self->address, &w, chunks);
@@ -79,11 +81,24 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
 
             usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
             if(!len) break;
+            self->n_instructions++;
 
             RDAddress nextaddr = addr + len;
 
             if(rd_i_flags_has_jump(flags)) {
                 rd_i_get_xrefs_from_type_ex(ctx, addr, RD_CR_JUMP, &refs);
+
+                // consume all delay slot instructions into current block
+                while(nextaddr < seg->base.end_address) {
+                    usize nextidx = rd_i_address2index(seg, nextaddr);
+                    RDFlags nextflags =
+                        rd_i_flagsbuffer_get(seg->flags, nextidx);
+                    if(!rd_i_flags_has_dslot(nextflags)) break;
+                    usize slotlen =
+                        rd_i_flagsbuffer_get_range_length(seg->flags, nextidx);
+                    self->n_instructions++;
+                    nextaddr += slotlen;
+                }
 
                 if(rd_i_flags_has_cond(flags)) {
                     // true edge(s): jump targets from refs
@@ -192,6 +207,10 @@ RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }
 
 RDAddress rd_function_get_address(const RDFunction* self) {
     return self->address;
+}
+
+usize rd_function_get_n_instructions(const RDFunction* self) {
+    return self->n_instructions;
 }
 
 bool rd_function_get_chunk(const RDFunction* self, RDGraphNode n,

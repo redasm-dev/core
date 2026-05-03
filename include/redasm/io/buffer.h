@@ -15,6 +15,7 @@ RD_API bool rd_flagsbuffer_has_noret(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_jump(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_call(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_cond(const RDFlagsBuffer* self, usize idx);
+RD_API bool rd_flagsbuffer_has_dslot(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_name(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_imported(const RDFlagsBuffer* self, usize idx);
 RD_API bool rd_flagsbuffer_has_exported(const RDFlagsBuffer* self, usize idx);

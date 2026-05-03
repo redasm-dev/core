@@ -3,6 +3,33 @@
 #include "support/containers.h"
 #include "support/logging.h"
 
+#define rd_fire_all_hooks_impl(it, ctx, name, hooks, searchcb, ...)            \
+    do {                                                                       \
+        if(!name) return;                                                      \
+                                                                               \
+        const char* interned = rd_i_strpool_intern(&ctx->strings, name);       \
+        size_t _i = vect_lower_bound(interned, hooks, searchcb);               \
+                                                                               \
+        while(_i < vect_length(hooks) &&                                       \
+              vect_at(hooks, _i)->name == interned) {                          \
+            it = vect_at(hooks, _i);                                           \
+            __VA_ARGS__                                                        \
+            _i++;                                                              \
+        }                                                                      \
+    } while(0)
+
+#define rd_fire_one_hook_impl(it, ctx, name, hooks, searchcb, ...)             \
+    do {                                                                       \
+        if(!name) return false;                                                \
+        const char* interned = rd_i_strpool_intern(&ctx->strings, name);       \
+        size_t _i = vect_lower_bound(interned, hooks, searchcb);               \
+                                                                               \
+        if(_i < vect_length(hooks) && vect_at(hooks, _i)->name == interned) {  \
+            it = vect_at(hooks, _i);                                           \
+            __VA_ARGS__                                                        \
+        }                                                                      \
+    } while(0)
+
 static int _rd_instruction_hook_cmp(const void* a, const void* b) {
     const RDInstructionHookItem* ia = a;
     const RDInstructionHookItem* ib = b;
@@ -32,6 +59,14 @@ static int _rd_render_hook_cmp(const void* a, const void* b) {
     const RDRenderHookItem* ib = b;
     if(ia->name < ib->name) return -1;
     if(ia->name > ib->name) return 1;
+    return 0;
+}
+
+static int _rd_hook_search(const void* key, const void* elem) {
+    const char* name = (const char*)key;
+    const char* ename = ((const RDHookItem*)elem)->name;
+    if(name < ename) return -1;
+    if(name > ename) return 1;
     return 0;
 }
 
@@ -71,11 +106,40 @@ RDHooks* rd_i_hooks_create(void) { return calloc(1, sizeof(RDHooks)); }
 
 void rd_i_hooks_destroy(RDHooks* self) {
     if(!self) return;
+    vect_destroy(&self->general);
     vect_destroy(&self->instruction);
     vect_destroy(&self->address);
     vect_destroy(&self->xref);
     vect_destroy(&self->render);
     free(self);
+}
+
+bool rd_register_hook(RDContext* ctx, const char* name, RDHook h) {
+    if(!name || !h) return false;
+
+    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
+
+    size_t i =
+        vect_lower_bound(interned, &ctx->hooks->general, _rd_hook_search);
+
+    // check for duplicate
+    while(i < vect_length(&ctx->hooks->general) &&
+          vect_at(&ctx->hooks->general, i)->name == interned) {
+        if(vect_at(&ctx->hooks->general, i)->hook == h) {
+            LOG_WARN("hook '%s' already registered with same handler, ignoring",
+                     name);
+            return false;
+        }
+        i++;
+    }
+
+    vect_push(&ctx->hooks->general, (RDHookItem){
+                                        .name = interned,
+                                        .hook = h,
+                                    });
+
+    vect_sort(&ctx->hooks->general, _rd_instruction_hook_cmp);
+    return true;
 }
 
 bool rd_register_instruction_hook(RDContext* ctx, const char* name,
@@ -121,8 +185,8 @@ bool rd_register_address_hook(RDContext* ctx, const char* name,
     while(i < vect_length(&ctx->hooks->address) &&
           vect_at(&ctx->hooks->address, i)->name == interned) {
         if(vect_at(&ctx->hooks->address, i)->hook == h) {
-            LOG_WARN("instruction hook '%s' already registered with same "
-                     "handler, ignoring",
+            LOG_WARN("address hook '%s' already registered with same handler, "
+                     "ignoring",
                      name);
             return false;
         }
@@ -150,9 +214,9 @@ bool rd_register_xref_hook(RDContext* ctx, const char* name, RDXRefHook h) {
     while(i < vect_length(&ctx->hooks->xref) &&
           vect_at(&ctx->hooks->xref, i)->name == interned) {
         if(vect_at(&ctx->hooks->xref, i)->hook == h) {
-            LOG_WARN("instruction hook '%s' already registered with same "
-                     "handler, ignoring",
-                     name);
+            LOG_WARN(
+                "xref hook '%s' already registered with same handler, ignoring",
+                name);
             return false;
         }
         i++;
@@ -220,88 +284,71 @@ bool rd_register_render_operand_hook(RDContext* ctx, const char* name,
     return true;
 }
 
+void rd_fire_hook(RDContext* ctx, const char* name) {
+    RDHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->general,
+                           _rd_hook_search, { item->hook(ctx); });
+}
+
 void rd_fire_instruction_hook(RDContext* ctx, const char* name,
                               RDInstruction* instr) {
-    if(!name || !instr) return;
+    if(!instr) return;
 
-    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
-
-    size_t i = vect_lower_bound(interned, &ctx->hooks->instruction,
-                                _rd_instruction_hook_search);
-
-    while(i < vect_length(&ctx->hooks->instruction) &&
-          vect_at(&ctx->hooks->instruction, i)->name == interned) {
-        vect_at(&ctx->hooks->instruction, i)->hook(ctx, instr);
-        i++;
-    }
+    RDInstructionHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->instruction,
+                           _rd_instruction_hook_search,
+                           { item->hook(ctx, instr); });
 }
 
 void rd_fire_address_hook(RDContext* ctx, const char* name, RDAddress addr) {
-    if(!name) return;
-
-    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
-
-    size_t i = vect_lower_bound(interned, &ctx->hooks->address,
-                                _rd_address_hook_search);
-
-    while(i < vect_length(&ctx->hooks->address) &&
-          vect_at(&ctx->hooks->address, i)->name == interned) {
-        vect_at(&ctx->hooks->address, i)->hook(ctx, addr);
-        i++;
-    }
+    RDAddressHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->address,
+                           _rd_instruction_hook_search,
+                           { item->hook(ctx, addr); });
 }
 
 void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,
                        RDAddress to, RDXRefType type) {
-    if(!name) return;
-
-    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
-
-    size_t i =
-        vect_lower_bound(interned, &ctx->hooks->xref, _rd_xref_hook_search);
-
-    while(i < vect_length(&ctx->hooks->xref) &&
-          vect_at(&ctx->hooks->xref, i)->name == interned) {
-        vect_at(&ctx->hooks->xref, i)->hook(ctx, from, to, type);
-        i++;
-    }
+    RDXRefHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->xref,
+                           _rd_xref_hook_search,
+                           { item->hook(ctx, from, to, type); });
 }
 
 bool rd_fire_render_mnemonic_hook(RDContext* ctx, const char* name,
                                   RDRenderer* r, const RDInstruction* instr) {
-    if(!name || !r || !instr) return false;
-    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
+    if(!r || !instr) return false;
 
-    size_t i =
-        vect_lower_bound(interned, &ctx->hooks->render, _rd_render_hook_search);
+    bool res = false;
+    RDRenderHookItem* it;
 
-    if(i < vect_length(&ctx->hooks->render) &&
-       vect_at(&ctx->hooks->render, i)->name == interned &&
-       vect_at(&ctx->hooks->render, i)->mnemonic) {
-        vect_at(&ctx->hooks->render, i)->mnemonic(ctx, r, instr);
-        return true;
-    }
+    rd_fire_one_hook_impl(it, ctx, name, &ctx->hooks->render,
+                          _rd_render_hook_search, {
+                              if(it->mnemonic) {
+                                  it->mnemonic(ctx, r, instr);
+                                  res = true;
+                              }
+                          });
 
-    return false;
+    return res;
 }
 
 bool rd_fire_render_operand_hook(RDContext* ctx, const char* name,
                                  RDRenderer* r, const RDInstruction* instr,
                                  usize idx) {
-    if(!name || !r || !instr || idx >= RD_MAX_OPERANDS) return false;
+    if(!r || !instr || idx >= RD_MAX_OPERANDS) return false;
     if(instr->operands[idx].kind == RD_OP_NULL) return false;
 
-    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
+    bool res = false;
+    RDRenderHookItem* it;
 
-    size_t i =
-        vect_lower_bound(interned, &ctx->hooks->render, _rd_render_hook_search);
+    rd_fire_one_hook_impl(it, ctx, name, &ctx->hooks->render,
+                          _rd_render_hook_search, {
+                              if(it->operand) {
+                                  it->operand(ctx, r, instr, idx);
+                                  res = true;
+                              }
+                          });
 
-    if(i < vect_length(&ctx->hooks->render) &&
-       vect_at(&ctx->hooks->render, i)->name == interned &&
-       vect_at(&ctx->hooks->render, i)->operand) {
-        vect_at(&ctx->hooks->render, i)->operand(ctx, r, instr, idx);
-        return true;
-    }
-
-    return false;
+    return res;
 }

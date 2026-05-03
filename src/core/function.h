@@ -5,6 +5,7 @@
 typedef struct RDFunction {
     RDContext* context;
     RDAddress address;
+    usize n_instructions;
     RDGraph* graph;
 } RDFunction;
 

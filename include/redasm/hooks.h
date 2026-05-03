@@ -5,6 +5,7 @@
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/surface/renderer.h>
 
+typedef void (*RDHook)(RDContext*);
 typedef void (*RDInstructionHook)(RDContext*, RDInstruction*);
 typedef void (*RDAddressHook)(RDContext*, RDAddress);
 typedef void (*RDXRefHook)(RDContext*, RDAddress from, RDAddress to,
@@ -14,6 +15,7 @@ typedef void (*RDRenderMnemonicHook)(RDContext*, RDRenderer*,
 typedef void (*RDRenderOperandHook)(RDContext*, RDRenderer*,
                                     const RDInstruction*, usize idx);
 
+RD_API bool rd_register_hook(RDContext* ctx, const char* name, RDHook h);
 RD_API bool rd_register_instruction_hook(RDContext* ctx, const char* name,
                                          RDInstructionHook h);
 RD_API bool rd_register_address_hook(RDContext* ctx, const char* name,
@@ -25,6 +27,7 @@ RD_API bool rd_register_render_mnemonic_hook(RDContext* ctx, const char* name,
 RD_API bool rd_register_render_operand_hook(RDContext* ctx, const char* name,
                                             RDRenderOperandHook h);
 
+RD_API void rd_fire_hook(RDContext* ctx, const char* name);
 RD_API void rd_fire_instruction_hook(RDContext* ctx, const char* name,
                                      RDInstruction*);
 RD_API void rd_fire_address_hook(RDContext* ctx, const char* name,

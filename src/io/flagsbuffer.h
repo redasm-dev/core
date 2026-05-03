@@ -38,6 +38,7 @@ bool rd_i_flagsbuffer_set_call(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_func(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_noret(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_cond(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_dslot(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_op_over(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_type(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_name(RDFlagsBuffer* self, usize idx);

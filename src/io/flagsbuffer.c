@@ -104,6 +104,10 @@ bool rd_flagsbuffer_has_cond(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_cond(self->data[idx]);
 }
 
+bool rd_flagsbuffer_has_dslot(const RDFlagsBuffer* self, usize idx) {
+    return idx < self->base.length && rd_i_flags_has_dslot(self->data[idx]);
+}
+
 bool rd_i_flagsbuffer_has_op_over(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_op_over(self->data[idx]);
 }
@@ -254,6 +258,15 @@ bool rd_i_flagsbuffer_set_noret(RDFlagsBuffer* self, usize idx) {
 bool rd_i_flagsbuffer_set_cond(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
         rd_i_flags_set_cond(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_set_dslot(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_set_dslot(&self->data[idx]);
         return true;
     }
 
