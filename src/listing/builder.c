@@ -221,6 +221,7 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
 }
 
 void rd_i_listing_build(RDContext* ctx) {
+    LOG_INFO("generating listing...");
     RDListingBuilder b = {.context = ctx};
     rd_i_listing_init(&b.listing, &ctx->listing);
 

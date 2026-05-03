@@ -1,5 +1,4 @@
 #include "state.h"
-#include "plugins/builtin/analyzers.h"
 #include "plugins/builtin/loaders.h"
 #include "plugins/builtin/processors.h"
 #include "plugins/module.h"
@@ -38,7 +37,6 @@ void rd_i_state_init(void) {
     rd_i_theme_init(&rd_i_state.theme);
     rd_i_builtin_binary();
     rd_i_builtin_null();
-    rd_i_builtin_autorename();
 }
 
 void rd_i_state_deinit(void) {

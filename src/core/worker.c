@@ -1,3 +1,4 @@
+#include "core/autorename.h"
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
@@ -178,6 +179,7 @@ static void _rd_worker_step_signature(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_finalize(RDContext* ctx) {
     rd_i_listing_build(ctx);
+    rd_i_autorename(ctx);
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
     ctx->engine.status.is_listing_changed = true;
     ctx->engine.step++;

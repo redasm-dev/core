@@ -15,6 +15,7 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         src/core/db/db.c
         src/core/db/schema.c
+        src/core/autorename.c
         src/core/context.c
         src/core/engine.c
         src/core/function.c
@@ -32,7 +33,6 @@ target_sources(${PROJECT_NAME}
         src/io/reader.c
         src/listing/builder.c
         src/listing/listing.c
-        src/plugins/builtin/analyzers.c
         src/plugins/builtin/loaders.c
         src/plugins/builtin/processors.c
         src/plugins/processor/instruction.c
