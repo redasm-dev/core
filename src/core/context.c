@@ -991,7 +991,14 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
 
 bool rd_set_exported(RDContext* ctx, RDAddress address, const char* name) {
     const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
-    if(!seg) return false;
+
+    if(!seg) {
+        rd_i_add_problem(ctx, address, address,
+                         "skipping export '%s' to unmapped address",
+                         name ? name : "<unnamed>");
+
+        return false;
+    }
 
     usize idx = rd_i_address2index(seg, address);
 
