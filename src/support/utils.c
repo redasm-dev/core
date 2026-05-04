@@ -130,7 +130,7 @@ const char* rd_i_get_file_ext(const char* filepath) {
     // Has extension if dot exists and isn't at the start (avoid ".gitignore")
     if(ldot && ldot != fname) return ldot + 1;
 
-    return NULL;
+    return filepath + strlen(filepath); // no extension
 }
 
 char* rd_i_get_file_stem(const char* filepath) {
@@ -138,7 +138,7 @@ char* rd_i_get_file_stem(const char* filepath) {
     const char* fileext = rd_i_get_file_ext(filepath);
 
     // handle names without extension
-    if(!fileext) return rd_strdup(filename);
+    if(!fileext || !(*fileext)) return rd_strdup(filename);
 
     // handle names like ".gitignore"
     if(filename == fileext) return rd_strdup(fileext);
