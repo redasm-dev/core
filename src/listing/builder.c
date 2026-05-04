@@ -128,7 +128,7 @@ static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
                                                });
             }
 
-            b->address += rd_i_size_of(b->context, t->name, t->count, t->flags);
+            b->address += rd_i_size_of(b->context, t->name, t->count, t->mod);
             return idx;
         }
 
@@ -158,7 +158,7 @@ static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
         rd_i_listing_pop_indent(&b->listing, 1);
     }
     else
-        b->address += rd_i_size_of(b->context, t->name, 0, t->flags);
+        b->address += rd_i_size_of(b->context, t->name, 0, t->mod);
 
     if(isroot) {
         vect_push(&b->listing.symbols, (RDSymbol){

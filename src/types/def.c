@@ -72,12 +72,12 @@ RDTypeDef* rd_typedef_create_enum(const char* name, const char* type,
 }
 
 bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char* name,
-                           usize n, usize flags, RDContext* ctx) {
+                           usize n, RDTypeModifier mod, RDContext* ctx) {
     RDParam m = {
         .type =
             {
                 .name = rd_i_strpool_intern(&ctx->strings, type),
-                .flags = flags,
+                .mod = mod,
                 .count = n,
             },
         .name = rd_i_strpool_intern(&ctx->strings, name),
@@ -109,7 +109,7 @@ bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value,
 }
 
 bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
-                        usize n, usize flags, RDContext* ctx) {
+                        usize n, RDTypeModifier mod, RDContext* ctx) {
     if(self->kind != RD_TKIND_FUNC) {
         LOG_FAIL("cannot add argument to '%s'", self->name);
         return false;
@@ -120,7 +120,7 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
                   .type =
                       {
                           .name = rd_i_strpool_intern(&ctx->strings, type),
-                          .flags = flags,
+                          .mod = mod,
                           .count = n,
                       },
                   .name = rd_i_strpool_intern(&ctx->strings, name),
@@ -129,8 +129,8 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
     return true;
 }
 
-bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n, usize flags,
-                        RDContext* ctx) {
+bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
+                        RDTypeModifier mod, RDContext* ctx) {
     if(self->kind != RD_TKIND_FUNC) {
         LOG_FAIL("cannot set return type to '%s'", self->name);
         return false;
@@ -138,7 +138,7 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n, usize flags,
 
     self->func_.ret = (RDType){
         .name = rd_i_strpool_intern(&ctx->strings, type),
-        .flags = flags,
+        .mod = mod,
         .count = n,
     };
 
@@ -266,7 +266,7 @@ void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
         RDParam* m;
         vect_each(m, &tdef->compound_) {
             usize member_sz =
-                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.flags);
+                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.mod);
 
             panic_if(!member_sz,
                      "struct member '%s.%s' has unresolved size, ensure "
@@ -280,7 +280,7 @@ void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
         RDParam* m;
         vect_each(m, &tdef->compound_) {
             usize member_sz =
-                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.flags);
+                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.mod);
 
             panic_if(!member_sz,
                      "union member '%s.%s' has unresolved size, ensure "

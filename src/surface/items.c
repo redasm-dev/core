@@ -21,21 +21,36 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     panic_if(!seg, "_rd_surface_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
-    const unsigned int PTR_SIZE = r->context->processorplugin->ptr_size;
+
+    const RDProcessorPlugin* p = r->context->processorplugin;
+    const unsigned int PTR_SIZE = p->ptr_size;
+    const unsigned int CPTR_SIZE =
+        p->code_ptr_size ? p->code_ptr_size : PTR_SIZE;
+
     bool is_be = r->context->processorplugin->flags & RD_PF_BE;
     usize idx = rd_i_address2index(seg, address);
 
     // pointer
-    if(t->flags & RD_TYPE_ISPOINTER) {
-        const char* ptrtype = rd_integral_from_size(PTR_SIZE);
-        u64 v;
+    const char* ptr_type = NULL;
+    unsigned int calc_ptr_size = 0;
 
-        if(rd_i_buffer_read_primitive(flags, idx, ptrtype, is_be, &v)) {
-            const unsigned int F = PTR_SIZE * 2;
+    if(t->mod == RD_TYPE_PTR) {
+        ptr_type = rd_integral_from_size(PTR_SIZE);
+        calc_ptr_size = PTR_SIZE;
+    }
+    else if(t->mod == RD_TYPE_PTR) {
+        ptr_type = rd_integral_from_size(CPTR_SIZE);
+        calc_ptr_size = CPTR_SIZE;
+    }
+
+    if(ptr_type) {
+        u64 v;
+        if(rd_i_buffer_read_primitive(flags, idx, ptr_type, is_be, &v)) {
+            const unsigned int F = calc_ptr_size * 2;
             rd_renderer_loc(r, v, F, RD_NUM_DEFAULT);
         }
         else
-            rd_renderer_nop(r, "?");
+            rd_renderer_muted(r, "?");
 
         return;
     }
@@ -48,7 +63,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             u8 v;
 
             if(!rd_i_buffer_read_u8(flags, idx + i, &v)) {
-                rd_renderer_nop(r, "?");
+                rd_renderer_muted(r, "?");
                 continue;
             }
 
@@ -72,7 +87,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                     rd_renderer_num(r, 0, 10, 0, RD_NUM_DEFAULT);
             }
             else
-                rd_renderer_nop(r, "?");
+                rd_renderer_muted(r, "?");
         }
         return;
     }
@@ -86,7 +101,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                             : rd_i_buffer_read_le16(flags, idx, &v);
 
             if(!ok) {
-                rd_renderer_nop(r, "?");
+                rd_renderer_muted(r, "?");
                 continue;
             }
 
@@ -111,7 +126,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             rd_renderer_text(r, rd_i_escape_char(v, false), RD_THEME_STRING,
                              RD_THEME_BACKGROUND);
         else
-            rd_renderer_nop(r, "?");
+            rd_renderer_muted(r, "?");
         rd_renderer_norm(r, "'");
         return;
     }
@@ -128,7 +143,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             rd_renderer_text(r, rd_i_escape_char16(v, false), RD_THEME_STRING,
                              RD_THEME_BACKGROUND);
         else
-            rd_renderer_nop(r, "?");
+            rd_renderer_muted(r, "?");
         rd_renderer_norm(r, "'");
         return;
     }
@@ -136,11 +151,11 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     // numeric primitive
     u64 v;
     if(rd_i_buffer_read_primitive(flags, idx, t->name, is_be, &v)) {
-        usize sz = rd_i_size_of(r->context, t->name, 0, t->flags);
+        usize sz = rd_i_size_of(r->context, t->name, 0, t->mod);
         rd_renderer_num(r, v, 16, sz * 2, RD_NUM_DEFAULT);
     }
     else
-        rd_renderer_nop(r, "?");
+        rd_renderer_muted(r, "?");
 }
 
 static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
@@ -211,7 +226,7 @@ static void _rd_render_hex_dump_item(RDRenderer* r, const RDListingItem* item) {
         if(rd_flagsbuffer_get_value(seg->flags, idx, &v))
             rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
         else
-            rd_renderer_nop(r, "??");
+            rd_renderer_muted(r, "??");
 
         rd_renderer_ws(r, 1);
     }
@@ -229,7 +244,7 @@ static void _rd_render_hex_dump_item(RDRenderer* r, const RDListingItem* item) {
         if(rd_flagsbuffer_get_value(seg->flags, idx, (u8*)&ptr))
             rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
         else
-            rd_renderer_nop(r, "?");
+            rd_renderer_muted(r, "?");
     }
 
     if(c < RD_LISTING_HEX_LINE) rd_renderer_ws(r, RD_LISTING_HEX_LINE - c);
@@ -246,7 +261,7 @@ static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
     if(item->fill.has_value)
         rd_renderer_num(r, item->fill.value, 16, 2, RD_NUM_DEFAULT);
     else
-        rd_renderer_nop(r, "??");
+        rd_renderer_muted(r, "??");
 }
 
 static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
@@ -344,7 +359,7 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
     rd_renderer_text(r, item->type.name, RD_THEME_TYPE, RD_THEME_BACKGROUND);
 
     // 3. pointer modifier
-    if(item->type.flags & RD_TYPE_ISPOINTER) rd_renderer_norm(r, "*");
+    if(rd_type_is_ptr(&item->type)) rd_renderer_norm(r, "*");
 
     rd_renderer_ws(r, 1);
 
@@ -381,7 +396,7 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
     }
 
     // 6. value (only for primitives and pointers, not compound heads)
-    if(tdef->kind == RD_TKIND_PRIM || (item->type.flags & RD_TYPE_ISPOINTER)) {
+    if(tdef->kind == RD_TKIND_PRIM || rd_type_is_ptr(&item->type)) {
         rd_renderer_ws(r, 1);
         rd_renderer_norm(r, "=");
         rd_renderer_ws(r, 1);

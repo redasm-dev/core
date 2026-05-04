@@ -47,7 +47,8 @@ static void _rd_renderer_calc_auto_column(RDRenderer* self) {
 }
 
 static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
-                             usize fill, RDThemeKind fg, RDNumberFlags flags) {
+                             unsigned int fill, RDThemeKind fg,
+                             RDNumberFlags flags) {
     RDBaseParams p = {
         .base = base ? base : 16,
         .with_prefix = flags & RD_NUM_PREFIX,
@@ -302,7 +303,6 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},
         {rd_flagsbuffer_has_dslot, "DSLOT", RD_THEME_MUTED},
         {rd_flagsbuffer_has_flow, "FLOW", RD_THEME_FOREGROUND},
-        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_STOP},
         {rd_flagsbuffer_has_tail, "TAIL", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_name, "NAME", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_exported, "EXPORTED", RD_THEME_FOREGROUND},
@@ -378,7 +378,44 @@ void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
     if(p->get_mnemonic) mnem = p->get_mnemonic(instr, self->context->processor);
     if(!mnem) mnem = rd_i_to_dec(instr->id);
 
-    rd_renderer_text(self, mnem, fg, RD_THEME_BACKGROUND);
+    bool is_def = fg == RD_THEME_DEFAULT;
+
+    switch(instr->flow) {
+        case RD_IF_JUMP:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_JUMP : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        case RD_IF_JUMP_COND:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_JUMP_COND : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        case RD_IF_CALL:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_CALL : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        case RD_IF_CALL_COND:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_CALL_COND : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        case RD_IF_STOP:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_STOP : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        case RD_IF_NOP:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_MUTED : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+
+        default:
+            rd_renderer_text(self, mnem, is_def ? RD_THEME_FOREGROUND : fg,
+                             RD_THEME_BACKGROUND);
+            break;
+    }
 }
 
 void rd_renderer_reg(RDRenderer* self, int reg) {
@@ -393,11 +430,11 @@ void rd_renderer_reg(RDRenderer* self, int reg) {
     rd_renderer_text(self, regname, RD_THEME_REG, RD_THEME_BACKGROUND);
 }
 
-void rd_renderer_nop(RDRenderer* self, const char* s) {
+void rd_renderer_muted(RDRenderer* self, const char* s) {
     rd_renderer_text(self, s, RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
-void rd_renderer_loc(RDRenderer* self, RDAddress address, usize fill,
+void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
                      RDNumberFlags flags) {
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES)) {
         RDName n;

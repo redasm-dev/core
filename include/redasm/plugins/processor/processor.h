@@ -39,8 +39,8 @@ typedef struct RDProcessorPlugin {
 
     void (*render_segment)(RDRenderer*, const RDSegment*, RDProcessor*);
     void (*render_function)(RDRenderer*, const RDFunction*, RDProcessor*);
-    void (*render_mnemonic)(RDRenderer*, const RDInstruction*, RDProcessor*);
-    void (*render_operand)(RDRenderer*, const RDInstruction*, usize idx, RDProcessor*);
+    bool (*render_mnemonic)(RDRenderer*, const RDInstruction*, RDProcessor*);
+    bool (*render_operand)(RDRenderer*, const RDInstruction*, usize idx, RDProcessor*);
 } RDProcessorPlugin;
 // clang-format on
 

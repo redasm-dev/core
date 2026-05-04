@@ -56,7 +56,7 @@ CREATE TABLE TypeParams ( \
     type       TEXT NOT NULL, \
     name       TEXT NOT NULL, \
     count      INTEGER NOT NULL, \
-    flags      INTEGER NOT NULL, \
+    modifier   INTEGER NOT NULL, \
     member_idx INTEGER NOT NULL, \
     PRIMARY KEY(owner, member_idx) \
 ); \
@@ -72,7 +72,7 @@ CREATE TABLE Types ( \
     address    INTEGER PRIMARY KEY, \
     name       TEXT NOT NULL, \
     count      INTEGER NOT NULL, \
-    flags      INTEGER NOT NULL, \
+    modifier   INTEGER NOT NULL, \
     confidence INTEGER NOT NULL \
 ); \
 \

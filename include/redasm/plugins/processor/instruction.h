@@ -39,7 +39,7 @@ typedef struct RDPhraseOperand {
 typedef struct RDDisplOperand {
     RDReg base;
     RDReg index;
-    i64 displ;
+    i64 offset;
     u8 scale;
 } RDDisplOperand;
 

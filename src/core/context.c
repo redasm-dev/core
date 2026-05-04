@@ -330,6 +330,22 @@ bool rd_is_address(const RDContext* self, RDAddress address) {
     return rd_find_segment(self, address) != NULL;
 }
 
+bool rd_has_refs_from(const RDContext* self, RDAddress address) {
+    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+    return rd_i_flagsbuffer_has_xref_out(seg->flags, idx);
+}
+
+bool rd_has_refs_to(const RDContext* self, RDAddress address) {
+    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+    return rd_i_flagsbuffer_has_xref_in(seg->flags, idx);
+}
+
 bool rd_get_address(RDContext* self, const char* name, RDAddress* address) {
     if(!name) return false;
     if(rd_i_db_get_address(self, name, address)) return true;
@@ -611,6 +627,53 @@ bool rd_read_be64(const RDContext* self, RDAddress address, u64* v) {
     return rd_i_buffer_read_be64((const RDBuffer*)s->flags, idx, v);
 }
 
+bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
+    bool is_be = ctx->processorplugin->flags & RD_PF_BE;
+
+    switch(ctx->processorplugin->ptr_size) {
+        case sizeof(u8): {
+            u8 ptr_v;
+            if(!rd_read_u8(ctx, address, &ptr_v)) return false;
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u16): {
+            u16 ptr_v;
+            if(is_be ? !rd_read_be16(ctx, address, &ptr_v)
+                     : !rd_read_le16(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u32): {
+            u32 ptr_v;
+            if(is_be ? !rd_read_be32(ctx, address, &ptr_v)
+                     : !rd_read_le32(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u64): {
+            u64 ptr_v;
+            if(is_be ? !rd_read_be64(ctx, address, &ptr_v)
+                     : !rd_read_le64(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        default: break;
+    }
+
+    return false;
+}
+
 bool rd_expect_u8(const RDContext* self, RDAddress address, u8 v) {
     const RDSegmentFull* s = rd_i_find_segment(self, address);
     if(!s) return false;
@@ -796,7 +859,7 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
             // clang-format off
             // reserve at least these bytes, +2 for quoting, +1 null terminator
             usize sz = rd_i_size_of(ctx, t.base.name, t.base.count,
-                                          t.base.flags) + 3;
+                                          t.base.mod) + 3;
             // clang-format on
 
             usize idx = rd_i_address2index(seg, self->address);
@@ -850,9 +913,7 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
 
     const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
     const char* ptrtype = rd_integral_from_size(PTR_SIZE);
-
-    rd_i_set_type(self, address, ptrtype, 0, RD_TYPE_ISPOINTER,
-                  RD_CONFIDENCE_AUTO);
+    rd_i_set_type(self, address, ptrtype, 0, RD_TYPE_PTR, RD_CONFIDENCE_AUTO);
 
     rd_i_flagsbuffer_set_imported(seg->flags, idx);
     rd_i_db_set_imported(self, address, imp);

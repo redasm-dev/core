@@ -81,12 +81,12 @@ static void _rd_db_bind_param_str(RDContext* ctx, sqlite3_stmt* stmt,
 static sqlite3_stmt* _rd_db_prepare_typedef_params_query(RDContext* ctx) {
     return _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
         INSERT INTO TypeParams \
-            VALUES (:owner, :type, :name, :count, :flags, :member_idx) \
+            VALUES (:owner, :type, :name, :count, :mod, :member_idx) \
         ON CONFLICT DO \
             UPDATE SET type = EXCLUDED.type, \
                        name = EXCLUDED.name, \
                        count = EXCLUDED.count, \
-                       flags = EXCLUDED.flags, \
+                       modifier = EXCLUDED.modifier, \
                        member_idx = EXCLUDED.member_idx \
         ");
 }
@@ -534,11 +534,11 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         vect_each(m, &tdef->compound_) {
             stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
                     INSERT INTO TypeParams \
-                        VALUES (:owner, :type, :name, :count, :flags, :member_idx) \
+                        VALUES (:owner, :type, :name, :count, :modifier, :member_idx) \
                     ON CONFLICT DO \
                         UPDATE SET type = EXCLUDED.type, \
                                    count = EXCLUDED.count, \
-                                   flags = EXCLUDED.flags, \
+                                   modifier = EXCLUDED.modifier, \
                                    member_idx = EXCLUDED.member_idx \
                     ");
 
@@ -546,7 +546,7 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             _rd_db_bind_param_str(ctx, stmt, ":type", m->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", m->name);
             _rd_db_bind_param_int(ctx, stmt, ":count", m->type.count);
-            _rd_db_bind_param_int(ctx, stmt, ":flags", m->type.flags);
+            _rd_db_bind_param_int(ctx, stmt, ":modifier", m->type.mod);
             _rd_db_bind_param_int(ctx, stmt, ":member_idx", ++i);
             _rd_db_step(ctx, stmt);
         }
@@ -568,7 +568,7 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             _rd_db_bind_param_str(ctx, stmt, ":type", tdef->func_.ret.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", ""); // return has no name
             _rd_db_bind_param_int(ctx, stmt, ":count", tdef->func_.ret.count);
-            _rd_db_bind_param_int(ctx, stmt, ":flags", tdef->func_.ret.flags);
+            _rd_db_bind_param_int(ctx, stmt, ":mod", tdef->func_.ret.mod);
             _rd_db_bind_param_int(ctx, stmt, ":member_idx", 0);
             _rd_db_step(ctx, stmt);
         }
@@ -582,7 +582,7 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             _rd_db_bind_param_str(ctx, stmt, ":type", p->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", p->name);
             _rd_db_bind_param_int(ctx, stmt, ":count", p->type.count);
-            _rd_db_bind_param_int(ctx, stmt, ":flags", p->type.flags);
+            _rd_db_bind_param_int(ctx, stmt, ":mod", p->type.mod);
             _rd_db_bind_param_int(ctx, stmt, ":member_idx", i++);
             _rd_db_step(ctx, stmt);
         }
@@ -592,28 +592,28 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
 }
 
 void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
-                      usize count, RDTypeFlags flags, RDConfidence c) {
+                      usize count, RDTypeModifier mod, RDConfidence c) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE, "\
         INSERT INTO Types \
-            VALUES (:address, :name, :count, :flags, :confidence) \
+            VALUES (:address, :name, :count, :mod, :confidence) \
         ON CONFLICT DO  \
             UPDATE SET name = EXCLUDED.name,  \
                        count = EXCLUDED.count, \
-                       flags = EXCLUDED.flags, \
+                       modifier = EXCLUDED.modifier, \
                        confidence = EXCLUDED.confidence \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", address);
     _rd_db_bind_param_str(ctx, stmt, ":name", name);
     _rd_db_bind_param_int(ctx, stmt, ":count", count);
-    _rd_db_bind_param_int(ctx, stmt, ":flags", flags);
+    _rd_db_bind_param_int(ctx, stmt, ":mod", mod);
     _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
     _rd_db_step(ctx, stmt);
 }
 
 bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPE, "\
-        SELECT name, count, flags, confidence  \
+        SELECT name, count, modifier, confidence  \
         FROM Types \
         WHERE address = :address \
     ");
@@ -624,7 +624,7 @@ bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
         t->base.name = rd_i_strpool_intern(&ctx->strings,
                                            (char*)sqlite3_column_text(stmt, 0));
         t->base.count = sqlite3_column_int64(stmt, 1);
-        t->base.flags = sqlite3_column_int64(stmt, 2);
+        t->base.mod = sqlite3_column_int64(stmt, 2);
         t->confidence = (RDConfidence)sqlite3_column_int64(stmt, 3);
         return true;
     }

@@ -107,7 +107,7 @@ void rd_i_db_del_name(RDContext* ctx, RDAddress address);
 void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 
 void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
-                      usize count, RDTypeFlags flags, RDConfidence c);
+                      usize count, RDTypeModifier mod, RDConfidence c);
 bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 void rd_i_db_del_type(RDContext* ctx, RDAddress address);
 void rd_i_db_del_type_range(RDContext* ctx, RDAddress startaddr,

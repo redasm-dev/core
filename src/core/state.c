@@ -219,8 +219,8 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
                 d, rd_i_format(&buf, "  [%d].base: %x\n", i, op->displ.base));
             str_append(
                 d, rd_i_format(&buf, "  [%d].index: %x\n", i, op->displ.index));
-            str_append(
-                d, rd_i_format(&buf, "  [%d].displ: %x\n", i, op->displ.displ));
+            str_append(d, rd_i_format(&buf, "  [%d].displ: %x\n", i,
+                                      op->displ.offset));
             str_append(
                 d, rd_i_format(&buf, "  [%d].scale: %x\n", i, op->displ.scale));
         }

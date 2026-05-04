@@ -61,7 +61,7 @@ static void _rd_autorename_nullsub(RDContext* ctx, const RDFunction* f,
     rd_auto_name(ctx, f->address, new_name);
 }
 
-void rd_i_autorename(RDContext* ctx) {
+static void _rd_autorename_functions(RDContext* ctx) {
     LOG_INFO("autorenaming functions");
     RDCharVect name_buf = {0};
 
@@ -84,4 +84,36 @@ void rd_i_autorename(RDContext* ctx) {
     }
 
     vect_destroy(&name_buf);
+}
+
+static void _rd_autorename_types(RDContext* ctx) {
+    LOG_INFO("autorenaming types");
+
+    RDCharVect name_buf = {0};
+
+    const RDSymbol* sym;
+    vect_each(sym, &ctx->listing.symbols) {
+        if(sym->kind != RD_SYMBOL_TYPE) continue;
+
+        RDTypeFull t;
+        if(!rd_i_get_type(ctx, sym->address, &t) || !rd_type_is_ptr(&t.base))
+            continue;
+
+        RDAddress dst;
+        if(!rd_read_ptr(ctx, sym->address, &dst) || !rd_is_address(ctx, dst))
+            continue;
+
+        RDName target;
+        if(!rd_i_get_name(ctx, dst, false, &target)) continue;
+
+        const char* new_name = rd_i_format(&name_buf, "p_%s", target.value);
+        rd_auto_name(ctx, sym->address, new_name);
+    }
+
+    vect_destroy(&name_buf);
+}
+
+void rd_i_autorename(RDContext* ctx) {
+    _rd_autorename_functions(ctx);
+    _rd_autorename_types(ctx);
 }

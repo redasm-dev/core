@@ -14,8 +14,8 @@ static inline bool rd_i_is_void(const RDType* t) {
 }
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
-                   RDTypeFlags flags);
+                   RDTypeModifier flags);
 bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
-                   RDTypeFlags flags, RDConfidence c);
+                   RDTypeModifier flags, RDConfidence c);

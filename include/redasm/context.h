@@ -152,6 +152,8 @@ RD_API bool rd_set_imported_ord(RDContext* self, RDAddress address,
 RD_API bool rd_get_imported(RDContext* self, RDAddress address,
                             RDImported* imp);
 RD_API void rd_flow(RDContext* self, RDAddress addr);
+RD_API bool rd_has_refs_from(const RDContext* self, RDAddress address);
+RD_API bool rd_has_refs_to(const RDContext* self, RDAddress address);
 RD_API bool rd_get_address(RDContext* self, const char* name,
                            RDAddress* address);
 RD_API bool rd_to_offset(const RDContext* self, RDAddress address,
@@ -195,6 +197,7 @@ RD_API bool rd_expect_le64(const RDContext* self, RDAddress address, u64 v);
 RD_API bool rd_expect_be16(const RDContext* self, RDAddress address, u16 v);
 RD_API bool rd_expect_be32(const RDContext* self, RDAddress address, u32 v);
 RD_API bool rd_expect_be64(const RDContext* self, RDAddress address, u64 v);
+RD_API bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v);
 
 RD_API usize rd_read(const RDContext* self, RDAddress address, void* data,
                      usize n);

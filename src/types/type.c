@@ -10,16 +10,16 @@ usize rd_size_of(const RDContext* ctx, const char* name, usize n) {
 }
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
-                   RDTypeFlags flags) {
+                   RDTypeModifier mod) {
     const RDProcessorPlugin* p = ctx->processorplugin;
     RDTypeDef* tdef = rd_i_typedef_find(ctx, name, true);
     usize sz;
 
-    if(tdef->kind == RD_TKIND_FUNC) {
+    if(tdef->kind == RD_TKIND_FUNC || mod == RD_TYPE_CPTR) {
         sz = p->code_ptr_size;
         if(!sz) sz = p->ptr_size;
     }
-    else if(flags & RD_TYPE_ISPOINTER) {
+    else if(mod == RD_TYPE_PTR) {
         sz = p->ptr_size;
     }
     else {
@@ -44,7 +44,7 @@ const char* rd_integral_from_size(unsigned int size) {
 }
 
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
-                   RDTypeFlags flags, RDConfidence c) {
+                   RDTypeModifier flags, RDConfidence c) {
     const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
     if(!seg) return false;
 
@@ -76,7 +76,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 
             if(oldt.confidence == c && i == idx) {
                 usize oldsz = rd_i_size_of(ctx, oldt.base.name, oldt.base.count,
-                                           oldt.base.flags);
+                                           oldt.base.mod);
 
                 if(newsz <= oldsz && !strcmp(name, oldt.base.name))
                     return false;
@@ -130,16 +130,16 @@ bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t) {
 }
 
 bool rd_auto_type(RDContext* ctx, RDAddress address, const char* name, usize n,
-                  RDTypeFlags flags) {
+                  RDTypeModifier flags) {
     return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_AUTO);
 }
 
 bool rd_library_type(RDContext* ctx, RDAddress address, const char* name,
-                     usize n, RDTypeFlags flags) {
+                     usize n, RDTypeModifier flags) {
     return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_LIBRARY);
 }
 
 bool rd_user_type(RDContext* ctx, RDAddress address, const char* name, usize n,
-                  RDTypeFlags flags) {
+                  RDTypeModifier flags) {
     return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_USER);
 }

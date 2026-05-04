@@ -277,8 +277,8 @@ static void _rdil_render_statement(RDRenderer* r, const RDILInstruction* il,
 
     switch(op) {
 
-        case RD_IL_NOP: rd_renderer_nop(r, "nop"); break;
-        case RD_IL_UNKN: rd_renderer_nop(r, "unknown"); break;
+        case RD_IL_NOP: rd_renderer_muted(r, "nop"); break;
+        case RD_IL_UNKN: rd_renderer_muted(r, "unknown"); break;
 
         case RD_IL_COPY: {
             _rdil_render_expr(r, il, cur); // dst
@@ -348,7 +348,7 @@ static void _rdil_render_statement(RDRenderer* r, const RDILInstruction* il,
 }
 void rd_i_il_render(RDRenderer* r, const RDILInstruction* il) {
     if(!il->length) {
-        rd_renderer_nop(r, "unknown");
+        rd_renderer_muted(r, "unknown");
         return;
     }
 

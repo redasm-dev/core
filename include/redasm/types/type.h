@@ -5,13 +5,14 @@
 
 typedef enum {
     RD_TYPE_NONE = 0,
-    RD_TYPE_ISPOINTER = (1 << 0),
-} RDTypeFlags;
+    RD_TYPE_PTR,
+    RD_TYPE_CPTR,
+} RDTypeModifier;
 
 typedef struct RDType {
     const char* name;
     usize count;
-    RDTypeFlags flags;
+    RDTypeModifier mod;
 } RDType;
 
 // rd_size_of: returns the size of a registered type in bytes, without padding.
@@ -25,10 +26,14 @@ RD_API const char* rd_integral_from_size(unsigned int size);
 RD_API bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t);
 
 RD_API bool rd_auto_type(RDContext* ctx, RDAddress address, const char* name,
-                         usize n, RDTypeFlags flags);
+                         usize n, RDTypeModifier flags);
 
 RD_API bool rd_library_type(RDContext* ctx, RDAddress address, const char* name,
-                            usize n, RDTypeFlags flags);
+                            usize n, RDTypeModifier flags);
 
 RD_API bool rd_user_type(RDContext* ctx, RDAddress address, const char* name,
-                         usize n, RDTypeFlags flags);
+                         usize n, RDTypeModifier flags);
+
+static inline bool rd_type_is_ptr(const RDType* self) {
+    return self->mod == RD_TYPE_PTR || self->mod == RD_TYPE_CPTR;
+}
