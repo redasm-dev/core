@@ -86,9 +86,8 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 
             i += rd_i_flagsbuffer_get_range_length(seg->flags, i);
         }
-        else {
+        else
             i++;
-        }
     }
 
     // startidx_exp is always a valid HEAD index, safe to convert.
