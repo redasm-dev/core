@@ -7,7 +7,11 @@ void rd_i_processor_render_instruction(RDRenderer* r,
     const RDContext* ctx = r->context;
     const RDProcessorPlugin* p = ctx->processorplugin;
 
-    if(p->render_mnemonic) p->render_mnemonic(r, instr, ctx->processor);
+    if(p->render_mnemonic)
+        p->render_mnemonic(r, instr, ctx->processor);
+    else
+        rd_renderer_mnem(r, instr, RD_THEME_FOREGROUND);
+
     rd_renderer_ws(r, 1);
 
     if(p->render_operand) {
