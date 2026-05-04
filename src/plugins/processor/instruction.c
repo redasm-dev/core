@@ -10,3 +10,10 @@ bool rd_instruction_equals(const RDContext* ctx, const RDInstruction* instr,
     if(!m) return false;
     return !strcmp(m, mnemonic);
 }
+
+void rd_instruction_set_mnemonic(RDInstruction* instr, const char* mnem) {
+    if(!mnem) return;
+
+    strncpy(instr->mnemonic, mnem, RD_MNEMONIC_LENGTH - 1);
+    instr->mnemonic[RD_MNEMONIC_LENGTH - 1] = '\0';
+}

@@ -5,7 +5,7 @@
 #include <redasm/registers.h>
 
 #define RD_MAX_OPERANDS 8
-#define RD_NMNEMONIC 32
+#define RD_MNEMONIC_LENGTH 32
 #define RD_IS_DSLOT 0xFF
 
 typedef enum {
@@ -100,13 +100,15 @@ typedef struct RDInstruction {
     union {
         void* userdata2;
         uptr uservalue2;
-        char mnemonic[RD_NMNEMONIC];
+        char mnemonic[RD_MNEMONIC_LENGTH];
     };
 } RDInstruction;
 
 RD_API bool rd_instruction_equals(const RDContext* ctx,
                                   const RDInstruction* instr,
                                   const char* mnemonic);
+
+RD_API void rd_instruction_set_mnemonic(RDInstruction* instr, const char* mnem);
 
 static inline bool rd_is_delay_slot(const RDInstruction* instr) {
     return instr->delay_slots == RD_IS_DSLOT;
