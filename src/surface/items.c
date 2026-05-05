@@ -38,7 +38,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         ptr_type = rd_integral_from_size(PTR_SIZE);
         calc_ptr_size = PTR_SIZE;
     }
-    else if(t->mod == RD_TYPE_PTR) {
+    else if(t->mod == RD_TYPE_CPTR) {
         ptr_type = rd_integral_from_size(CPTR_SIZE);
         calc_ptr_size = CPTR_SIZE;
     }
