@@ -162,11 +162,6 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_REFS)) return;
 
-    if(item->address == 0x00008174) {
-        int zzz = 0;
-        zzz++;
-    }
-
     RDContext* ctx = r->context;
     if(!rd_i_get_xrefs_from_ex(ctx, item->address, &r->xrefs)) return;
 

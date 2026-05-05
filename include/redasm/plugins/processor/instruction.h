@@ -90,6 +90,7 @@ typedef struct RDInstruction {
     u16 length;
     u8 flow;
     u8 delay_slots;
+    bool write_back;
     RDOperand operands[RD_MAX_OPERANDS];
 
     union {
