@@ -1,5 +1,6 @@
 #include "items.h"
 #include "core/context.h"
+#include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include <ctype.h>
@@ -21,8 +22,8 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     panic_if(!seg, "_rd_surface_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
-
     const RDProcessorPlugin* p = r->context->processorplugin;
+
     const unsigned int PTR_SIZE = p->ptr_size;
     const unsigned int CPTR_SIZE =
         p->code_ptr_size ? p->code_ptr_size : PTR_SIZE;
@@ -161,6 +162,11 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_REFS)) return;
 
+    if(item->address == 0x00008174) {
+        int zzz = 0;
+        zzz++;
+    }
+
     RDContext* ctx = r->context;
     if(!rd_i_get_xrefs_from_ex(ctx, item->address, &r->xrefs)) return;
 
@@ -169,12 +175,33 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
         const RDSegmentFull* seg = rd_i_find_segment(ctx, xref->address);
         if(!seg) continue;
 
-        RDTypeFull t; // render strings only
+        RDTypeFull t;
         if(!rd_i_get_type(ctx, xref->address, &t)) continue;
+
+        bool is_ptr = rd_type_is_ptr(&t.base);
+        RDAddress ptr_address = 0, address = xref->address;
+
+        // try to follow the pointer location
+        if(is_ptr && xref->type == RD_DR_READ &&
+           rd_follow_ptr(ctx, xref->address, &ptr_address)) {
+            seg = rd_i_find_segment(ctx, ptr_address);
+
+            bool has_xrefs_in =
+                seg && rd_i_flagsbuffer_has_xref_in(
+                           seg->flags, rd_i_address2index(seg, ptr_address));
+
+            if(has_xrefs_in && rd_i_get_type(ctx, ptr_address, &t))
+                address = ptr_address;
+            else
+                is_ptr = false;
+        }
+
+        // render strings only
         if(strcmp(t.base.name, "char") != 0 || !t.base.count) continue;
 
         rd_renderer_ws(r, RD_SURFACE_WS_REFS);
-        _rd_render_value(r, xref->address, &t.base, false);
+        if(is_ptr) rd_renderer_norm(r, " => ");
+        _rd_render_value(r, address, &t.base, false);
     }
 }
 
@@ -348,12 +375,10 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
     _rd_render_modifiers(r, item, RD_THEME_TYPE, RD_THEME_BACKGROUND);
 
     // 1. struct/union keyword for compound heads
-    if(tdef->kind == RD_TKIND_STRUCT && !item->parent_tdef) {
+    if(tdef->kind == RD_TKIND_STRUCT && !item->parent_tdef)
         rd_renderer_text(r, "struct ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
-    }
-    else if(tdef->kind == RD_TKIND_UNION && !item->parent_tdef) {
+    else if(tdef->kind == RD_TKIND_UNION && !item->parent_tdef)
         rd_renderer_text(r, "union ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
-    }
 
     // 2. type name
     rd_renderer_text(r, item->type.name, RD_THEME_TYPE, RD_THEME_BACKGROUND);

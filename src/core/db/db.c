@@ -56,23 +56,23 @@ static sqlite3_stmt* _rd_db_prepare_query(RDContext* ctx, int id,
     return ctx->db.queries[id];
 }
 
-static int _rd_db_step(RDContext* ctx, sqlite3_stmt* stmt) {
+static int _rd_db_step(const RDContext* ctx, sqlite3_stmt* stmt) {
     int res = sqlite3_step(stmt);
     if((res == SQLITE_ROW) || (res == SQLITE_DONE)) return res;
     panic("SQL: %s", sqlite3_errmsg(ctx->db.handle));
 }
 
-static void _rd_db_bind_param_null(RDContext* ctx, sqlite3_stmt* stmt,
+static void _rd_db_bind_param_null(const RDContext* ctx, sqlite3_stmt* stmt,
                                    const char* id) {
     RD_DB_BIND(ctx, stmt, id, sqlite3_bind_null(stmt, _idx));
 }
 
-static void _rd_db_bind_param_int(RDContext* ctx, sqlite3_stmt* stmt,
+static void _rd_db_bind_param_int(const RDContext* ctx, sqlite3_stmt* stmt,
                                   const char* id, sqlite3_int64 v) {
     RD_DB_BIND(ctx, stmt, id, sqlite3_bind_int64(stmt, _idx, v));
 }
 
-static void _rd_db_bind_param_str(RDContext* ctx, sqlite3_stmt* stmt,
+static void _rd_db_bind_param_str(const RDContext* ctx, sqlite3_stmt* stmt,
                                   const char* id, const char* s) {
     RD_DB_BIND(ctx, stmt, id,
                sqlite3_bind_text(stmt, _idx, s, -1, SQLITE_STATIC));

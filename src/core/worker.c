@@ -6,6 +6,7 @@
 #include "listing/builder.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/logging.h"
 #include "support/pattern.h"
 
 // clang-format off
@@ -70,6 +71,25 @@ static void _rd_worker_promote_refs(RDContext* ctx) {
             if(!vect_is_empty(refs))
                 rd_i_engine_enqueue_call(ctx, addr, NULL, RD_CONFIDENCE_AUTO);
         }
+    }
+}
+
+static void _rd_worker_follow_pointers(RDContext* ctx) {
+    LOG_INFO("following pointers");
+
+    const RDSymbol* sym;
+    vect_each(sym, &ctx->listing.symbols) {
+        if(sym->kind != RD_SYMBOL_TYPE) continue;
+
+        RDTypeFull t;
+        if(!rd_i_get_type(ctx, sym->address, &t) || !rd_type_is_ptr(&t.base))
+            continue;
+
+        RDAddress dst;
+        if(!rd_read_ptr(ctx, sym->address, &dst) || !rd_is_address(ctx, dst))
+            continue;
+
+        rd_add_xref(ctx, sym->address, dst, RD_DR_ADDRESS);
     }
 }
 
@@ -179,6 +199,7 @@ static void _rd_worker_step_signature(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_finalize(RDContext* ctx) {
     rd_i_listing_build(ctx);
+    _rd_worker_follow_pointers(ctx);
     rd_fire_hook(ctx, "redasm.finalize");
     rd_i_autorename(ctx);
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);

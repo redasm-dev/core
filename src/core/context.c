@@ -23,6 +23,15 @@
 
 #define RD_WORKER_QUEUE_SIZE 8192
 
+static bool _rd_vect_contains_address(const RDAddressVect* v, RDAddress addr) {
+    RDAddress* a;
+    vect_each(a, v) {
+        if(*a == addr) return true;
+    }
+
+    return false;
+}
+
 const RDAnalyzerPlugin* rd_analyzeritem_get_plugin(const RDAnalyzerItem* self) {
     return self->plugin;
 }
@@ -399,7 +408,11 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
         // find first code item
         while(idx < vect_length(&self->listing) &&
               vect_at(&self->listing, idx)->address == address) {
-            if(vect_at(&self->listing, idx)->kind == RD_LK_INSTRUCTION) break;
+
+            const RDListingItem* item = vect_at(&self->listing, idx);
+            if(item->kind == RD_LK_INSTRUCTION || item->kind == RD_LK_TYPE)
+                break;
+
             idx++;
         }
 
@@ -672,6 +685,31 @@ bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
     }
 
     return false;
+}
+
+bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
+    RDAddressVect visited = {0};
+    RDAddress current = address;
+
+    while(true) {
+        if(_rd_vect_contains_address(&visited, current)) break; // loop detected
+        vect_push(&visited, current);
+
+        RDTypeFull t;
+        if(!rd_i_get_type(ctx, current, &t) || !rd_type_is_ptr(&t.base)) break;
+
+        RDAddress next;
+        if(!rd_read_ptr(ctx, current, &next) || !rd_is_address(ctx, next))
+            break;
+
+        current = next;
+    }
+
+    vect_destroy(&visited);
+
+    if(current == address) return false; // didn't move
+    if(v) *v = current;
+    return true;
 }
 
 bool rd_expect_u8(const RDContext* self, RDAddress address, u8 v) {

@@ -1,4 +1,5 @@
 #include "autorename.h"
+#include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/logging.h"
 
@@ -100,11 +101,17 @@ static void _rd_autorename_types(RDContext* ctx) {
             continue;
 
         RDAddress dst;
-        if(!rd_read_ptr(ctx, sym->address, &dst) || !rd_is_address(ctx, dst))
-            continue;
+        if(!rd_follow_ptr(ctx, sym->address, &dst)) continue;
+
+        const RDSegmentFull* seg = rd_i_find_segment(ctx, dst);
+        if(!seg) continue;
+
+        const RDFlagsBuffer* flags = seg->flags;
+        usize idx = rd_i_address2index(seg, dst);
+        if(!rd_i_flagsbuffer_has_xref_in(flags, idx)) continue;
 
         RDName target;
-        if(!rd_i_get_name(ctx, dst, false, &target)) continue;
+        if(!rd_i_get_name(ctx, dst, true, &target)) continue;
 
         const char* new_name = rd_i_format(&name_buf, "p_%s", target.value);
         rd_auto_name(ctx, sym->address, new_name);
