@@ -4,9 +4,10 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include <ctype.h>
+#include <stddef.h>
 
 #define RD_SURFACE_WS_COMMENT 8
-#define RD_SURFACE_WS_REFS 4
+#define RD_SURFACE_WS_REFS 8
 
 static void _rd_render_modifiers(RDRenderer* r, const RDListingItem* item,
                                  RDThemeKind fg, RDThemeKind bg) {

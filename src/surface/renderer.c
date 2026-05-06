@@ -463,8 +463,8 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
     _rd_renderer_num(self, (i64)address, 16, fill, RD_THEME_NUMBER, flags);
 }
 
-void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base, usize fill,
-                     RDNumberFlags flags) {
+void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
+                     unsigned int fill, RDNumberFlags flags) {
     bool hasname = false;
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES) &&
