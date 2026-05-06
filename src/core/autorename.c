@@ -13,52 +13,66 @@ static void _rd_autorename_trampoline(RDContext* ctx, const RDFunction* f,
     bool hasname = false;
 
     for(int depth = 0; depth < RD_AUTORENAME_DEPTH; depth++) {
-        if(instr->operands[0].kind == RD_OP_ADDR)
-            tgt = instr->operands[0].addr;
-        else if(instr->operands[0].kind == RD_OP_MEM)
-            tgt = instr->operands[0].mem;
-        else
-            return;
+        bool found = false;
 
-        // ignore self loops
-        if(tgt == instr->address) return;
+        for(int i = RD_MAX_OPERANDS; i-- > 0;) {
+            const RDOperand* op = &instr->operands[i];
 
-        // target has a name, we're done
+            if(op->kind == RD_OP_ADDR) {
+                tgt = op->addr;
+                found = true;
+                break;
+            }
+            if(op->kind == RD_OP_MEM) {
+                tgt = op->mem;
+                found = true;
+                break;
+            }
+
+            if(op->kind == RD_OP_REG) {
+                RDRegValue val;
+                if(rd_get_regval_id(ctx, instr->address, op->reg, &val)) {
+                    tgt = (RDAddress)val;
+                    found = true;
+                    break;
+                }
+            }
+            else if(op->kind == RD_OP_DISPL) {
+                RDRegValue base, index;
+                if(!rd_get_regval_id(ctx, instr->address, op->displ.base,
+                                     &base))
+                    break;
+
+                RDAddress addr = (RDAddress)base;
+
+                if(op->displ.index != RD_REGID_UNKNOWN) {
+                    if(!rd_get_regval_id(ctx, instr->address, op->displ.index,
+                                         &index))
+                        break;
+
+                    addr += (RDAddress)index *
+                            (op->displ.scale ? op->displ.scale : 1);
+                }
+
+                tgt = addr + op->displ.offset;
+                found = true;
+                break;
+            }
+        }
+
+        if(!found || tgt == instr->address) return;
+
         hasname = rd_i_get_name(ctx, tgt, false, &n);
         if(hasname) break;
 
-        // target is unnamed, follow one more jump if possible
         if(!rd_decode(ctx, tgt, instr)) return;
         if(instr->flow != RD_IF_JUMP) return;
     }
 
     if(!hasname) return;
 
+    // target has a name, we're done
     const char* new_name = rd_i_format(namebuf, "j_%s", n.value);
-    rd_auto_name(ctx, f->address, new_name);
-}
-
-static void _rd_autorename_nullsub(RDContext* ctx, const RDFunction* f,
-                                   RDInstruction* instr, RDCharVect* namebuf) {
-    bool is_nullsub = false;
-    RDAddress addr = f->address;
-
-    while(rd_decode(ctx, addr, instr)) {
-        if(instr->flow == RD_IF_STOP) {
-            is_nullsub = true;
-            break;
-        }
-
-        if(instr->flow != RD_IF_NOP) break; // disqualified
-
-        addr += instr->length;
-    }
-
-    if(!is_nullsub) return;
-
-    const char* new_name =
-        rd_i_format(namebuf, "nullsub_%s", rd_i_to_hex(f->address, 0));
-
     rd_auto_name(ctx, f->address, new_name);
 }
 
@@ -75,13 +89,32 @@ static void _rd_autorename_functions(RDContext* ctx) {
            n.confidence > RD_CONFIDENCE_AUTO)
             continue;
 
+        RDAddress address = f->address;
+        bool is_nullsub = false;
         RDInstruction instr;
-        if(!rd_decode(ctx, f->address, &instr)) continue;
 
-        if(instr.flow == RD_IF_JUMP)
-            _rd_autorename_trampoline(ctx, f, &instr, &name_buf);
-        else
-            _rd_autorename_nullsub(ctx, f, &instr, &name_buf);
+        for(int i = 0; i < RD_AUTORENAME_DEPTH; i++) {
+            if(!rd_decode(ctx, address, &instr)) break;
+
+            if(instr.flow == RD_IF_JUMP) {
+                _rd_autorename_trampoline(ctx, f, &instr, &name_buf);
+                break;
+            }
+
+            if(instr.flow == RD_IF_STOP) {
+                is_nullsub = true;
+                break;
+            }
+
+            if(!rd_is_transparent(&instr)) break;
+            address += instr.length;
+        }
+
+        if(is_nullsub) {
+            const char* new_name = rd_i_format(&name_buf, "nullsub_%s",
+                                               rd_i_to_hex(f->address, 0));
+            rd_auto_name(ctx, f->address, new_name);
+        }
     }
 
     vect_destroy(&name_buf);
