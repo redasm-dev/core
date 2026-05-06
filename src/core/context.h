@@ -119,6 +119,11 @@ typedef struct RDContext {
     } problems;
 } RDContext;
 
+static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
+                                         RDAddress addr) {
+    return addr >= seg->base.start_address && addr < seg->base.end_address;
+}
+
 const RDSegmentFull* rd_i_find_segment(const RDContext* self, RDAddress addr);
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,

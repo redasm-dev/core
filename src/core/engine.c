@@ -4,17 +4,22 @@
 #include "support/containers.h"
 #include "support/error.h"
 
+static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
+                                                    RDAddress address) {
+    const RDSegmentFull* seg = ctx->engine.segment;
+
+    if(!seg || !rd_i_segment_contains(seg, address))
+        return rd_i_find_segment(ctx, address);
+
+    return seg;
+}
+
 static bool _rd_engine_accept_address(const RDContext* ctx, RDAddress address,
                                       RDWorkerQueue* q) {
     if(!queue_is_empty(q) && queue_peek_back(q).address == address)
         return false;
 
-    const RDSegmentFull* seg = ctx->engine.segment;
-
-    if(!seg || address < seg->base.start_address ||
-       address >= seg->base.end_address)
-        seg = rd_i_find_segment(ctx, address);
-
+    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
     return seg && (seg->base.perm & RD_SP_X);
 }
 
@@ -115,19 +120,30 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     if(ctx->engine.flow.kind == RD_WI_FLOW) {
         ctx->engine.current = ctx->engine.flow;
         ctx->engine.flow.kind = RD_WI_NONE;
+        assert(ctx->engine.segment && "flow tick with no current segment");
     }
-    else if(!queue_is_empty(&ctx->engine.qcall)) {
-        queue_pop(&ctx->engine.qcall, &ctx->engine.current);
-    }
-    else if(!queue_is_empty(&ctx->engine.qjump)) {
-        queue_pop(&ctx->engine.qjump, &ctx->engine.current);
-    }
-    else
-        return 0;
+    else {
+        if(!queue_is_empty(&ctx->engine.qcall)) {
+            queue_pop(&ctx->engine.qcall, &ctx->engine.current);
+        }
+        else if(!queue_is_empty(&ctx->engine.qjump)) {
+            queue_pop(&ctx->engine.qjump, &ctx->engine.current);
+        }
+        else
+            return 0;
 
-    ctx->engine.segment = rd_i_find_segment(ctx, ctx->engine.current.address);
-    assert(ctx->engine.segment && "program counter without segment");
-    if(!(ctx->engine.segment->base.perm & RD_SP_X)) goto done;
+        ctx->engine.segment =
+            _rd_engine_find_segment(ctx, ctx->engine.current.address);
+
+        if(!ctx->engine.segment) {
+            rd_i_add_problem(ctx, ctx->engine.current.address,
+                             ctx->engine.current.address,
+                             "program counter outside any segment");
+            goto done;
+        }
+
+        if(!(ctx->engine.segment->base.perm & RD_SP_X)) goto done;
+    }
 
     usize idx =
         rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
@@ -221,8 +237,7 @@ void rd_flow(RDContext* ctx, RDAddress address) {
     const RDSegmentFull* seg = ctx->engine.segment;
 
     // avoid inter-segment flow
-    if(address < seg->base.start_address || address >= seg->base.end_address)
-        return;
+    if(!rd_i_segment_contains(seg, address)) return;
 
     ctx->engine.flow = (RDWorkerItem){
         .kind = RD_WI_FLOW,
@@ -231,16 +246,17 @@ void rd_flow(RDContext* ctx, RDAddress address) {
 }
 
 bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 
     usize idx = rd_i_address2index(seg, address);
     *instr = (RDInstruction){0};
+    ctx->engine.segment = seg;
     return rd_i_engine_decode(ctx, address, seg, idx, instr);
 }
 
 bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -253,6 +269,7 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
 
     *instr = (RDInstruction){0};
+    ctx->engine.segment = seg;
     return rd_i_engine_decode(ctx, rd_i_index2address(seg, idx), seg, idx,
                               instr);
 }
