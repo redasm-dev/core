@@ -98,7 +98,8 @@ typedef struct RDLoadAddressing {
 } RDLoadAddressing;
 
 RD_API void rd_destroy(RDContext* self);
-RD_API bool rd_step(RDContext* self, const RDWorkerStatus** status);
+RD_API bool rd_step(RDContext* self, RDWorkerStatus* status);
+RD_API bool rd_is_busy(const RDContext* self);
 RD_API void rd_disassemble(RDContext* self);
 RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address,

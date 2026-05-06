@@ -140,16 +140,16 @@ static void _rd_worker_scan_prologues(RDContext* ctx) {
     rd_pattern_destroy(&pattern);
 }
 
-static void _rd_worker_step_init(RDContext* ctx) {
+static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx); // Show pre-analysis listing
-    ctx->engine.status.is_listing_changed = true;
+    if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 }
 
-static void _rd_worker_step_emulate(RDContext* ctx) {
+static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
     if(rd_i_engine_has_pending_code(ctx)) {
         rd_i_engine_tick(ctx);
-        optional_set(&ctx->engine.status.address, ctx->engine.current.address);
+        if(status) optional_set(&status->address, ctx->engine.current.address);
     }
     else
         ctx->engine.step++;
@@ -197,51 +197,59 @@ static void _rd_worker_step_mergedata(RDContext* ctx) {
 
 static void _rd_worker_step_signature(RDContext* ctx) { ctx->engine.step++; }
 
-static void _rd_worker_step_finalize(RDContext* ctx) {
+static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx);
     _rd_worker_follow_pointers(ctx);
     rd_fire_hook(ctx, "redasm.finalize");
     rd_i_autorename(ctx);
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
-    ctx->engine.status.is_listing_changed = true;
+
+    if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 }
 
-bool rd_step(RDContext* ctx, const RDWorkerStatus** status) {
-    assert(ctx->engine.step < RD_WS_COUNT);
-    ctx->engine.status.is_busy = ctx->engine.step < RD_WS_DONE;
-    ctx->engine.status.step = RD_STEP_NAMES[ctx->engine.step];
-    ctx->engine.status.segment = (const RDSegment*)ctx->engine.segment;
-    ctx->engine.status.is_listing_changed = false;
-    ctx->engine.status.pending_calls = queue_length(&ctx->engine.qcall);
-    ctx->engine.status.pending_jumps = queue_length(&ctx->engine.qjump);
-    optional_unset(&ctx->engine.status.address);
+bool rd_is_busy(const RDContext* self) {
+    return self->engine.step < RD_WS_DONE || rd_i_engine_has_pending_code(self);
+}
 
-    if(ctx->engine.status.is_busy) {
-        switch(ctx->engine.step) {
-            case RD_WS_INIT: _rd_worker_step_init(ctx); break;
+bool rd_step(RDContext* self, RDWorkerStatus* status) {
+    assert(self->engine.step < RD_WS_COUNT);
+    bool is_busy = self->engine.step < RD_WS_DONE;
+
+    if(status) {
+        status->is_busy = is_busy;
+        status->step = RD_STEP_NAMES[self->engine.step];
+        status->segment = (const RDSegment*)self->engine.segment;
+        status->is_listing_changed = false;
+        status->pending_calls = queue_length(&self->engine.qcall);
+        status->pending_jumps = queue_length(&self->engine.qjump);
+        optional_unset(&status->address);
+    }
+
+    if(is_busy) {
+        switch(self->engine.step) {
+            case RD_WS_INIT: _rd_worker_step_init(self, status); break;
 
             case RD_WS_EMULATE1:
-            case RD_WS_EMULATE2: _rd_worker_step_emulate(ctx); break;
+            case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
 
             case RD_WS_ANALYZE1:
-            case RD_WS_ANALYZE2: _rd_worker_step_analyze(ctx); break;
+            case RD_WS_ANALYZE2: _rd_worker_step_analyze(self); break;
 
-            case RD_WS_MERGECODE: _rd_worker_step_mergecode(ctx); break;
+            case RD_WS_MERGECODE: _rd_worker_step_mergecode(self); break;
 
             case RD_WS_MERGEDATA1:
-            case RD_WS_MERGEDATA2: _rd_worker_step_mergedata(ctx); break;
+            case RD_WS_MERGEDATA2: _rd_worker_step_mergedata(self); break;
 
             case RD_WS_SIGNATURE1:
-            case RD_WS_SIGNATURE2: _rd_worker_step_signature(ctx); break;
+            case RD_WS_SIGNATURE2: _rd_worker_step_signature(self); break;
 
-            case RD_WS_FINALIZE: _rd_worker_step_finalize(ctx); break;
+            case RD_WS_FINALIZE: _rd_worker_step_finalize(self, status); break;
             default: unreachable();
         }
     }
 
-    if(status) *status = &ctx->engine.status;
-    return ctx->engine.status.is_busy;
+    return is_busy;
 }
 
 void rd_disassemble(RDContext* ctx) {

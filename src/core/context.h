@@ -108,7 +108,6 @@ typedef struct RDContext {
         RDWorkerQueue qcall;
         RDWorkerItem flow;
         RDWorkerItem current;
-        RDWorkerStatus status;
         unsigned int step;
     } engine;
 
