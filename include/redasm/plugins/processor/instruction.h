@@ -143,6 +143,10 @@ static inline bool rd_can_flow(const RDInstruction* instr) {
     return instr->flow != RD_IF_JUMP && instr->flow != RD_IF_STOP;
 }
 
+static inline bool rd_is_transparent(const RDInstruction* instr) {
+    return instr->flow == RD_IF_NONE || instr->flow == RD_IF_NOP;
+}
+
 static inline bool rd_is_cond(const RDInstruction* instr) {
     switch(instr->flow) {
         case RD_IF_JUMP_COND:
