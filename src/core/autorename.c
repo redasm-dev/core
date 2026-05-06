@@ -90,23 +90,23 @@ static void _rd_autorename_functions(RDContext* ctx) {
             continue;
 
         RDAddress address = f->address;
-        bool is_nullsub = false;
+        bool is_nullsub = true;
         RDInstruction instr;
 
         for(int i = 0; i < RD_AUTORENAME_DEPTH; i++) {
             if(!rd_decode(ctx, address, &instr)) break;
 
             if(instr.flow == RD_IF_JUMP) {
+                is_nullsub = false;
                 _rd_autorename_trampoline(ctx, f, &instr, &name_buf);
                 break;
             }
 
-            if(instr.flow == RD_IF_STOP) {
-                is_nullsub = true;
-                break;
-            }
+            if(instr.flow == RD_IF_STOP) break;
 
-            if(!rd_is_transparent(&instr)) break;
+            if(instr.flow != RD_IF_NOP)
+                is_nullsub = false; // latch false, never recover
+
             address += instr.length;
         }
 
