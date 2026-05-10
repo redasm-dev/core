@@ -14,6 +14,7 @@ typedef enum {
 typedef struct RDEngineItem {
     RDEngineItemKind kind;
     RDConfidence confidence;
+    RDAddress from;
     RDAddress address;
     RDRegisterHMap registers;
     char* name;

@@ -3,6 +3,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/logging.h"
 
 static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
                                                     RDAddress address) {
@@ -110,6 +111,7 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
         RDEngineItem item = {
             .kind = RD_EI_JUMP,
             .address = address,
+            .from = ctx->engine.current.address,
         };
 
         hmap_clone(&item.registers, &ctx->engine.current.registers);
@@ -139,6 +141,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
             .kind = RD_EI_CALL,
             .confidence = c,
             .address = address,
+            .from = ctx->engine.current.address,
             .name = name ? rd_strdup(name) : NULL,
         };
 
@@ -211,11 +214,12 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     rd_i_flagsbuffer_undefine_queued(ctx->engine.segment->flags, idx);
 
     panic_if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx),
-             "tail reached tick from %s at %llx",
+             "TAIL reached tick from %s queue (INDEX: %llx, CURRENT: %llx, "
+             "FROM: %llx)",
              ctx->engine.current.kind == RD_EI_FLOW   ? "FLOW"
              : ctx->engine.current.kind == RD_EI_JUMP ? "JUMP"
                                                       : "CALL",
-             ctx->engine.current.address);
+             idx, ctx->engine.current.address, ctx->engine.current.from);
 
     RDInstruction instr = {
         .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
@@ -316,6 +320,7 @@ void rd_flow(RDContext* ctx, RDAddress address) {
 
     // address accepted, flow there
     optional_set(&ctx->engine.flow, address);
+    ctx->engine.current.from = ctx->engine.current.address;
 }
 
 bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {

@@ -222,7 +222,8 @@ bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
     };
 
     if(rd_i_db_add_mapping(self, m))
-        LOG_INFO("mapping input at %X (Address: [%X, %X))", off, addr, endaddr);
+        LOG_INFO("mapping input at offset %X (Address: [%X, %X))", off, addr,
+                 endaddr);
 
     return true;
 }
