@@ -3,7 +3,7 @@
 #include <redasm/function.h>
 #include <redasm/plugins/plugin.h>
 #include <redasm/plugins/processor/instruction.h>
-#include <redasm/plugins/processor/rdil.h>
+#include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
 #include <redasm/surface/renderer.h>
@@ -29,10 +29,9 @@ typedef struct RDProcessorPlugin {
 
     void (*decode)(RDContext*, RDInstruction*, RDProcessor*);
     void (*emulate)(RDContext*, const RDInstruction*, RDProcessor*);
-    void (*lift)(RDContext*, const RDInstruction*, RDILInstruction*, RDProcessor*);
+    void (*lift)(RDContext*, RDInstructionVect*, const RDInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
-    const char** (*get_prologues)(RDProcessor*, const RDContext*);
 
     const char* (*get_reg_name)(RDReg, RDProcessor*);
     bool (*get_reg_mask)(const char* name, RDRegMask*, RDProcessor*);

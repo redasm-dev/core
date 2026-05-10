@@ -250,7 +250,7 @@ static void _rd_ll_make_acyclic(RDLayeredLayout* ll) {
                     RDGraphNode* it;
                     vect_each(it, &dst->incoming) {
                         if(*it == cur) {
-                            vect_remove(&dst->incoming, it, 1);
+                            vect_del(&dst->incoming, it, 1);
                             break;
                         }
                     }
@@ -294,7 +294,7 @@ static void _rd_ll_make_acyclic(RDLayeredLayout* ll) {
             RDGraphNode* it;
             vect_each(it, &dst->incoming) {
                 if(*it == best_parent) {
-                    vect_remove(&dst->incoming, it, 1);
+                    vect_del(&dst->incoming, it, 1);
                     break;
                 }
             }

@@ -4,6 +4,7 @@
 #include "io/flagsbuffer.h"
 #include "plugins/processor/processor.h"
 #include "rdil/rdil.h"
+#include "rdil/renderer.h"
 #include "support/containers.h"
 #include "support/utils.h"
 #include <ctype.h>
@@ -82,6 +83,7 @@ void rd_i_renderer_destroy(RDRenderer* self) {
     rd_i_rowvect_destroy(&self->rows_front);
     vect_destroy(&self->rows_back);
     vect_destroy(&self->rows_front);
+    vect_destroy(&self->instr_buf);
     free(self->hl_word);
     free(self);
 }
@@ -273,20 +275,10 @@ void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
 }
 
 void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item) {
-    RDContext* ctx = self->context;
-    const RDProcessorPlugin* p = ctx->processorplugin;
+    const RDInstructionVect* v =
+        rd_il_lift(self->context, item->address, &self->instr_buf);
 
-    RDInstruction instr = {0};
-    rd_i_il_init(&ctx->il_buf);
-
-    usize idx = rd_i_address2index(item->segment, item->address);
-
-    if(p->lift && rd_i_engine_decode(self->context, item->address,
-                                     item->segment, idx, &instr))
-        p->lift(ctx, &instr, &ctx->il_buf, ctx->processor);
-
-    // render 'unknown' if empty
-    rd_i_il_render(self, &ctx->il_buf);
+    rd_i_il_render(self, v);
 }
 
 void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
@@ -442,7 +434,7 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
 
         if(!hasname) {
             const RDSegmentFull* seg =
-                rd_i_find_segment(self->context, address);
+                rd_i_db_find_segment(self->context, address);
 
             if(seg) {
                 usize idx = rd_i_address2index(seg, address);

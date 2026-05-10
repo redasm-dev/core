@@ -285,12 +285,13 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
 
     if(ok) {
         RDRenderer* r = rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
+        const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
         // manually craft an item
         RDListingItem item = {
             .kind = RD_LK_INSTRUCTION,
             .address = *addr,
-            .segment = *vect_front(&ctx->segments),
+            .segment = *vect_front(segments),
         };
 
         rd_i_renderer_new_row(r, &item);

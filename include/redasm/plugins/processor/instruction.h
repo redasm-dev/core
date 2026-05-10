@@ -13,10 +13,10 @@ typedef enum {
     RD_OP_CNST,
     RD_OP_REG,
     RD_OP_IMM,
-    RD_OP_ADDR,   // Address immediate
-    RD_OP_MEM,    // [Address]
-    RD_OP_PHRASE, // [BaseReg + IndexReg]
-    RD_OP_DISPL,  // [BaseReg + IndexReg + Displ]
+    RD_OP_ADDR,  // Address immediate
+    RD_OP_MEM,   // [Address]
+    RD_OP_DISPL, // [BaseReg + IndexReg*Scale + Displ]
+    RD_OP_SYM,
 
     RD_OP_USERBASE, // User defined operands
 } RDOperandKind;
@@ -30,11 +30,6 @@ typedef enum {
     RD_IF_STOP,
     RD_IF_NOP,
 } RDInstructionFlow;
-
-typedef struct RDPhraseOperand {
-    RDReg base;
-    RDReg index;
-} RDPhraseOperand;
 
 typedef struct RDDisplOperand {
     RDReg base;
@@ -75,9 +70,9 @@ typedef struct RDOperand {
         u64 imm;
         i64 s_imm;
         RDAddress mem;
-        RDPhraseOperand phrase;
         RDDisplOperand displ;
         RDUserOperand user;
+        const char* sym;
     };
 
     u32 userdata1;
@@ -90,8 +85,12 @@ typedef struct RDInstruction {
     u16 length;
     u8 flow;
     u8 delay_slots;
-    bool write_back;
     RDOperand operands[RD_MAX_OPERANDS];
+
+    union {
+        bool write_back;
+        bool indirect;
+    };
 
     union {
         void* userdata1;
@@ -105,18 +104,92 @@ typedef struct RDInstruction {
     };
 } RDInstruction;
 
-RD_API bool rd_instruction_equals(const RDContext* ctx,
-                                  const RDInstruction* instr,
-                                  const char* mnemonic);
+typedef struct RDInstructionVect RDInstructionVect;
 
-RD_API void rd_instruction_set_mnemonic(RDInstruction* instr, const char* mnem);
+RD_API bool rd_instr_equals(const RDContext* ctx, const RDInstruction* self,
+                            const char* mnemonic);
 
-static inline bool rd_is_delay_slot(const RDInstruction* instr) {
-    return instr->delay_slots == RD_IS_DSLOT;
+RD_API void rd_instr_set_mnemonic(RDInstruction* self, const char* mnem);
+
+static inline void rd_instr_set_op(RDInstruction* instr, int idx,
+                                   const RDOperand* op) {
+    instr->operands[idx] = *op;
 }
 
-static inline bool rd_is_jump(const RDInstruction* instr) {
-    switch(instr->flow) {
+static inline RDOperand* rd_instr_set_op_cnst(RDInstruction* instr, int idx,
+                                              u64 c) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_CNST;
+    op->cnst = c;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_scnst(RDInstruction* instr, int idx,
+                                               i64 c) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_CNST;
+    op->s_cnst = c;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_reg(RDInstruction* instr, int idx,
+                                             RDReg id) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_REG;
+    op->reg = id;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_imm(RDInstruction* instr, int idx,
+                                             u64 imm) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_IMM;
+    op->imm = imm;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_addr(RDInstruction* instr, int idx,
+                                              RDAddress addr) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_ADDR;
+    op->addr = addr;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_mem(RDInstruction* instr, int idx,
+                                             RDAddress mem) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_MEM;
+    op->mem = mem;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_displ(RDInstruction* instr, int idx,
+                                               RDReg base, RDReg index,
+                                               int scale, i64 offset) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_DISPL;
+    op->displ.base = base;
+    op->displ.index = index;
+    op->displ.scale = scale;
+    op->displ.offset = offset;
+    return op;
+}
+
+static inline RDOperand* rd_instr_set_op_sym(RDInstruction* instr, int idx,
+                                             const char* sym) {
+    RDOperand* op = &instr->operands[idx];
+    op->kind = RD_OP_SYM;
+    op->sym = sym;
+    return op;
+}
+
+static inline bool rd_instr_is_delay_slot(const RDInstruction* self) {
+    return self->delay_slots == RD_IS_DSLOT;
+}
+
+static inline bool rd_instr_is_jump(const RDInstruction* self) {
+    switch(self->flow) {
         case RD_IF_JUMP:
         case RD_IF_JUMP_COND: return true;
         default: break;
@@ -125,8 +198,8 @@ static inline bool rd_is_jump(const RDInstruction* instr) {
     return false;
 }
 
-static inline bool rd_is_call(const RDInstruction* instr) {
-    switch(instr->flow) {
+static inline bool rd_instr_is_call(const RDInstruction* self) {
+    switch(self->flow) {
         case RD_IF_CALL:
         case RD_IF_CALL_COND: return true;
         default: break;
@@ -135,20 +208,20 @@ static inline bool rd_is_call(const RDInstruction* instr) {
     return false;
 }
 
-static inline bool rd_is_branch(const RDInstruction* instr) {
-    return rd_is_jump(instr) || rd_is_call(instr);
+static inline bool rd_instr_is_branch(const RDInstruction* self) {
+    return rd_instr_is_jump(self) || rd_instr_is_call(self);
 }
 
-static inline bool rd_can_flow(const RDInstruction* instr) {
-    return instr->flow != RD_IF_JUMP && instr->flow != RD_IF_STOP;
+static inline bool rd_instr_can_flow(const RDInstruction* self) {
+    return self->flow != RD_IF_JUMP && self->flow != RD_IF_STOP;
 }
 
-static inline bool rd_is_transparent(const RDInstruction* instr) {
-    return instr->flow == RD_IF_NONE || instr->flow == RD_IF_NOP;
+static inline bool rd_instr_is_transparent(const RDInstruction* self) {
+    return self->flow == RD_IF_NONE || self->flow == RD_IF_NOP;
 }
 
-static inline bool rd_is_cond(const RDInstruction* instr) {
-    switch(instr->flow) {
+static inline bool rd_instr_is_cond(const RDInstruction* self) {
+    switch(self->flow) {
         case RD_IF_JUMP_COND:
         case RD_IF_CALL_COND: return true;
         default: break;

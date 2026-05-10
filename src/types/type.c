@@ -45,7 +45,7 @@ const char* rd_integral_from_size(unsigned int size) {
 
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier flags, RDConfidence c) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize newsz = rd_i_size_of(ctx, name, n, flags);
@@ -107,7 +107,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 }
 
 bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);

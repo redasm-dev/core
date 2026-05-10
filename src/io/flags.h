@@ -50,3 +50,7 @@ void rd_i_flags_undefine_comment(RDFlags* self);
 void rd_i_flags_undefine_xref_out(RDFlags* self);
 void rd_i_flags_undefine_xref_in(RDFlags* self);
 void rd_i_flags_undefine_op_over(RDFlags* self);
+
+void rd_i_flags_set_queued(RDFlags* self);
+bool rd_i_flags_has_queued(RDFlags self);
+void rd_i_flags_undefine_queued(RDFlags* self);

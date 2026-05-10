@@ -19,7 +19,7 @@ static void _rd_render_modifiers(RDRenderer* r, const RDListingItem* item,
 
 static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                              bool term) {
-    const RDSegmentFull* seg = rd_i_find_segment(r->context, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(r->context, address);
     panic_if(!seg, "_rd_surface_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
@@ -168,7 +168,7 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
 
     const RDXRef* xref;
     vect_each(xref, &r->xrefs) {
-        const RDSegmentFull* seg = rd_i_find_segment(ctx, xref->address);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, xref->address);
         if(!seg) continue;
 
         RDTypeFull t;
@@ -180,7 +180,7 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
         // try to follow the pointer location
         if(is_ptr && xref->type == RD_DR_READ &&
            rd_follow_ptr(ctx, xref->address, &ptr_address)) {
-            seg = rd_i_find_segment(ctx, ptr_address);
+            seg = rd_i_db_find_segment(ctx, ptr_address);
 
             bool has_xrefs_in =
                 seg && rd_i_flagsbuffer_has_xref_in(
@@ -235,7 +235,7 @@ static void _rd_render_comment(RDRenderer* r, const RDListingItem* item) {
 }
 
 static void _rd_render_hex_dump_item(RDRenderer* r, const RDListingItem* item) {
-    const RDSegmentFull* seg = rd_i_find_segment(r->context, item->address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(r->context, item->address);
     panic_if(!seg, "_rd_surface_render_hex_dump: invalid segment");
 
     int c = 0;

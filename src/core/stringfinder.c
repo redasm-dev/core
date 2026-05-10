@@ -64,8 +64,10 @@ void rd_i_find_strings(RDContext* ctx) {
     RDCharVect str = {0};
     vect_reserve(&str, RD_STRING_BASE_CAPACITY);
 
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+
     RDSegmentFull** it;
-    vect_each(it, &ctx->segments) {
+    vect_each(it, segments) {
         RDSegmentFull* seg = *it;
         RDFlagsBuffer* flags = seg->flags;
         usize startidx = 0;

@@ -225,8 +225,10 @@ void rd_i_listing_build(RDContext* ctx) {
     RDListingBuilder b = {.context = ctx};
     rd_i_listing_init(&b.listing, &ctx->listing);
 
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+
     RDSegmentFull** s;
-    vect_each(s, &ctx->segments) {
+    vect_each(s, segments) {
         b.segment = *s;
 
         rd_i_listing_add_segment(&b.listing, b.segment);
@@ -241,6 +243,10 @@ void rd_i_listing_build(RDContext* ctx) {
         while(b.address < b.segment->base.end_address) {
             usize i = rd_i_address2index(b.segment, b.address);
             panic_if(rd_flagsbuffer_has_tail(b.flags, i), "tail detected");
+
+            if(rd_i_flagsbuffer_has_queued(b.flags, i))
+                LOG_WARN("leak at %llx", b.address);
+
             rd_i_listing_push_indent(&b.listing, 2);
 
             if(rd_flagsbuffer_has_unknown(b.flags, i))

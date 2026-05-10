@@ -17,7 +17,7 @@ static u64 _rd_reader_get_pos(const RDReader* self) { return self->position; }
 
 static void _rd_flagsreader_seek(RDReader* self, usize pos) {
     RDFlagsReader* fr = (RDFlagsReader*)self;
-    self->segment = rd_i_find_segment(fr->context, pos);
+    self->segment = rd_i_db_find_segment(fr->context, pos);
 
     if(self->segment) {
         fr->base.position = rd_i_address2index(self->segment, pos);

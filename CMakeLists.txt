@@ -14,7 +14,9 @@ setup_compiler(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} 
     PRIVATE
         src/core/db/db.c
+        src/core/db/queries.c
         src/core/db/schema.c
+        src/core/db/types.c
         src/core/autorename.c
         src/core/context.c
         src/core/engine.c
@@ -39,13 +41,14 @@ target_sources(${PROJECT_NAME}
         src/plugins/processor/processor.c
         src/plugins/command.c
         src/plugins/module.c
+        src/rdil/opcodes.c
         src/rdil/rdil.c
+        src/rdil/renderer.c
         src/support/byteorder.c
         src/support/containers.c
         src/support/error.c
         src/support/hash.c
         src/support/logging.c
-        src/support/pattern.c
         src/support/utils.c
         src/support/stringpool.c
         src/surface/graph.c

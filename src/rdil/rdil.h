@@ -1,15 +1,24 @@
 #pragma once
 
-#include <redasm/config.h>
-#include <redasm/plugins/processor/rdil.h>
-#include <redasm/surface/renderer.h>
+#include "core/function.h"
+#include "core/registers.h"
+#include "plugins/processor/processor.h"
+#include <redasm/rdil/rdil.h>
 
-typedef struct RDILInstruction {
-    u8* data;
-    usize length;
-    usize capacity;
-} RDILInstruction;
+typedef struct RDIL {
+    RDContext* context;
+    const RDFunction* function;
+    RDRegisterHMap registers;
+    RDInstructionVect lifted;
+    RDAddress current_address;
 
-void rd_i_il_init(RDILInstruction* self);
-void rd_i_il_deinit(RDILInstruction* self);
-void rd_i_il_render(RDRenderer* r, const RDILInstruction* il);
+    struct {
+        RDAddress value;
+        bool known;
+    } target;
+
+    bool done;
+} RDIL;
+
+const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
+                                    RDInstructionVect* il);

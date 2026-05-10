@@ -48,7 +48,7 @@ static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
 
     if(fromrow >= 0 && src_lidx < vect_length(listing)) {
         const RDListingItem* src_item = vect_at(listing, src_lidx);
-        const RDSegmentFull* seg = rd_i_find_segment(ctx, src_item->address);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, src_item->address);
 
         if(seg) {
             usize idx = rd_i_address2index(seg, src_item->address);
@@ -90,7 +90,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
         const RDListingItem* item = vect_at(listing, lidx);
         if(item->kind != RD_LK_INSTRUCTION) continue;
 
-        const RDSegmentFull* seg = rd_i_find_segment(ctx, item->address);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, item->address);
         assert(seg);
 
         usize idx = rd_i_address2index(seg, item->address);
@@ -102,7 +102,8 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
             const RDXRef* r;
             vect_each(r, xrefs) {
-                const RDSegmentFull* rseg = rd_i_find_segment(ctx, r->address);
+                const RDSegmentFull* rseg =
+                    rd_i_db_find_segment(ctx, r->address);
                 if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
 
                 usize ridx = rd_i_address2index(rseg, r->address);
@@ -120,7 +121,8 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
             const RDXRef* r;
             vect_each(r, xrefs) {
-                const RDSegmentFull* rseg = rd_i_find_segment(ctx, r->address);
+                const RDSegmentFull* rseg =
+                    rd_i_db_find_segment(ctx, r->address);
                 if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
 
                 int torow = _rd_surfacepath_calculate_index(start, rows, ctx,

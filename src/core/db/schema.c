@@ -87,7 +87,7 @@ CREATE TABLE Imported ( \
     module  TEXT \
 ); \
 \
-CREATE TABLE TrackedRegisters ( \
+CREATE TABLE SegmentRegisters ( \
     address  INTEGER NOT NULL, \
     reg      TEXT NOT NULL, \
     value    INTEGER, \

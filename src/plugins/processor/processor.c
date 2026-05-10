@@ -3,9 +3,8 @@
 #include "surface/renderer.h"
 #include <stddef.h>
 
-static bool _rd_render_operand_default(RDRenderer* r,
-                                       const RDInstruction* instr, usize idx,
-                                       RDProcessor* p) {
+bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
+                                   usize idx, RDProcessor* p) {
     RD_UNUSED(p);
     const RDProcessorPlugin* plugin = r->context->processorplugin;
     const RDOperand* op = &instr->operands[idx];
@@ -32,34 +31,33 @@ static bool _rd_render_operand_default(RDRenderer* r,
             rd_renderer_norm(r, "]");
             break;
 
-        case RD_OP_PHRASE: {
+        case RD_OP_DISPL: {
             rd_renderer_norm(r, "[");
-            rd_renderer_reg(r, op->phrase.base);
+            rd_renderer_reg(r, op->displ.base);
 
-            if(op->phrase.index != RD_REGID_UNKNOWN) {
+            if(op->displ.index != RD_REGID_UNKNOWN) {
                 rd_renderer_norm(r, "+");
-                rd_renderer_reg(r, op->phrase.index);
+                rd_renderer_reg(r, op->displ.index);
+
+                if(op->displ.scale > 1) {
+                    rd_renderer_norm(r, "*");
+                    rd_renderer_num(r, op->displ.scale, 16, 0, RD_NUM_DEFAULT);
+                }
             }
+
+            if(op->displ.offset > 0) rd_renderer_norm(r, "+");
+            if(op->displ.offset < 0) rd_renderer_norm(r, "-");
+
+            if(op->displ.offset != 0)
+                rd_renderer_num(r, op->displ.offset, 16, 0, RD_NUM_DEFAULT);
 
             rd_renderer_norm(r, "]");
             break;
         }
 
-        case RD_OP_DISPL: {
-            rd_renderer_norm(r, "[");
-            rd_renderer_reg(r, op->displ.base);
-            rd_renderer_norm(r, "+");
-            rd_renderer_reg(r, op->displ.index);
-
-            if(op->displ.scale > 1) {
-                rd_renderer_norm(r, "*");
-                rd_renderer_num(r, op->displ.scale, 16, 0, RD_NUM_DEFAULT);
-            }
-
-            if(op->displ.offset != 0)
-                rd_renderer_num(r, op->displ.offset, 16, 0, RD_NUM_SIGNED);
-
-            rd_renderer_norm(r, "]");
+        case RD_OP_SYM: {
+            rd_renderer_text(r, op->sym ? op->sym : "???", RD_THEME_LOCATION,
+                             RD_THEME_BACKGROUND);
             break;
         }
 
@@ -93,7 +91,7 @@ void rd_i_processor_render_instruction(RDRenderer* r,
         if(p->render_operand)
             done = p->render_operand(r, instr, i, ctx->processor);
 
-        if(!done) _rd_render_operand_default(r, instr, i, ctx->processor);
+        if(!done) rd_i_processor_render_operand(r, instr, i, ctx->processor);
     }
 
     data->operand.value = (RDOperand){0};

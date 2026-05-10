@@ -10,7 +10,7 @@
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader.h>
 #include <redasm/plugins/processor/processor.h>
-#include <redasm/plugins/processor/rdil.h>
+#include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
 #include <redasm/support/logging.h>

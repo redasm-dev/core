@@ -2,12 +2,10 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
-#include "io/flagsbuffer.h"
 #include "listing/builder.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"
-#include "support/pattern.h"
 
 // clang-format off
 typedef enum {
@@ -50,30 +48,6 @@ static int _rd_worker_problem_cmp(const void* a, const void* b) {
     return 0;
 }
 
-static void _rd_worker_promote_refs(RDContext* ctx) {
-    RDSegmentFull** it;
-
-    vect_each(it, &ctx->segments) {
-        const RDSegmentFull* seg = *it;
-        if(!(seg->base.perm & RD_SP_X)) continue;
-
-        RDFlagsBuffer* flags = seg->flags;
-
-        for(usize i = 0; i < flags->base.length; i++) {
-            if(!rd_i_flagsbuffer_has_xref_in(seg->flags, i)) continue;
-            if(rd_flagsbuffer_has_code(seg->flags, i)) continue;
-            if(rd_flagsbuffer_has_tail(seg->flags, i)) continue;
-
-            RDAddress addr = rd_i_index2address(seg, i);
-            const RDXRefVect* refs =
-                rd_i_get_xrefs_to_type(ctx, addr, RD_DR_ADDRESS);
-
-            if(!vect_is_empty(refs))
-                rd_i_engine_enqueue_call(ctx, addr, NULL, RD_CONFIDENCE_AUTO);
-        }
-    }
-}
-
 static void _rd_worker_follow_pointers(RDContext* ctx) {
     LOG_INFO("following pointers");
 
@@ -93,53 +67,6 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     }
 }
 
-static void _rd_worker_scan_prologues(RDContext* ctx) {
-    if(!ctx->processorplugin->get_prologues) return;
-
-    const char** prologues =
-        ctx->processorplugin->get_prologues(ctx->processor, ctx);
-    if(!prologues) return;
-
-    RDPattern pattern = {0};
-
-    for(const char** p = prologues; *p; p++) {
-        if(!rd_pattern_compile(&pattern, *p)) continue;
-
-        RDSegmentFull** it;
-        vect_each(it, &ctx->segments) {
-            if(!((*it)->base.perm & RD_SP_X)) continue;
-
-            const RDFlagsBuffer* flags = (*it)->flags;
-
-            for(usize i = 0; i < flags->base.length;) {
-                if(rd_flagsbuffer_has_tail(flags, i)) {
-                    i++;
-                    continue;
-                }
-
-                bool is_candidate = rd_flagsbuffer_has_unknown(flags, i) ||
-                                    (rd_flagsbuffer_has_code(flags, i) &&
-                                     !rd_flagsbuffer_has_func(flags, i));
-
-                if(is_candidate) {
-                    if(rd_pattern_match(&pattern, flags, i)) {
-                        RDAddress addr = (*it)->base.start_address + i;
-                        rd_auto_function(ctx, addr, NULL);
-                    }
-
-                    i++;
-                }
-                else {
-                    assert(!rd_flagsbuffer_has_tail(flags, i));
-                    i += rd_i_flagsbuffer_get_range_length(flags, i);
-                }
-            }
-        }
-    }
-
-    rd_pattern_destroy(&pattern);
-}
-
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx); // Show pre-analysis listing
     if(status) status->is_listing_changed = true;
@@ -147,12 +74,19 @@ static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
 }
 
 static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
+    if(!ctx->engine.emulate_start) ctx->engine.emulate_start = clock();
+
     if(rd_i_engine_has_pending_code(ctx)) {
         rd_i_engine_tick(ctx);
         if(status) optional_set(&status->address, ctx->engine.current.address);
     }
-    else
+    else {
+        double elapsed =
+            (double)(clock() - ctx->engine.emulate_start) / CLOCKS_PER_SEC;
+        LOG_INFO("completed in %.2fs", elapsed);
+        ctx->engine.emulate_start = 0;
         ctx->engine.step++;
+    }
 }
 
 static void _rd_worker_step_analyze(RDContext* ctx) {
@@ -171,8 +105,6 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
 
     rd_reader_seek(ctx->input_reader, 0);
 
-    if(ctx->engine.step == RD_WS_ANALYZE2) _rd_worker_scan_prologues(ctx);
-
     if(rd_i_engine_has_pending_code(ctx)) {
         if(ctx->engine.step == RD_WS_ANALYZE1)
             ctx->engine.step = RD_WS_EMULATE1;
@@ -185,10 +117,7 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
         ctx->engine.step++;
 }
 
-static void _rd_worker_step_mergecode(RDContext* ctx) {
-    _rd_worker_promote_refs(ctx);
-    ctx->engine.step++;
-}
+static void _rd_worker_step_mergecode(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_mergedata(RDContext* ctx) {
     rd_i_find_strings(ctx);
@@ -206,6 +135,13 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
 
     if(status) status->is_listing_changed = true;
     ctx->engine.step++;
+
+    rd_i_db_flush(ctx);
+
+    // post-analysis summary
+    LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
+             vect_length(&ctx->listing.functions),
+             vect_length(&ctx->listing.symbols), vect_length(&ctx->problems));
 }
 
 bool rd_is_busy(const RDContext* self) {
@@ -255,4 +191,8 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 void rd_disassemble(RDContext* ctx) {
     while(rd_step(ctx, NULL))
         ;
+}
+
+const char* rd_str_intern(RDContext* self, const char* s) {
+    return rd_i_strpool_intern(&self->strings, s);
 }

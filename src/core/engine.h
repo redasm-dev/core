@@ -1,8 +1,30 @@
 #pragma once
 
-#include "core/db/types.h"
+#include "core/registers.h"
 #include "core/segment.h"
 #include <redasm/redasm.h>
+
+typedef enum {
+    RD_EI_NONE = 0,
+    RD_EI_FLOW,
+    RD_EI_JUMP,
+    RD_EI_CALL,
+} RDEngineItemKind;
+
+typedef struct RDEngineItem {
+    RDEngineItemKind kind;
+    RDConfidence confidence;
+    RDAddress address;
+    RDRegisterHMap registers;
+    char* name;
+} RDEngineItem;
+
+typedef struct RDEngineQueue {
+    RDEngineItem* data;
+    usize length;
+    usize capacity;
+    usize head;
+} RDEngineQueue;
 
 bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address);
 bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,

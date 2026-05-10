@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/db/db.h"
+#include "core/db/types.h"
 #include "listing/listing.h"
+#include "plugins/processor/processor.h"
 #include "support/utils.h"
 #include "surface/row.h"
 #include <redasm/config.h>
@@ -20,6 +21,7 @@ typedef struct RDRenderer {
     RDCharVect word_buf;
     RDCharVect text_buf;
     RDXRefVect xrefs;
+    RDInstructionVect instr_buf;
     char* hl_word;
 } RDRenderer;
 

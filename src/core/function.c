@@ -69,7 +69,7 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
         RDAddress addr = wi.address;
         RDGraphNode src = wi.node;
 
-        const RDSegmentFull* seg = rd_i_find_segment(ctx, addr);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, addr);
         if(!seg) continue;
 
         while(addr < seg->base.end_address) {
@@ -221,6 +221,21 @@ bool rd_function_get_chunk(const RDFunction* self, RDGraphNode n,
     if(!c) return false;
     if(chunk) *chunk = *c;
     return true;
+}
+
+bool rd_function_contains_address(const RDFunction* self, RDAddress address) {
+    if(!self->graph) return false;
+
+    const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);
+
+    RDGraphNode* n;
+    vect_each(n, nodes) {
+        const RDFunctionChunk* chunk = rd_i_function_get_chunk(self, *n);
+        if(chunk && (address >= chunk->start && address < chunk->end))
+            return true;
+    }
+
+    return false;
 }
 
 int rd_i_function_find_chunk_pred(const void* key, const void* item) {

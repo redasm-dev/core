@@ -1,37 +1,18 @@
 #pragma once
 
 #include "core/db/db.h"
+#include "core/engine.h"
 #include "core/segment.h"
 #include "io/buffer.h"
 #include "listing/listing.h"
-#include "rdil/rdil.h"
+#include "plugins/processor/processor.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
 #include <redasm/redasm.h>
 #include <redasm/types/def.h>
+#include <time.h>
 
 typedef struct RDHooks RDHooks;
-
-typedef enum {
-    RD_WI_NONE = 0,
-    RD_WI_FLOW,
-    RD_WI_JUMP,
-    RD_WI_CALL,
-} RDWorkerItemKind;
-
-typedef struct RDWorkerItem {
-    RDWorkerItemKind kind;
-    RDConfidence confidence;
-    RDAddress address;
-    char* name;
-} RDWorkerItem;
-
-typedef struct RDWorkerQueue {
-    RDWorkerItem* data;
-    usize length;
-    usize capacity;
-    usize head;
-} RDWorkerQueue;
 
 typedef struct RDAnalyzerItem {
     const RDAnalyzerPlugin* plugin;
@@ -62,9 +43,8 @@ typedef struct RDContext {
     RDCharVect sym_buf;
     RDCharVect imp_buf;
     RDCharVect problem_buf;
-    RDTrackedRegVect tregs_buf;
     RDOvrOperandVect ovr_ops_buf;
-    RDILInstruction il_buf;
+    RDInstructionVect lift_buf;
 
     char* filepath;
     RDByteBuffer* input;
@@ -74,7 +54,7 @@ typedef struct RDContext {
     unsigned int min_string;
     RDLoadAddressing addressing;
 
-    RDDB db;
+    RDDB* db;
     RDListing listing;
     RDHooks* hooks;
 
@@ -85,18 +65,6 @@ typedef struct RDContext {
     } types;
 
     struct {
-        RDSegmentFull** data;
-        usize length;
-        usize capacity;
-    } segments;
-
-    struct {
-        RDInputMapping* data;
-        usize length;
-        usize capacity;
-    } mappings;
-
-    struct {
         RDAddress value;
         bool has_value;
     } entry_point;
@@ -104,11 +72,16 @@ typedef struct RDContext {
     struct {
         const RDSegmentFull* segment;
         RDDelaySlotInfo dslot_info;
-        RDWorkerQueue qjump;
-        RDWorkerQueue qcall;
-        RDWorkerItem flow;
-        RDWorkerItem current;
+        RDEngineQueue qjump;
+        RDEngineQueue qcall;
+        RDEngineItem current;
         unsigned int step;
+        clock_t emulate_start;
+
+        struct {
+            RDAddress value;
+            bool has_value;
+        } flow;
     } engine;
 
     struct {
@@ -122,8 +95,6 @@ static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
                                          RDAddress addr) {
     return addr >= seg->base.start_address && addr < seg->base.end_address;
 }
-
-const RDSegmentFull* rd_i_find_segment(const RDContext* self, RDAddress addr);
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
                                const char* filepath, RDByteBuffer* input);

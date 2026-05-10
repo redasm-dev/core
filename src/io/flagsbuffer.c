@@ -421,3 +421,25 @@ bool rd_i_flagsbuffer_undefine_op_over(RDFlagsBuffer* self, usize idx) {
 
     return false;
 }
+
+bool rd_i_flagsbuffer_set_queued(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_set_queued(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_has_queued(const RDFlagsBuffer* self, usize idx) {
+    return idx < self->base.length && rd_i_flags_has_queued(self->data[idx]);
+}
+
+bool rd_i_flagsbuffer_undefine_queued(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_queued(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}

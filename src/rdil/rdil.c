@@ -1,248 +1,244 @@
 #include "rdil.h"
-#include "support/containers.h"
-#include "surface/renderer.h"
+#include "core/context.h"
+#include "core/db/db.h"
+#include "rdil/opcodes.h"
+#include "support/error.h"
+#include "support/logging.h"
 
-static u8 _rdil_read_u8(const RDILInstruction* self, usize* cur) {
-    assert(*cur < self->length && "RDIL buffer overrun");
-    return self->data[(*cur)++];
-}
+typedef struct RDILValue {
+    u64 value;
+    bool known;
+} RDILValue;
 
-static u64 _rdil_read_uleb(const RDILInstruction* self, usize* cur) {
-    u64 result = 0;
-    int shift = 0;
-    u8 b;
+static bool _rd_il_eval_cond(const RDInstruction* il, const RDILValue* lhs,
+                             const RDILValue* rhs) {
+    assert(lhs->known && rhs->known);
 
-    do {
-        b = _rdil_read_u8(self, cur);
-        result |= (u64)(b & 0x7F) << shift;
-        shift += 7;
-    } while(b & 0x80);
+    switch(il->id) {
+        case RD_IL_JUMP_EQ:
+        case RD_IL_CALL_EQ: return lhs->value == rhs->value;
 
-    return result;
-}
+        case RD_IL_JUMP_NE:
+        case RD_IL_CALL_NE: return lhs->value != rhs->value;
 
-static i64 _rdil_read_sleb(const RDILInstruction* self, usize* cur) {
-    i64 result = 0;
-    int shift = 0;
-    u8 b;
+        case RD_IL_JUMP_LT:
+        case RD_IL_CALL_LT: return lhs->value < rhs->value;
 
-    do {
-        b = _rdil_read_u8(self, cur);
-        result |= (i64)(b & 0x7F) << shift;
-        shift += 7;
-    } while(b & 0x80);
+        case RD_IL_JUMP_LE:
+        case RD_IL_CALL_LE: return lhs->value <= rhs->value;
 
-    // sign extend if sign bit of last byte was set
-    if((b & 0x40) && shift < 64) result |= -(1LL << shift);
-    return result;
-}
+        case RD_IL_JUMP_GT:
+        case RD_IL_CALL_GT: return lhs->value > rhs->value;
 
-static i64 _rdil_peek_sleb(const RDILInstruction* self, usize cur) {
-    i64 result = 0;
-    int shift = 0;
-    u8 b;
+        case RD_IL_JUMP_GE:
+        case RD_IL_CALL_GE: return lhs->value >= rhs->value;
 
-    do {
-        b = _rdil_read_u8(self, &cur);
-        result |= (i64)(b & 0x7F) << shift;
-        shift += 7;
-    } while(b & 0x80);
-
-    if((b & 0x40) && shift < 64) result |= -(1LL << shift);
-
-    return result;
-}
-
-static void _rdil_write_u8(RDILInstruction* self, u8 b) { vect_push(self, b); }
-
-static void _rdil_write_uleb(RDILInstruction* self, u64 v) {
-    do {
-        u8 b = v & 0x7F;
-        v >>= 7;
-        if(v) b |= 0x80;
-        _rdil_write_u8(self, b);
-    } while(v);
-}
-
-static void _rdil_write_sleb(RDILInstruction* self, i64 v) {
-    bool more = true;
-    while(more) {
-        u8 b = v & 0x7F;
-        v >>= 7;
-        // sign bit of b matches sign of remaining value -> done
-        bool sign = b & 0x40;
-        more = !((v == 0 && !sign) || (v == -1 && sign));
-        if(more) b |= 0x80;
-
-        _rdil_write_u8(self, b);
+        default: break;
     }
+
+    unreachable();
+    return false;
 }
 
-void rd_i_il_init(RDILInstruction* self) { vect_clear(self); }
-void rd_i_il_deinit(RDILInstruction* self) { vect_destroy(self); }
+static RDILValue _rd_il_eval_alu(const RDInstruction* il, const RDILValue* lhs,
+                                 const RDILValue* rhs) {
+    if(!lhs->known || !rhs->known) return (RDILValue){0};
 
-void rd_il_nop(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_NOP); }
-void rd_il_unkn(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_UNKN); }
-void rd_il_copy(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_COPY); }
-void rd_il_goto(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_GOTO); }
-void rd_il_call(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_CALL); }
-void rd_il_ret(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_RET); }
-void rd_il_if(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_IF); }
-void rd_il_push(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_PUSH); }
-void rd_il_pop(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_POP); }
-void rd_il_trap(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_TRAP); }
+    u64 val = 0;
 
-void rd_il_reg(RDILInstruction* self, int reg) {
-    _rdil_write_u8(self, RD_IL_REG);
-    _rdil_write_uleb(self, (u64)reg);
-}
+    switch(il->id) {
+        case RD_IL_ADD: val = lhs->value + rhs->value; break;
+        case RD_IL_SUB: val = lhs->value - rhs->value; break;
+        case RD_IL_MUL: val = lhs->value * rhs->value; break;
+        case RD_IL_DIV: val = rhs->value ? lhs->value / rhs->value : 0; break;
+        case RD_IL_MOD: val = rhs->value ? lhs->value % rhs->value : 0; break;
+        case RD_IL_AND: val = lhs->value & rhs->value; break;
+        case RD_IL_OR: val = lhs->value | rhs->value; break;
+        case RD_IL_XOR: val = lhs->value ^ rhs->value; break;
+        case RD_IL_LSL: val = lhs->value << (rhs->value & 0x3F); break;
+        case RD_IL_LSR: val = lhs->value >> (rhs->value & 0x3F); break;
 
-void rd_il_var(RDILInstruction* self, RDAddress address) {
-    _rdil_write_u8(self, RD_IL_VAR);
-    _rdil_write_uleb(self, address);
-}
+        case RD_IL_ASL:
+            val = (u64)((i64)lhs->value << (rhs->value & 0x3F));
+            break;
 
-void rd_il_sym(RDILInstruction* self, const char* name) {
-    _rdil_write_u8(self, RD_IL_SYM);
-    while(*name)
-        _rdil_write_u8(self, (u8)*name++);
-    _rdil_write_u8(self, 0);
-}
+        case RD_IL_ASR:
+            val = (u64)((i64)lhs->value >> (rhs->value & 0x3F));
+            break;
 
-void rd_il_uint(RDILInstruction* self, u64 value) {
-    _rdil_write_u8(self, RD_IL_UINT);
-    _rdil_write_uleb(self, value);
-}
-
-void rd_il_sint(RDILInstruction* self, i64 value) {
-    _rdil_write_u8(self, RD_IL_SINT);
-    _rdil_write_sleb(self, value);
-}
-
-void rd_il_mem(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_MEM); }
-void rd_il_not(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_NOT); }
-void rd_il_add(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_ADD); }
-void rd_il_sub(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_SUB); }
-void rd_il_mul(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_MUL); }
-void rd_il_div(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_DIV); }
-void rd_il_mod(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_MOD); }
-void rd_il_and(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_AND); }
-void rd_il_or(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_OR); }
-void rd_il_xor(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_XOR); }
-void rd_il_lsl(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_LSL); }
-void rd_il_lsr(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_LSR); }
-void rd_il_asl(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_ASL); }
-void rd_il_asr(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_ASR); }
-void rd_il_rol(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_ROL); }
-void rd_il_ror(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_ROR); }
-void rd_il_eq(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_EQ); }
-void rd_il_ne(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_NE); }
-void rd_il_lt(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_LT); }
-void rd_il_le(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_LE); }
-void rd_il_gt(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_GT); }
-void rd_il_ge(RDILInstruction* self) { _rdil_write_u8(self, RD_IL_GE); }
-
-static const char* _rdil_op_str(u8 op) {
-    switch(op) {
-        case RD_IL_ADD: return "+";
-        case RD_IL_SUB: return "-";
-        case RD_IL_MUL: return "*";
-        case RD_IL_DIV: return "/";
-        case RD_IL_MOD: return "%";
-        case RD_IL_AND: return "&";
-        case RD_IL_OR: return "|";
-        case RD_IL_XOR: return "^";
-        case RD_IL_LSL: return "<<";
-        case RD_IL_LSR: return ">>";
-        case RD_IL_ASL: return "<<<";
-        case RD_IL_ASR: return ">>>";
-        case RD_IL_ROL: return "rol ";
-        case RD_IL_ROR: return "ror ";
-        case RD_IL_EQ: return "==";
-        case RD_IL_NE: return "!=";
-        case RD_IL_LT: return "<";
-        case RD_IL_LE: return "<=";
-        case RD_IL_GT: return ">";
-        case RD_IL_GE: return ">=";
-        default: return "?";
-    }
-}
-
-static void _rdil_render_expr(RDRenderer* r, const RDILInstruction* il,
-                              usize* cur) {
-    u8 op = _rdil_read_u8(il, cur);
-
-    switch(op) {
-        case RD_IL_REG: {
-            int reg = (int)_rdil_read_uleb(il, cur);
-            rd_renderer_reg(r, reg);
+        case RD_IL_ROL: {
+            u64 n = rhs->value & 0x3F;
+            val = (lhs->value << n) | (lhs->value >> (64 - n));
             break;
         }
 
-        case RD_IL_VAR: {
-            RDAddress addr = _rdil_read_uleb(il, cur);
-            const char* name = rd_get_name(r->context, addr);
-            if(name) {
-                rd_renderer_text(r, name, RD_THEME_LOCATION,
-                                 RD_THEME_BACKGROUND);
+        case RD_IL_ROR: {
+            u64 n = rhs->value & 0x3F;
+            val = (lhs->value >> n) | (lhs->value << (64 - n));
+            break;
+        }
+
+        default: unreachable(); return (RDILValue){0};
+    }
+
+    return (RDILValue){.value = val, .known = true};
+}
+
+static RDILValue _rd_il_eval_op(RDIL* self, const RDInstruction* il,
+                                usize idx) {
+    assert(idx < RD_MAX_OPERANDS);
+    const RDOperand* op = &il->operands[idx];
+
+    switch(op->kind) {
+        case RD_OP_CNST: return (RDILValue){.value = op->cnst, .known = true};
+        case RD_OP_IMM: return (RDILValue){.value = op->imm, .known = true};
+        case RD_OP_ADDR: return (RDILValue){.value = op->addr, .known = true};
+
+        case RD_OP_REG: {
+            RDRegValue val;
+            if(rd_il_get_regval_id(self, op->reg, &val))
+                return (RDILValue){.value = val, .known = true};
+
+            return (RDILValue){0};
+        }
+
+        case RD_OP_SYM: {
+            RDRegValue val;
+            if(rd_il_get_regval(self, op->sym, &val))
+                return (RDILValue){.value = val, .known = true};
+
+            return (RDILValue){0};
+        }
+
+        case RD_OP_DISPL: {
+            RDRegValue base_val = 0;
+            bool known = rd_il_get_regval_id(self, op->displ.base, &base_val);
+            if(!known) return (RDILValue){0};
+
+            u64 addr = base_val;
+
+            if(op->displ.index != RD_REGID_UNKNOWN) {
+                RDRegValue index_val = 0;
+                known &= rd_il_get_regval_id(self, op->displ.index, &index_val);
+                addr += index_val * (op->displ.scale ? op->displ.scale : 1);
             }
-            else
-                rd_renderer_loc(r, addr, 0, RD_NUM_DEFAULT);
+
+            addr += op->displ.offset;
+            return (RDILValue){.value = addr, .known = known};
+        }
+
+        case RD_OP_MEM: {
+            // attempt memory read (FIXME: size unknown, use pointer size)
+            RDAddress val = 0;
+            if(!rd_read_ptr(self->context, op->mem, &val))
+                return (RDILValue){0};
+
+            return (RDILValue){.value = val, .known = true};
+        }
+
+        default: unreachable(); break;
+    }
+
+    return (RDILValue){0};
+}
+
+static void _rd_il_eval_set(RDIL* self, const RDOperand* dst,
+                            const RDILValue* src) {
+    if(dst->kind == RD_OP_REG) {
+        if(src->known)
+            rd_il_set_regval_id(self, dst->reg, src->value);
+        else
+            rd_il_del_regval_id(self, dst->reg);
+    }
+    else if(dst->kind == RD_OP_SYM) {
+        if(src->known)
+            rd_il_set_regval(self, dst->sym, src->value);
+        else
+            rd_il_del_regval(self, dst->sym);
+    }
+    // RD_OP_MEM: memory write, evaluator doesn't track memory state, skip
+}
+
+static void _rd_il_eval(RDIL* self, const RDInstruction* il) {
+    switch(il->id) {
+        case RD_IL_UNKNOWN:
+        case RD_IL_NOP: break;
+
+        case RD_IL_TRAP:
+        case RD_IL_RET: self->done = true; break;
+
+        case RD_IL_MOV: {
+            const RDOperand* dst_op = &il->operands[0];
+            RDILValue src = _rd_il_eval_op(self, il, 1);
+            _rd_il_eval_set(self, dst_op, &src);
             break;
         }
 
-        case RD_IL_SYM: {
-            const char* name = (const char*)(il->data + *cur);
-            rd_renderer_text(r, name, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
-            *cur += strlen(name) + 1;
+        case RD_IL_PUSH: // virtual stack not implemented
+            break;
+
+        case RD_IL_POP: {
+            // virtual stack not implemented.
+            // Destination register becomes unknown
+            if(il->operands[0].kind == RD_OP_REG)
+                rd_il_del_regval_id(self, il->operands[0].reg);
+            else if(il->operands[0].kind == RD_OP_SYM)
+                rd_il_del_regval(self, il->operands[0].sym);
             break;
         }
 
-        case RD_IL_UINT: {
-            u64 v = _rdil_read_uleb(il, cur);
-            rd_renderer_num(r, v, 16, 0, RD_NUM_DEFAULT);
+        case RD_IL_JUMP:
+        case RD_IL_CALL: {
+            const RDOperand* op = &il->operands[0];
+            if(self->lifted.real_instr.indirect && op->kind == RD_OP_MEM) {
+                // indirect branch through memory pointer, use address as target
+                self->target.value = op->mem;
+                self->target.known = true;
+            }
+            else {
+                RDILValue tgt = _rd_il_eval_op(self, il, 0);
+                self->target.value = (RDAddress)tgt.value;
+                self->target.known = tgt.known;
+            }
+
             break;
         }
 
-        case RD_IL_SINT: {
-            i64 v = _rdil_read_sleb(il, cur);
-            rd_renderer_num(r, v < 0 ? -v : v, 16, 0, RD_NUM_DEFAULT);
+        case RD_IL_JUMP_EQ:
+        case RD_IL_JUMP_NE:
+        case RD_IL_JUMP_LT:
+        case RD_IL_JUMP_LE:
+        case RD_IL_JUMP_GT:
+        case RD_IL_JUMP_GE:
+        case RD_IL_CALL_EQ:
+        case RD_IL_CALL_NE:
+        case RD_IL_CALL_LT:
+        case RD_IL_CALL_LE:
+        case RD_IL_CALL_GT:
+        case RD_IL_CALL_GE: {
+            RDILValue lhs = _rd_il_eval_op(self, il, 0);
+            RDILValue rhs = _rd_il_eval_op(self, il, 1);
+
+            if(lhs.known && rhs.known && _rd_il_eval_cond(il, &lhs, &rhs)) {
+                RDILValue tgt = _rd_il_eval_op(self, il, 2);
+                self->target.value = (RDAddress)tgt.value;
+                self->target.known = tgt.known;
+            }
+
             break;
         }
 
-        case RD_IL_MEM:
-            rd_renderer_norm(r, "[");
-            _rdil_render_expr(r, il, cur); // u
-            rd_renderer_norm(r, "]");
-            break;
-
-        case RD_IL_NOT:
-            rd_renderer_norm(r, "~");
-            _rdil_render_expr(r, il, cur); // u
-            break;
-
-        case RD_IL_ADD: {
-            _rdil_render_expr(r, il, cur); // l
-            if(il->data[*cur] == RD_IL_SINT &&
-               _rdil_peek_sleb(il, *cur + 1) < 0)
-                rd_renderer_norm(r, "-");
-            else
-                rd_renderer_norm(r, "+");
-            _rdil_render_expr(r, il, cur); // r
+        // ALU ops
+        case RD_IL_NOT: {
+            const RDOperand* dst_op = &il->operands[0];
+            RDILValue src = _rd_il_eval_op(self, il, 1);
+            if(src.known) src.value = ~src.value;
+            _rd_il_eval_set(self, dst_op, &src);
             break;
         }
 
-        case RD_IL_SUB: {
-            _rdil_render_expr(r, il, cur); // l
-            if(il->data[*cur] == RD_IL_SINT &&
-               _rdil_peek_sleb(il, *cur + 1) < 0)
-                rd_renderer_norm(r, "+");
-            else
-                rd_renderer_norm(r, "-");
-            _rdil_render_expr(r, il, cur); // r
-            break;
-        }
-
+        case RD_IL_ADD:
+        case RD_IL_SUB:
         case RD_IL_MUL:
         case RD_IL_DIV:
         case RD_IL_MOD:
@@ -254,110 +250,391 @@ static void _rdil_render_expr(RDRenderer* r, const RDILInstruction* il,
         case RD_IL_ASL:
         case RD_IL_ASR:
         case RD_IL_ROL:
-        case RD_IL_ROR:
-        case RD_IL_EQ:
-        case RD_IL_NE:
-        case RD_IL_LT:
-        case RD_IL_LE:
-        case RD_IL_GT:
-        case RD_IL_GE: {
-            _rdil_render_expr(r, il, cur); // l
-            rd_renderer_norm(r, _rdil_op_str(op));
-            _rdil_render_expr(r, il, cur); // r
+        case RD_IL_ROR: {
+            const RDOperand* dst_op = &il->operands[0];
+            RDILValue src1 = _rd_il_eval_op(self, il, 1);
+            RDILValue src2 = _rd_il_eval_op(self, il, 2);
+            RDILValue res = _rd_il_eval_alu(il, &src1, &src2);
+            _rd_il_eval_set(self, dst_op, &res);
             break;
         }
 
-        default: rd_renderer_norm(r, "?"); break;
+        default: unreachable();
     }
 }
 
-static void _rdil_render_statement(RDRenderer* r, const RDILInstruction* il,
-                                   usize* cur) {
-    u8 op = _rdil_read_u8(il, cur);
+RDIL* rd_il_create(RDContext* ctx, const RDFunction* f) {
+    RDIL* self = malloc(sizeof(*self));
+    *self = (RDIL){.context = ctx};
+    rd_i_registermap_init(&self->registers);
+    rd_il_assign(self, f);
+    return self;
+}
 
-    switch(op) {
+void rd_il_destroy(RDIL* self) {
+    if(!self) return;
 
-        case RD_IL_NOP: rd_renderer_muted(r, "nop"); break;
-        case RD_IL_UNKN: rd_renderer_muted(r, "unknown"); break;
+    hmap_destroy(&self->registers);
+    vect_destroy(&self->lifted);
+    free(self);
+}
 
-        case RD_IL_COPY: {
-            _rdil_render_expr(r, il, cur); // dst
-            rd_renderer_norm(r, "=");
-            _rdil_render_expr(r, il, cur); // src
-            break;
-        }
+void rd_il_flush(RDIL* self) {
+    hmap_clear(&self->registers);
+    vect_clear(&self->lifted);
+    self->current_address = self->function ? self->function->address : 0;
+    self->done = false;
+}
 
-        case RD_IL_GOTO: {
-            rd_renderer_text(r, "goto", RD_THEME_JUMP, RD_THEME_BACKGROUND);
-            rd_renderer_ws(r, 1);
-            _rdil_render_expr(r, il, cur); // target
-            break;
-        }
+void rd_il_assign(RDIL* self, const RDFunction* f) {
+    self->function = f;
+    rd_il_flush(self);
 
-        case RD_IL_CALL: {
-            _rdil_render_expr(r, il, cur); // target (VAR renders as name)
-            rd_renderer_norm(r, "()");
-            break;
-        }
+    if(!f) return;
 
-        case RD_IL_RET: {
-            rd_renderer_text(r, "ret", RD_THEME_STOP, RD_THEME_BACKGROUND);
-            rd_renderer_norm(r, " ");
-            _rdil_render_expr(r, il, cur); // target
-            break;
-        }
+    // seed segment registers from DB into local register file
+    const RDSegmentRegNameVect* sreg_names =
+        rd_i_db_get_all_sreg_names(self->context);
 
-        case RD_IL_IF: {
-            rd_renderer_text(r, "if", RD_THEME_JUMP_COND, RD_THEME_BACKGROUND);
-            rd_renderer_norm(r, "(");
-            _rdil_render_expr(r, il, cur); // cond
-            rd_renderer_norm(r, ") ");
-            rd_renderer_text(r, "goto", RD_THEME_JUMP, RD_THEME_BACKGROUND);
-            rd_renderer_ws(r, 1);
-            _rdil_render_expr(r, il, cur); // t
-            rd_renderer_norm(r, " else ");
-            rd_renderer_text(r, "goto", RD_THEME_JUMP, RD_THEME_BACKGROUND);
-            rd_renderer_ws(r, 1);
-            _rdil_render_expr(r, il, cur); // f
-            break;
-        }
+    const char** it;
+    vect_each(it, sreg_names) {
+        RDRegValue val;
 
-        case RD_IL_PUSH: {
-            rd_renderer_norm(r, "push");
-            rd_renderer_norm(r, "(");
-            _rdil_render_expr(r, il, cur); // src
-            rd_renderer_norm(r, ")");
-            break;
-        }
-
-        case RD_IL_POP: {
-            _rdil_render_expr(r, il, cur); // dst
-            rd_renderer_norm(r, "=pop()");
-            break;
-        }
-
-        case RD_IL_TRAP: {
-            rd_renderer_norm(r, "trap");
-            rd_renderer_ws(r, 1);
-            _rdil_render_expr(r, il, cur); // u
-            break;
-        }
-
-        default: rd_renderer_norm(r, "?"); break;
+        if(rd_get_sregval(self->context, f->address, *it, &val))
+            rd_il_set_regval(self, *it, val);
     }
 }
-void rd_i_il_render(RDRenderer* r, const RDILInstruction* il) {
-    if(!il->length) {
-        rd_renderer_muted(r, "unknown");
-        return;
+
+bool rd_il_run(RDIL* self) {
+    if(!self->function) return false;
+    if(!self->context->processorplugin->lift) return false;
+
+    while(rd_il_step(self))
+        ;
+
+    return true;
+}
+
+bool rd_il_step(RDIL* self) {
+    if(self->done || !self->function || !self->function->graph) return false;
+
+    self->target.known = false;
+
+    const RDInstructionVect* v =
+        rd_il_lift(self->context, self->current_address, &self->lifted);
+
+    RDAddress next_address = self->current_address + v->real_instr.length;
+
+    // this instruction has delay slots:
+    // save the address, process delay slots and restore the address
+    if(v->real_instr.delay_slots > 0 &&
+       v->real_instr.delay_slots != RD_IS_DSLOT) {
+
+        // keep lifted instruction with delay slot and restore it later
+        RDInstructionVect keep = *v;
+        bool done_keep = self->done;
+        self->lifted = (RDInstructionVect){0};
+        self->current_address = self->current_address + keep.real_instr.length;
+
+        for(u8 i = 0; i < keep.real_instr.delay_slots; i++)
+            rd_il_step(self);
+
+        vect_destroy(&self->lifted);
+        self->lifted = keep;
+        self->done = done_keep;
+        next_address = self->current_address;
     }
 
-    usize cur = 0;
-    bool first = true;
-
-    while(cur < il->length) {
-        if(!first) rd_renderer_norm(r, "; ");
-        _rdil_render_statement(r, il, &cur);
-        first = false;
+    const RDInstruction* il;
+    vect_each(il, &self->lifted) {
+        _rd_il_eval(self, il);
+        if(self->done) return true;
     }
+
+    self->current_address = next_address;
+
+    // check if we've left the function
+    if(!rd_function_contains_address(self->function, self->current_address) ||
+       !rd_instr_can_flow(&self->lifted.real_instr))
+        self->done = true;
+
+    return true;
+}
+
+RDAddress rd_il_current_address(const RDIL* self) {
+    return self->current_address;
+}
+
+RDInstructionSlice rd_il_current_il(const RDIL* self) {
+    return vect_to_slice(RDInstructionSlice, &self->lifted);
+}
+
+const RDInstruction* rd_il_current_instr(const RDIL* self) {
+    return &self->lifted.real_instr;
+}
+
+bool rd_il_get_target(const RDIL* self, RDAddress* target) {
+    if(self->target.known && target) *target = self->target.value;
+    return self->target.known;
+}
+
+bool rd_il_get_regval(const RDIL* self, const char* regname,
+                      RDRegValue* value) {
+    if(!regname) return false;
+
+    RDContext* ctx = self->context;
+    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
+
+    if(ctx->processorplugin->get_reg_mask)
+        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
+
+    const char* canonical = regname;
+    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
+        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+
+    RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
+    const RDRegister* r = hmap_get(&self->registers, &key);
+    if(!r) return false;
+
+    if(value) *value = (r->value & m.mask) >> m.shift;
+    return true;
+}
+
+bool rd_il_set_regval(RDIL* self, const char* regname, RDRegValue value) {
+    if(!regname) return false;
+
+    RDContext* ctx = self->context;
+    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
+
+    if(ctx->processorplugin->get_reg_mask)
+        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
+
+    const char* canonical = regname;
+    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
+        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+
+    // merge if bit field
+    if(m.mask != RD_REGMASK_FULL) {
+        RDRegValue base = 0;
+        rd_il_get_regval(self, canonical, &base);
+        value = (base & ~m.mask) | ((value << m.shift) & m.mask);
+    }
+
+    RDRegister r = {
+        .name = rd_i_strpool_intern(&ctx->strings, canonical),
+        .value = value,
+    };
+
+    hmap_set(&self->registers, &r);
+    return true;
+}
+
+bool rd_il_del_regval(RDIL* self, const char* regname) {
+    if(!regname) return false;
+
+    RDContext* ctx = self->context;
+    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
+
+    if(ctx->processorplugin->get_reg_mask)
+        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
+
+    const char* canonical = regname;
+    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
+        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+
+    RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
+    hmap_del(&self->registers, &key);
+    return true;
+}
+
+bool rd_il_get_regval_id(const RDIL* self, RDReg id, RDRegValue* value) {
+    RDContext* ctx = self->context;
+    if(!ctx->processorplugin->get_reg_name) return false;
+
+    const char* regname =
+        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    return regname && rd_il_get_regval(self, regname, value);
+}
+
+bool rd_il_set_regval_id(RDIL* self, RDReg id, RDRegValue value) {
+    RDContext* ctx = self->context;
+    if(!ctx->processorplugin->get_reg_name) return false;
+
+    const char* regname =
+        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    return regname && rd_il_set_regval(self, regname, value);
+}
+
+bool rd_il_del_regval_id(RDIL* self, RDReg id) {
+    RDContext* ctx = self->context;
+    if(!ctx->processorplugin->get_reg_name) return false;
+
+    const char* regname =
+        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    return regname && rd_il_del_regval(self, regname);
+}
+
+static bool _rd_il_invalid_operand(const RDInstruction* instr,
+                                   RDAddress address, int instr_idx,
+                                   int op_idx) {
+    const RDOperand* op = &instr->operands[op_idx];
+    const char* op_kind = NULL;
+
+    switch(op->kind) {
+        case RD_OP_NULL: op_kind = "NULL"; break;
+        case RD_OP_CNST: op_kind = "CNST"; break;
+        case RD_OP_REG: op_kind = "REG"; break;
+        case RD_OP_IMM: op_kind = "IMM"; break;
+        case RD_OP_ADDR: op_kind = "ADDR"; break;
+        case RD_OP_MEM: op_kind = "MEM"; break;
+        case RD_OP_DISPL: op_kind = "DISPL"; break;
+        case RD_OP_SYM: op_kind = "SYM"; break;
+        default: op_kind = "USER"; break;
+    }
+
+    LOG_FAIL(
+        "RDIL instruction #%d '%s' at %llx, invalid operand %d (kind = %s)",
+        instr_idx, instr->mnemonic, address, op_idx, op_kind);
+
+    return false;
+}
+
+static bool _rd_il_validate(RDAddress address, const RDInstructionVect* v) {
+    for(usize i = 0; i < vect_length(v); i++) {
+        const RDInstruction* instr = vect_at(v, i);
+
+        switch(instr->id) {
+            case RD_IL_CALL:
+            case RD_IL_JUMP:
+            case RD_IL_PUSH: {
+                if(instr->operands[0].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                break;
+            }
+
+            case RD_IL_POP: {
+                RDOperandKind k = instr->operands[0].kind;
+
+                if(k != RD_OP_REG && k != RD_OP_SYM)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                break;
+            }
+
+            case RD_IL_MOV: {
+                RDOperandKind k = instr->operands[0].kind;
+
+                if(k != RD_OP_REG && k != RD_OP_MEM && k != RD_OP_SYM)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                if(instr->operands[1].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 1);
+
+                break;
+            }
+
+            case RD_IL_CALL_EQ:
+            case RD_IL_CALL_NE:
+            case RD_IL_CALL_LT:
+            case RD_IL_CALL_LE:
+            case RD_IL_CALL_GT:
+            case RD_IL_CALL_GE:
+            case RD_IL_JUMP_EQ:
+            case RD_IL_JUMP_NE:
+            case RD_IL_JUMP_LT:
+            case RD_IL_JUMP_LE:
+            case RD_IL_JUMP_GT:
+            case RD_IL_JUMP_GE: {
+                if(instr->operands[0].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                if(instr->operands[1].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 1);
+
+                if(instr->operands[2].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 2);
+
+                break;
+            }
+
+            case RD_IL_NOT: {
+                RDOperandKind k = instr->operands[0].kind;
+
+                if(k != RD_OP_REG && k != RD_OP_SYM)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                if(instr->operands[1].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 1);
+
+                break;
+            }
+
+            case RD_IL_ADD:
+            case RD_IL_SUB:
+            case RD_IL_MUL:
+            case RD_IL_DIV:
+            case RD_IL_MOD:
+            case RD_IL_AND:
+            case RD_IL_OR:
+            case RD_IL_XOR:
+            case RD_IL_LSL:
+            case RD_IL_LSR:
+            case RD_IL_ASL:
+            case RD_IL_ASR:
+            case RD_IL_ROL:
+            case RD_IL_ROR: {
+                RDOperandKind k = instr->operands[0].kind;
+
+                if(k != RD_OP_REG && k != RD_OP_SYM)
+                    return _rd_il_invalid_operand(instr, address, i, 0);
+
+                if(instr->operands[1].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 1);
+
+                if(instr->operands[2].kind == RD_OP_NULL)
+                    return _rd_il_invalid_operand(instr, address, i, 2);
+
+                break;
+            }
+
+            default: break;
+        }
+    }
+
+    return true;
+}
+
+const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
+                                    RDInstructionVect* v) {
+    vect_clear(v);
+
+    if(ctx->processorplugin->lift) {
+        if(rd_decode(ctx, address, &v->real_instr))
+            ctx->processorplugin->lift(ctx, v, &v->real_instr, ctx->processor);
+    }
+
+    if(!_rd_il_validate(address, v)) vect_clear(v);
+    if(vect_is_empty(v)) rd_il_push_instr(v, RD_IL_UNKNOWN);
+
+    return v;
+}
+
+RDInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
+    const RDInstructionVect* il = rd_il_lift(ctx, address, &ctx->lift_buf);
+    return vect_to_slice(RDInstructionSlice, il);
+}
+
+RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
+    if(s >= RD_IL_COUNT) {
+        LOG_FAIL("%d is an invalid RDIL statement", (int)s);
+        return NULL;
+    }
+
+    vect_push(self, (RDInstruction){.id = (u32)s});
+    RDInstruction* instr = vect_back(self);
+
+    const RDILStatementInfo* info = &RDIL_OP_TABLE[instr->id];
+    rd_instr_set_mnemonic(instr, info->mnemonic);
+    return instr;
 }

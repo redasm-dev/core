@@ -174,7 +174,7 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
         default: str_append(d, "IF_NONE"); break;
     }
 
-    if(rd_is_delay_slot(instr)) str_append(d, " | IS_DSLOT");
+    if(rd_instr_is_delay_slot(instr)) str_append(d, " | IS_DSLOT");
     str_push(d, '\n');
 
     int c = 0;
@@ -205,13 +205,6 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
         else if(op->kind == RD_OP_MEM) {
             str_append(d, "OP_MEM\n");
             str_append(d, rd_i_format(&buf, "  [%d].mem: %x\n", i, op->mem));
-        }
-        else if(op->kind == RD_OP_PHRASE) {
-            str_append(d, "OP_PHRASE\n");
-            str_append(
-                d, rd_i_format(&buf, "  [%d].base: %x\n", i, op->phrase.base));
-            str_append(d, rd_i_format(&buf, "  [%d].index: %x\n", i,
-                                      op->phrase.index));
         }
         else if(op->kind == RD_OP_DISPL) {
             str_append(d, "OP_DISPL\n");

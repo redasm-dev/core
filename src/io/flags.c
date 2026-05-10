@@ -37,6 +37,9 @@ static const RDFlags FL_OPOVER = 1U << 26;
 // [DATA] bits
 static const RDFlags FL_TYPE = 1U << 18;
 
+// transient bits
+static const RDFlags FL_QUEUED = 1U << 31; // address is pending in a queue
+
 bool rd_i_flags_has_unknown(RDFlags self) {
     return !(self & (FL_CODE | FL_DATA | FL_TAIL));
 }
@@ -234,3 +237,7 @@ void rd_i_flags_undefine_op_over(RDFlags* self) {
     assert(rd_i_flags_has_code(*self));
     *self &= ~FL_OPOVER;
 }
+
+void rd_i_flags_set_queued(RDFlags* self) { *self |= FL_QUEUED; }
+bool rd_i_flags_has_queued(RDFlags self) { return self & FL_QUEUED; }
+void rd_i_flags_undefine_queued(RDFlags* self) { *self &= ~FL_QUEUED; }

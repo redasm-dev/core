@@ -2,6 +2,12 @@
 
 typedef struct RDContext RDContext;
 
+typedef enum {
+    RD_CONFIDENCE_AUTO = 0,
+    RD_CONFIDENCE_LIBRARY,
+    RD_CONFIDENCE_USER,
+} RDConfidence;
+
 #define RD_UNUSED(x) (void)(x)
 #define rd_count_of(x) (sizeof(x) / sizeof(*(x)))
 

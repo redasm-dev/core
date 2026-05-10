@@ -20,6 +20,18 @@ typedef bool (*VectPredicate)(const void*);
         (self)->data[(self)->length++] = __VA_ARGS__;                          \
     } while(0)
 
+#define vect_ins(self, idx, ...)                                               \
+    do {                                                                       \
+        _vect_grow((void**)(&(self)->data), &(self)->capacity, (self)->length, \
+                   sizeof(*(self)->data));                                     \
+        if(idx < (self)->length) {                                             \
+            memmove(&(self)->data[(idx) + 1], &(self)->data[(idx)],            \
+                    ((self)->length - (idx)) * sizeof(*(self)->data));         \
+        }                                                                      \
+        (self)->data[(idx)] = __VA_ARGS__;                                     \
+        (self)->length++;                                                      \
+    } while(0)
+
 #define vect_destroy(self)                                                     \
     do {                                                                       \
         free((void*)((self)->data));                                           \
@@ -34,21 +46,20 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_clear(self) (self)->length = 0
 
-#define vect_remove(self, it, n)                                               \
+#define vect_del(self, it, n)                                                  \
     do {                                                                       \
         assert((it) >= (self)->data &&                                         \
                (it) + (n) <= (self)->data + (self)->length &&                  \
-               "vect_remove: out of bounds");                                  \
+               "vect_del: out of bounds");                                     \
         memmove((it), (it) + (n),                                              \
                 ((self)->data + (self)->length - (it) - (n)) *                 \
                     sizeof(*(self)->data));                                    \
         (self)->length -= (n);                                                 \
     } while(0)
 
-#define vect_remove_at(self, i, n)                                             \
+#define vect_del_at(self, i, n)                                                \
     do {                                                                       \
-        assert((i) + (n) <= (self)->length &&                                  \
-               "vect_remove_at: out of bounds");                               \
+        assert((i) + (n) <= (self)->length && "vect_del_at: out of bounds");   \
         memmove(&(self)->data[(i)], &(self)->data[(i) + (n)],                  \
                 ((self)->length - (i) - (n)) * sizeof(*(self)->data));         \
         (self)->length -= (n);                                                 \
@@ -216,6 +227,74 @@ typedef bool (*VectPredicate)(const void*);
         (self)->head = 0;                                                      \
     } while(0)
 
+#define HMAP_OCCUPIED 1
+
+typedef struct HMapHeader {
+    int state;
+    size_t hash;
+} HMapHeader;
+
+typedef size_t (*HMapHash)(const void* entry);
+typedef bool (*HMapEqual)(const void* a, const void* b);
+
+#define hmap_get(self, entry)                                                  \
+    _hmap_get((self)->data, (self)->capacity, (entry), sizeof(*(self)->data),  \
+              (self)->hash, (self)->equal)
+
+#define hmap_set(self, entry)                                                  \
+    _hmap_set((void**)&(self)->data, &(self)->capacity, &(self)->length,       \
+              (entry), sizeof(*(self)->data), (self)->hash, (self)->equal)
+
+#define hmap_del(self, entry)                                                  \
+    _hmap_del((self)->data, (self)->capacity, &(self)->length, (entry),        \
+              sizeof(*(self)->data), (self)->hash, (self)->equal)
+
+#define hmap_reserve(self, n)                                                  \
+    do {                                                                       \
+        if((n) > (self)->capacity)                                             \
+            _hmap_rehash((void**)&(self)->data, &(self)->capacity, (n),        \
+                         (self)->length, sizeof(*(self)->data));               \
+    } while(0)
+
+#define hmap_clone(dst, src)                                                   \
+    do {                                                                       \
+        (dst)->length = (src)->length;                                         \
+        (dst)->capacity = (src)->capacity;                                     \
+        (dst)->hash = (src)->hash;                                             \
+        (dst)->equal = (src)->equal;                                           \
+        if(((src)->capacity)) {                                                \
+            (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));      \
+            assert((dst)->data);                                               \
+            memcpy((dst)->data, (src)->data,                                   \
+                   (src)->capacity * sizeof(*(src)->data));                    \
+        }                                                                      \
+    } while(0)
+
+#define hmap_destroy(self)                                                     \
+    do {                                                                       \
+        free((self)->data);                                                    \
+        (self)->data = NULL;                                                   \
+        (self)->length = 0;                                                    \
+        (self)->capacity = 0;                                                  \
+    } while(0)
+
+#define hmap_clear(self)                                                       \
+    do {                                                                       \
+        if((self)->data)                                                       \
+            memset((self)->data, 0, (self)->capacity * sizeof(*(self)->data)); \
+        (self)->length = 0;                                                    \
+    } while(0)
+
+#define hmap_length(self) ((self)->length)
+#define hmap_capacity(self) ((self)->capacity)
+#define hmap_is_empty(self) ((self)->length == 0)
+#define hmap_contains(self, entry) (hmap_get(self, entry) != NULL)
+
+#define hmap_each(it, self)                                                    \
+    for((it) = (self)->data;                                                   \
+        (self)->data && ((it) < (self)->data + (self)->capacity); (it)++)      \
+        if(((const HMapHeader*)(it))->state == HMAP_OCCUPIED)
+
 #define optional_set(self, ...)                                                \
     do {                                                                       \
         (self)->value = __VA_ARGS__;                                           \
@@ -247,3 +326,11 @@ size_t _vect_lower_bound(const void* key, void* data, size_t len, size_t itemsz,
                          VectCompare cb);
 size_t _vect_upper_bound(const void* key, void* data, size_t len, size_t itemsz,
                          VectCompare cb);
+void _hmap_rehash(void** data, size_t* capacity, size_t newcapacity,
+                  size_t length, size_t itemsz);
+void* _hmap_get(void* data, size_t capacity, const void* entry, size_t itemsz,
+                HMapHash hash_fn, HMapEqual eq_fn);
+void _hmap_set(void** data, size_t* capacity, size_t* length, const void* entry,
+               size_t itemsz, HMapHash hash_fn, HMapEqual eq_fn);
+void _hmap_del(void* data, size_t capacity, size_t* length, const void* entry,
+               size_t itemsz, HMapHash hash_fn, HMapEqual eq_fn);

@@ -17,9 +17,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #define RD_WORKER_QUEUE_SIZE 8192
 
@@ -55,10 +53,12 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
     self->reader = rd_i_reader_create_flags(self);
     self->hooks = rd_i_hooks_create();
     self->min_string = RD_MIN_STRING_LENGTH;
+    self->db = rd_i_db_create(self);
 
+    rd_i_registermap_init(&self->engine.current.registers);
+    rd_i_strpool_init(&self->strings);
     rd_i_listing_init(&self->listing, NULL);
     rd_i_register_primitives(self);
-    rd_i_db_init(self);
 
     queue_reserve(&self->engine.qcall, RD_WORKER_QUEUE_SIZE);
     queue_reserve(&self->engine.qjump, RD_WORKER_QUEUE_SIZE);
@@ -67,7 +67,7 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     if(rd_flagsbuffer_has_name(seg->flags, rd_i_address2index(seg, address)))
@@ -105,7 +105,7 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
 
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -191,26 +191,6 @@ RDLoader* rd_get_loader(const RDContext* self) { return self->loader; }
 
 bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                     RDAddress endaddr, u32 perm) {
-    if(addr >= endaddr) return false;
-
-    // check for overlaps with existing segments
-    RDSegmentFull** it;
-    vect_each(it, &self->segments) {
-        RDAddress s = (*it)->base.start_address;
-        RDAddress e = (*it)->base.end_address;
-        if(addr < e && endaddr > s) {
-
-            rd_i_add_problem(
-                self, addr, addr,
-                "segment '%s' [%llx, %llx) overlaps with '%s' [%llx, %llx)",
-                name, addr, endaddr, (*it)->base.name, s, e);
-            return false;
-        }
-    }
-
-    LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr, endaddr);
-
-    // TODO: davide - Store flags for this segment in DB
     RDSegmentFull* s = calloc(1, sizeof(*s));
     s->base.name = rd_i_strpool_intern(&self->strings, name);
     s->base.start_address = addr;
@@ -218,9 +198,13 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
     s->base.perm = perm;
     s->flags = rd_i_flagsbuffer_create(endaddr - addr);
 
-    vect_push(&self->segments, s);
-    rd_i_db_add_segment(self, s);
-    vect_sort(&self->segments, rd_i_segment_cmp_pred);
+    if(rd_i_db_add_segment(self, s)) {
+        LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr,
+                 endaddr);
+    }
+    else
+        free(s);
+
     return true;
 }
 
@@ -231,57 +215,15 @@ bool rd_map_segment_n(RDContext* self, const char* name, RDAddress addr,
 
 bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
                   RDOffset endaddr) {
-    RDAddress endoff = endaddr - addr + off;
-    if(off >= endoff || addr >= endaddr) return false;
-
-    usize n = endaddr - addr;
-    if(off + n > self->input->base.length) return false;
-
-    // segment must exist and mapping must not cross boundary
-    const RDSegmentFull* seg = rd_i_find_segment(self, addr);
-
-    if(!seg) {
-        rd_i_add_problem(self, addr, addr, "no segment at %llx", addr);
-        return false;
-    }
-
-    if(endaddr > seg->base.end_address) {
-        rd_i_add_problem(
-            self, addr, addr,
-            "[%llx, %llx) crosses segment boundary '%s' [%llx, %llx)", addr,
-            endaddr, seg->base.name, seg->base.start_address,
-            seg->base.end_address);
-        return false;
-    }
-
-    // overlap check against existing mappings
-    RDInputMapping* it;
-    vect_each(it, &self->mappings) {
-        if(addr < it->end_address && endaddr > it->start_address) {
-            rd_i_add_problem(
-                self, addr, addr,
-                "[%llx, %llx) overlaps with existing mapping [%llx, %llx)",
-                addr, endaddr, it->start_address, it->end_address);
-            return false;
-        }
-    }
-
-    LOG_INFO("mapping input at %X (Address: [%X, %X))", off, addr, endaddr);
-
-    // write bytes into the segment's flags buffer
-    usize buf_idx = rd_i_address2index(seg, addr);
-    rd_i_buffer_write((RDBuffer*)seg->flags, buf_idx, self->input->data + off,
-                      n);
-
     RDInputMapping m = {
         .offset = off,
         .start_address = addr,
         .end_address = endaddr,
     };
 
-    vect_push(&self->mappings, m);
-    rd_i_db_add_mapping(self, &m);
-    vect_sort(&self->mappings, rd_i_mapping_cmp_pred);
+    if(rd_i_db_add_mapping(self, m))
+        LOG_INFO("mapping input at %X (Address: [%X, %X))", off, addr, endaddr);
+
     return true;
 }
 
@@ -289,14 +231,8 @@ bool rd_map_input_n(RDContext* self, RDOffset off, RDAddress addr, usize n) {
     return rd_map_input(self, off, addr, addr + n);
 }
 
-const RDSegmentFull* rd_i_find_segment(const RDContext* self, RDAddress addr) {
-    RDSegmentFull** res = (RDSegmentFull**)vect_bsearch(&addr, &self->segments,
-                                                        rd_i_segment_find_pred);
-    return res ? *res : NULL;
-}
-
 const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr) {
-    return (const RDSegment*)rd_i_find_segment(self, addr);
+    return (const RDSegment*)rd_i_db_find_segment(self, addr);
 }
 
 const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
@@ -314,7 +250,9 @@ const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
 }
 
 bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
-    RDInputMapping* m = (RDInputMapping*)vect_bsearch(&address, &self->mappings,
+    const RDMappingVect* mappings = rd_i_db_get_mappings(self);
+
+    RDInputMapping* m = (RDInputMapping*)vect_bsearch(&address, mappings,
                                                       rd_i_mapping_find_pred);
     if(!m) return false;
     if(offset) *offset = (address - m->start_address) + m->offset;
@@ -324,7 +262,7 @@ bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
 bool rd_to_address(const RDContext* self, RDOffset offset, RDAddress* address) {
     RDInputMapping* m;
 
-    vect_each(m, &self->mappings) {
+    vect_each(m, rd_i_db_get_mappings(self)) {
         usize size = m->end_address - m->start_address;
         if(offset >= m->offset && offset < m->offset + size) {
             if(address) *address = (offset - m->offset) + m->start_address;
@@ -340,7 +278,7 @@ bool rd_is_address(const RDContext* self, RDAddress address) {
 }
 
 bool rd_has_refs_from(const RDContext* self, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -348,7 +286,7 @@ bool rd_has_refs_from(const RDContext* self, RDAddress address) {
 }
 
 bool rd_has_refs_to(const RDContext* self, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -380,7 +318,7 @@ bool rd_get_address(RDContext* self, const char* name, RDAddress* address) {
 }
 
 const char* rd_get_comment(RDContext* self, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return NULL;
 
     if(rd_i_flagsbuffer_has_comment(seg->flags,
@@ -433,7 +371,7 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
 }
 
 bool rd_undefine(RDContext* ctx, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -473,7 +411,7 @@ bool rd_user_name(RDContext* self, RDAddress address, const char* name) {
 }
 
 bool rd_set_noreturn(RDContext* self, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -488,7 +426,7 @@ bool rd_set_noreturn(RDContext* self, RDAddress address) {
 }
 
 bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -516,7 +454,7 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
 
 bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
                        RDConfidence c) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 
     usize index = rd_i_address2index(seg, address);
@@ -541,27 +479,18 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->str_buf);
     vect_destroy(&self->imp_buf);
     vect_destroy(&self->name_buf);
-    vect_destroy(&self->tregs_buf);
     vect_destroy(&self->ovr_ops_buf);
     vect_destroy(&self->problems);
     vect_destroy(&self->xrefs_to);
     vect_destroy(&self->xrefs_to_type);
     vect_destroy(&self->xrefs_from);
     vect_destroy(&self->xrefs_from_type);
-    vect_destroy(&self->mappings);
-    rd_i_il_deinit(&self->il_buf);
+    hmap_destroy(&self->engine.current.registers);
+    vect_destroy(&self->lift_buf);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
-
-    RDSegmentFull** s;
-    vect_each(s, &self->segments) {
-        rd_i_buffer_destroy((RDBuffer*)(*s)->flags);
-        free(*s);
-    }
-
-    vect_destroy(&self->segments);
-    rd_i_db_deinit(self);
+    rd_i_db_destroy(self->db);
 
     RDTypeDef** def;
     vect_each(def, &self->types) rd_i_typedef_destroy(*def);
@@ -592,49 +521,49 @@ RDReader* rd_get_input_reader(const RDContext* self) {
 }
 
 bool rd_read_u8(const RDContext* self, RDAddress address, u8* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_u8((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_le16(const RDContext* self, RDAddress address, u16* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_le16((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_le32(const RDContext* self, RDAddress address, u32* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_le32((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_le64(const RDContext* self, RDAddress address, u64* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_le64((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_be16(const RDContext* self, RDAddress address, u16* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_be16((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_be32(const RDContext* self, RDAddress address, u32* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_be32((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_be64(const RDContext* self, RDAddress address, u64* v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_read_be64((const RDBuffer*)s->flags, idx, v);
@@ -713,56 +642,56 @@ bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
 }
 
 bool rd_expect_u8(const RDContext* self, RDAddress address, u8 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_u8((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_le16(const RDContext* self, RDAddress address, u16 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_le16((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_le32(const RDContext* self, RDAddress address, u32 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_le32((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_le64(const RDContext* self, RDAddress address, u64 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_le64((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_be16(const RDContext* self, RDAddress address, u16 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_be16((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_be32(const RDContext* self, RDAddress address, u32 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_be32((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_expect_be64(const RDContext* self, RDAddress address, u64 v) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
     return rd_i_buffer_expect_be64((const RDBuffer*)s->flags, idx, v);
 }
 
 usize rd_read(const RDContext* self, RDAddress address, void* data, usize n) {
-    const RDSegmentFull* s = rd_i_find_segment(self, address);
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     return rd_i_buffer_read((RDBuffer*)s->flags, rd_i_address2index(s, address),
                             data, n);
@@ -773,14 +702,16 @@ RDProblemSlice rd_get_all_problems(const RDContext* self) {
 }
 
 RDSegmentSlice rd_get_all_segments(const RDContext* self) {
+    const RDSegmentVect* segments = rd_i_db_get_segments(self);
+
     return (RDSegmentSlice){
-        .data = (const RDSegment**)self->segments.data,
-        .length = self->segments.length,
+        .data = (const RDSegment**)segments->data,
+        .length = segments->length,
     };
 }
 
 RDInputMappingSlice rd_get_all_mappings(const RDContext* self) {
-    return vect_to_slice(RDInputMappingSlice, &self->mappings);
+    return vect_to_slice(RDInputMappingSlice, rd_i_db_get_mappings(self));
 }
 
 RDFunctionSlice rd_get_all_functions(const RDContext* self) {
@@ -806,7 +737,7 @@ const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
                                          RDXRefVect* r) {
     vect_clear(r);
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, fromaddr);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, fromaddr);
     if(!seg) return r;
 
     usize idx = rd_i_address2index(seg, fromaddr);
@@ -821,7 +752,7 @@ const RDXRefVect* rd_i_get_xrefs_from_type_ex(RDContext* self,
                                               RDXRefVect* r) {
     vect_clear(r);
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, fromaddr);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, fromaddr);
     if(!seg) return r;
 
     usize idx = rd_i_address2index(seg, fromaddr);
@@ -835,7 +766,7 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefVect* r) {
     vect_clear(r);
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, toaddr);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, toaddr);
     if(!seg) return r;
 
     usize idx = rd_i_address2index(seg, toaddr);
@@ -849,7 +780,7 @@ const RDXRefVect* rd_i_get_xrefs_to_type_ex(RDContext* self, RDAddress toaddr,
                                             usize type, RDXRefVect* r) {
     vect_clear(r);
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, toaddr);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, toaddr);
     if(!seg) return r;
 
     usize idx = rd_i_address2index(seg, toaddr);
@@ -881,12 +812,12 @@ const RDXRefVect* rd_i_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
 const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
     switch(self->kind) {
         case RD_SYMBOL_SEGMENT: {
-            const RDSegmentFull* seg = rd_i_find_segment(ctx, self->address);
+            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
             return seg ? seg->base.name : NULL;
         }
 
         case RD_SYMBOL_STRING: {
-            const RDSegmentFull* seg = rd_i_find_segment(ctx, self->address);
+            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
             assert(seg &&
                    "cannot convert symbol to string, type outside of segments");
 
@@ -931,7 +862,7 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
 
 bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
                        const RDImported* imp) {
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -960,8 +891,8 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
 
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c) {
-    const RDSegmentFull* fromseg = rd_i_find_segment(self, fromaddr);
-    const RDSegmentFull* toseg = rd_i_find_segment(self, toaddr);
+    const RDSegmentFull* fromseg = rd_i_db_find_segment(self, fromaddr);
+    const RDSegmentFull* toseg = rd_i_db_find_segment(self, toaddr);
     if(!fromseg || !toseg) return false;
 
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
@@ -1023,8 +954,8 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 
 bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c) {
-    const RDSegmentFull* fromseg = rd_i_find_segment(self, fromaddr);
-    const RDSegmentFull* toseg = rd_i_find_segment(self, toaddr);
+    const RDSegmentFull* fromseg = rd_i_db_find_segment(self, fromaddr);
+    const RDSegmentFull* toseg = rd_i_db_find_segment(self, toaddr);
     if(!fromseg || !toseg) return false;
 
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
@@ -1051,9 +982,10 @@ bool rd_get_entry_point(const RDContext* self, RDAddress* address) {
     }
 
     // try to fallback to the first address available
-    if(!vect_is_empty(&self->segments)) {
-        if(address)
-            *address = (*vect_front(&self->segments))->base.start_address;
+    const RDSegmentVect* segments = rd_i_db_get_segments(self);
+
+    if(!vect_is_empty(segments)) {
+        if(address) *address = (*vect_front(segments))->base.start_address;
 
         return true;
     }
@@ -1089,7 +1021,7 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
 }
 
 bool rd_set_exported(RDContext* ctx, RDAddress address, const char* name) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
 
     if(!seg) {
         rd_i_add_problem(ctx, address, address,
@@ -1130,7 +1062,7 @@ bool rd_set_imported_ord(RDContext* ctx, RDAddress address, const char* module,
 }
 
 bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
-    const RDSegmentFull* seg = rd_i_find_segment(ctx, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -1197,7 +1129,7 @@ void rd_set_min_string(RDContext* self, unsigned int l) {
 bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
     if(index >= RD_MAX_OPERANDS) return false;
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -1221,7 +1153,7 @@ bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
 bool rd_operand_as_immediate(RDContext* self, RDAddress address, int index) {
     if(index >= RD_MAX_OPERANDS) return false;
 
-    const RDSegmentFull* seg = rd_i_find_segment(self, address);
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize flag_idx = rd_i_address2index(seg, address);
