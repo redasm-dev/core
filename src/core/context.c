@@ -689,9 +689,65 @@ bool rd_expect_be64(const RDContext* self, RDAddress address, u64 v) {
 
 usize rd_read(const RDContext* self, RDAddress address, void* data, usize n) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
-    if(!s) return false;
+    if(!s) return 0;
     return rd_i_buffer_read((RDBuffer*)s->flags, rd_i_address2index(s, address),
                             data, n);
+}
+
+bool rd_write_u8(RDContext* self, RDAddress address, u8 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_u8((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_le16(RDContext* self, RDAddress address, u16 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_le16((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_le32(RDContext* self, RDAddress address, u32 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_le32((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_le64(RDContext* self, RDAddress address, u64 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_le64((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_be16(RDContext* self, RDAddress address, u16 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_be16((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_be32(RDContext* self, RDAddress address, u32 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_be32((RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_write_be64(RDContext* self, RDAddress address, u64 v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write_be64((RDBuffer*)s->flags, idx, v);
+}
+
+usize rd_write(RDContext* self, RDAddress address, const void* data, usize n) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return 0;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_write((RDBuffer*)s->flags, idx, data, n);
 }
 
 RDProblemSlice rd_get_all_problems(const RDContext* self) {

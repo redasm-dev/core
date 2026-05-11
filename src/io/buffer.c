@@ -231,14 +231,57 @@ bool rd_i_buffer_read_primitive(const RDBuffer* self, usize idx,
     return false;
 }
 
-bool rd_i_buffer_write(RDBuffer* self, usize idx, const void* ptr, usize n) {
+usize rd_i_buffer_write(RDBuffer* self, usize idx, const void* ptr, usize n) {
     if(!ptr || idx >= self->length) return false;
 
     u8* p = (u8*)ptr;
+    usize i = 0;
 
-    for(usize i = 0; i < n; i++) {
-        if(!self->set_byte(self, idx + i, p[i])) return false;
+    for(; i < n; i++) {
+        if(!self->set_byte(self, idx + i, p[i])) break;
     }
 
-    return true;
+    return i;
+}
+
+bool rd_i_buffer_write_u8(RDBuffer* self, usize idx, u8 v) {
+    return self->set_byte(self, idx, v);
+}
+
+bool rd_i_buffer_write_le16(RDBuffer* self, usize idx, u16 v) {
+    u8 b[2] = {(u8)(v >> 0), (u8)(v >> 8)};
+    return rd_i_buffer_write(self, idx, b, 2);
+}
+
+bool rd_i_buffer_write_le32(RDBuffer* self, usize idx, u32 v) {
+    u8 b[4] = {(u8)(v >> 0), (u8)(v >> 8), (u8)(v >> 16), (u8)(v >> 24)};
+    return rd_i_buffer_write(self, idx, b, 4);
+}
+
+bool rd_i_buffer_write_le64(RDBuffer* self, usize idx, u64 v) {
+    u8 b[8] = {
+        (u8)(v >> 0),  (u8)(v >> 8),  (u8)(v >> 16), (u8)(v >> 24),
+        (u8)(v >> 32), (u8)(v >> 40), (u8)(v >> 48), (u8)(v >> 56),
+    };
+
+    return rd_i_buffer_write(self, idx, b, 8);
+}
+
+bool rd_i_buffer_write_be16(RDBuffer* self, usize idx, u16 v) {
+    u8 b[2] = {(u8)(v >> 8), (u8)(v >> 0)};
+    return rd_i_buffer_write(self, idx, b, 2);
+}
+
+bool rd_i_buffer_write_be32(RDBuffer* self, usize idx, u32 v) {
+    u8 b[4] = {(u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8), (u8)(v >> 0)};
+    return rd_i_buffer_write(self, idx, b, 4);
+}
+
+bool rd_i_buffer_write_be64(RDBuffer* self, usize idx, u64 v) {
+    u8 b[8] = {
+        (u8)(v >> 56), (u8)(v >> 48), (u8)(v >> 40), (u8)(v >> 32),
+        (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8),  (u8)(v >> 0),
+    };
+
+    return rd_i_buffer_write(self, idx, b, 8);
 }
