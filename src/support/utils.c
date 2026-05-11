@@ -106,6 +106,7 @@ int rd_strnicmp(const char* a, const char* b, int n) {
     return n <= 0 ? 0 : tolower((unsigned char)*a) - tolower((unsigned char)*b);
 }
 
+void* rd_alloc(usize n) { return calloc(1, n); }
 void rd_free(void* p) { free(p); }
 
 const char* rd_i_get_file_name(const char* filepath) {
