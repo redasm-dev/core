@@ -383,10 +383,6 @@ bool rd_undefine(RDContext* ctx, RDAddress address) {
     return true;
 }
 
-RDDelaySlotInfo rd_get_delay_slot_info(const RDContext* self) {
-    return self->engine.dslot_info;
-}
-
 bool rd_auto_function(RDContext* self, RDAddress address, const char* name) {
     return rd_i_set_function(self, address, name, RD_CONFIDENCE_AUTO);
 }

@@ -20,6 +20,11 @@ typedef struct RDAnalyzerItem {
     usize n_runs;
 } RDAnalyzerItem;
 
+typedef struct RDDelaySlotInfo {
+    RDInstruction instr;
+    u8 n;
+} RDDelaySlotInfo;
+
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
@@ -75,13 +80,9 @@ typedef struct RDContext {
         RDEngineQueue qjump;
         RDEngineQueue qcall;
         RDEngineItem current;
+        RDEngineFlow flow;
         unsigned int step;
         clock_t emulate_start;
-
-        struct {
-            RDAddress value;
-            bool has_value;
-        } flow;
     } engine;
 
     struct {

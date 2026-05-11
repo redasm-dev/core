@@ -86,11 +86,6 @@ typedef struct RDXRefSlice {
     usize length;
 } RDXRefSlice;
 
-typedef struct RDDelaySlotInfo {
-    RDInstruction instr;
-    u8 n;
-} RDDelaySlotInfo;
-
 typedef struct RDLoadAddressing {
     RDAddress entrypoint;
     RDAddress address;
@@ -129,7 +124,6 @@ RD_API const char* rd_get_name(RDContext* self, RDAddress address);
 RD_API const char* rd_to_hex(const RDContext* self, usize v);
 RD_API const char* rd_render_text(RDContext* self, RDAddress address);
 RD_API bool rd_undefine(RDContext* self, RDAddress address);
-RD_API RDDelaySlotInfo rd_get_delay_slot_info(const RDContext* self);
 RD_API bool rd_set_noreturn(RDContext* self, RDAddress address);
 RD_API bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt);
 RD_API bool rd_auto_name(RDContext* self, RDAddress address, const char* name);

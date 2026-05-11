@@ -3,7 +3,6 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
 
 static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
                                                     RDAddress address) {
@@ -45,16 +44,30 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
     return true;
 }
 
-static void _rd_engine_execute_delay_slots(RDContext* ctx,
-                                           const RDInstruction* instr) {
-    ctx->engine.dslot_info.instr = *instr;
-    ctx->engine.dslot_info.n = 1;
-    RDAddress address = instr->address + instr->length;
+static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
+                                                   const RDInstruction* instr) {
+    // save outer tick identity
+    // - flow is intentionally NOT saved: the last delay slot's rd_flow call
+    //   sets the continuation address that the branch emulate needs to see
+    // - registers are intentionally NOT saved: delay slot writes must be
+    //   visible to branch emulate
+    RDAddress saved_address = ctx->engine.current.address;
+    RDEngineItemKind saved_kind = ctx->engine.current.kind;
+    RDConfidence saved_conf = ctx->engine.current.confidence;
+    char* saved_name = ctx->engine.current.name;
+    const RDSegmentFull* saved_seg = ctx->engine.segment;
 
-    while(ctx->engine.dslot_info.n <=
-          ctx->engine.dslot_info.instr.delay_slots) {
+    ctx->engine.dslot_info.instr = *instr;
+    ctx->engine.dslot_info.n = 0;
+    RDAddress address = instr->address + instr->length;
+    u8 nslot = 1;
+
+    while(nslot <= ctx->engine.dslot_info.instr.delay_slots) {
         rd_flow(ctx, address);
+
+        ctx->engine.dslot_info.n = nslot; // inside slot tick
         u32 len = rd_i_engine_tick(ctx);
+        ctx->engine.dslot_info.n = 0; // back out
 
         if(!len) {
             rd_i_add_problem(ctx, instr->address, address,
@@ -64,10 +77,21 @@ static void _rd_engine_execute_delay_slots(RDContext* ctx,
         }
 
         address += len;
-        ctx->engine.dslot_info.n++;
+        nslot++;
     }
 
+    // clear delay slot state
     ctx->engine.dslot_info = (RDDelaySlotInfo){0};
+
+    // restore outer tick identity: flow deliberately excluded
+    ctx->engine.current.address = saved_address;
+    ctx->engine.current.kind = saved_kind;
+    ctx->engine.current.confidence = saved_conf;
+    ctx->engine.current.name = saved_name;
+    ctx->engine.segment = saved_seg;
+
+    // reinstate the correct continuation, suppressing what emulate set
+    return ctx->engine.flow;
 }
 
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
@@ -255,7 +279,19 @@ u16 rd_i_engine_tick(RDContext* ctx) {
             goto done;
         }
 
-        ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
+        if(instr.delay_slots && !rd_instr_is_delay_slot(&instr)) {
+            RDEngineFlow dslot_flow =
+                _rd_engine_execute_delay_slots(ctx, &instr);
+
+            ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
+
+            // always override: branch's rd_flow points at first delay slot,
+            // which is architecturally wrong. real PC after execution is
+            // determined by the last delay slot's flow.
+            ctx->engine.flow = dslot_flow;
+        }
+        else
+            ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
 
         if(rd_instr_is_jump(&instr))
             rd_i_flagsbuffer_set_jump(ctx->engine.segment->flags, idx);
@@ -265,7 +301,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         if(rd_instr_is_cond(&instr))
             rd_i_flagsbuffer_set_cond(ctx->engine.segment->flags, idx);
 
-        if(instr.delay_slots == RD_IS_DSLOT)
+        if(rd_instr_is_delay_slot(&instr))
             rd_i_flagsbuffer_set_dslot(ctx->engine.segment->flags, idx);
 
         if(ctx->engine.current.kind == RD_EI_FLOW)
@@ -280,9 +316,6 @@ u16 rd_i_engine_tick(RDContext* ctx) {
                           ctx->engine.current.name,
                           ctx->engine.current.confidence);
         }
-
-        if(instr.delay_slots && !rd_instr_is_delay_slot(&instr))
-            _rd_engine_execute_delay_slots(ctx, &instr);
     }
 
 done:
@@ -317,6 +350,11 @@ void rd_flow(RDContext* ctx, RDAddress address) {
         rd_i_flagsbuffer_set_flow(seg->flags, idx);
         return;
     }
+
+    if(ctx->engine.dslot_info.n &&
+       ctx->engine.dslot_info.n == ctx->engine.dslot_info.instr.delay_slots &&
+       !rd_instr_can_flow(&ctx->engine.dslot_info.instr))
+        return;
 
     // address accepted, flow there
     optional_set(&ctx->engine.flow, address);

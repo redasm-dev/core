@@ -20,6 +20,11 @@ typedef struct RDEngineItem {
     char* name;
 } RDEngineItem;
 
+typedef struct RDEngineFlow {
+    RDAddress value;
+    bool has_value;
+} RDEngineFlow;
+
 typedef struct RDEngineQueue {
     RDEngineItem* data;
     usize length;
