@@ -11,7 +11,7 @@ void rd_log(RDLogLevel level, const char* tag, const char* fmt, ...) {
         [RD_LOG_FAIL] = "FAIL ",
     };
 
-    const char* ls = level < RD_LOG_FAIL ? LEVEL_STR[level] : "INFO ";
+    const char* ls = level <= RD_LOG_FAIL ? LEVEL_STR[level] : "INFO ";
 
     // 1. always write to stderr: crash-safe, no heap involvement
     va_list args;
