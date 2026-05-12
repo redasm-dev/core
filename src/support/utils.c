@@ -86,6 +86,26 @@ char* rd_strdup(const char* s) {
     return memcpy(d, s, n);
 }
 
+char* rd_stristr(const char* haystack, const char* needle) {
+    if(!haystack || !needle) return NULL;
+    if(!(*needle)) return (char*)haystack;
+
+    for(; *haystack; haystack++) {
+        if(tolower((unsigned char)*haystack) != tolower((unsigned char)*needle))
+            continue;
+
+        const char *h = haystack, *n = needle;
+
+        while(*h && *n &&
+              tolower((unsigned char)*h) == tolower((unsigned char)*n))
+            h++, n++;
+
+        if(!*n) return (char*)haystack;
+    }
+
+    return NULL;
+}
+
 int rd_stricmp(const char* a, const char* b) {
     while(*a && *b) {
         int d = tolower((unsigned char)*a) - tolower((unsigned char)*b);
@@ -125,7 +145,8 @@ const char* rd_i_get_file_ext(const char* filepath) {
 
     const char* ldot = strrchr(filepath, '.');
 
-    // Has extension if dot exists and isn't at the start (avoid ".gitignore")
+    // Has extension if dot exists and isn't at the start (avoid
+    // ".gitignore")
     if(ldot && ldot != fname) return ldot + 1;
 
     return filepath + strlen(filepath); // no extension
