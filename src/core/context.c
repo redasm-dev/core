@@ -17,7 +17,6 @@
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
-#include <stdlib.h>
 
 #define RD_WORKER_QUEUE_SIZE 8192
 
@@ -44,7 +43,7 @@ void rd_analyzeritem_select(RDAnalyzerItem* self, bool sel) {
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
                                const char* filepath, RDByteBuffer* input) {
-    RDContext* self = calloc(1, sizeof(*self));
+    RDContext* self = rd_alloc0(1, sizeof(*self));
 
     self->loaderplugin = lplugin, self->loader = ldr;
     self->filepath = rd_strdup(filepath);
@@ -191,7 +190,7 @@ RDLoader* rd_get_loader(const RDContext* self) { return self->loader; }
 
 bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                     RDAddress endaddr, u32 perm) {
-    RDSegmentFull* s = calloc(1, sizeof(*s));
+    RDSegmentFull* s = rd_alloc0(1, sizeof(*s));
     s->base.name = rd_i_strpool_intern(&self->strings, name);
     s->base.start_address = addr;
     s->base.end_address = endaddr;
@@ -203,7 +202,7 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                  endaddr);
     }
     else
-        free(s);
+        rd_free(s);
 
     return true;
 }
@@ -494,7 +493,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->types);
 
     RDAnalyzerItem** ai;
-    vect_each(ai, &self->analyzerplugins) free(*ai);
+    vect_each(ai, &self->analyzerplugins) rd_free(*ai);
     vect_destroy(&self->analyzerplugins);
 
     if(self->processorplugin && self->processorplugin->destroy)
@@ -507,8 +506,8 @@ void rd_destroy(RDContext* self) {
     rd_i_reader_destroy(self->reader);
     rd_i_buffer_destroy((RDBuffer*)self->input);
     rd_i_strpool_destroy(&self->strings);
-    free(self->filepath);
-    free(self);
+    rd_free(self->filepath);
+    rd_free(self);
 }
 
 RDReader* rd_get_reader(const RDContext* self) { return self->reader; }

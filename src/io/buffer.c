@@ -1,6 +1,6 @@
 #include "buffer.h"
 #include "support/containers.h"
-#include <stdlib.h>
+#include <redasm/allocator.h>
 #include <string.h>
 
 #define RD_STR_BUF_MIN_CAPACITY 1024
@@ -32,17 +32,17 @@ static bool _rd_bytebuffer_set_byte(RDBuffer* self, usize idx, u8 b) {
 }
 
 static void _rd_bytebuffer_destroy(RDBuffer* self) {
-    free(_rd_as_bytebuffer(self)->data);
-    free(self);
+    rd_free(_rd_as_bytebuffer(self)->data);
+    rd_free(self);
 }
 
 RDByteBuffer* rd_i_buffer_create(usize n) {
-    RDByteBuffer* self = calloc(1, sizeof(*self));
+    RDByteBuffer* self = rd_alloc0(1, sizeof(*self));
     self->base.get_byte = _rd_bytebuffer_get_byte;
     self->base.set_byte = _rd_bytebuffer_set_byte;
     self->base.destroy = _rd_bytebuffer_destroy;
     self->base.length = n;
-    self->data = calloc(n, sizeof(*self->data));
+    self->data = rd_alloc0(n, sizeof(*self->data));
     return self;
 }
 

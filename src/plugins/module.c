@@ -1,8 +1,8 @@
 #include "plugins/module.h"
 #include "support/logging.h"
 #include <assert.h>
+#include <redasm/allocator.h>
 #include <redasm/support/utils.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define RD_PLUGIN_CREATE "rd_plugin_create"
@@ -47,7 +47,7 @@ RDModule* rd_i_module_create(const char* filepath) {
     if(!filepath) return NULL;
 
     LOG_INFO("Loading module '%s'", filepath);
-    RDModule* self = calloc(1, sizeof(*self));
+    RDModule* self = rd_alloc0(1, sizeof(*self));
 
 #if defined(_WIN32)
     self->handle = LoadLibraryA(filepath);
@@ -90,5 +90,5 @@ void rd_i_module_destroy(RDModule* self) {
     }
 
     rd_free(self->path);
-    free(self);
+    rd_free(self);
 }

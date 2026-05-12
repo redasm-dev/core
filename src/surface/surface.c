@@ -42,7 +42,7 @@ static void _rd_surface_render_range(RDSurface* self, LIndex idx, usize n) {
 }
 
 RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags) {
-    RDSurface* self = malloc(sizeof(*self));
+    RDSurface* self = rd_alloc(sizeof(*self));
 
     *self = (RDSurface){
         .renderer = rd_i_renderer_create(ctx, flags),
@@ -58,7 +58,7 @@ void rd_surface_destroy(RDSurface* self) {
     rd_i_surfacepath_deinit(&self->path_builder);
     rd_i_surfacestate_deinit(&self->state);
     rd_i_renderer_destroy(self->renderer);
-    free(self);
+    rd_free(self);
 }
 
 void rd_surface_seek(RDSurface* self, usize index) {

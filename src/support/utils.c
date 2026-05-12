@@ -4,9 +4,9 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include <ctype.h>
+#include <redasm/allocator.h>
 #include <redasm/support/utils.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -81,7 +81,7 @@ char* rd_strdup(const char* s) {
     if(!s) return NULL;
 
     size_t n = strlen(s);
-    char* d = malloc(n + 1);
+    char* d = rd_alloc(n + 1);
     d[n] = 0;
     return memcpy(d, s, n);
 }
@@ -105,30 +105,6 @@ int rd_strnicmp(const char* a, const char* b, int n) {
     }
     return n <= 0 ? 0 : tolower((unsigned char)*a) - tolower((unsigned char)*b);
 }
-
-void* rd_alloc(usize n) {
-    void* p = malloc(n);
-
-    if(!p) {
-        fprintf(stderr, "FATAL: failed to allocate %zu bytes.\n", n);
-        abort();
-    }
-
-    return p;
-}
-
-void* rd_alloc0(usize n) {
-    void* p = calloc(1, n);
-
-    if(!p) {
-        fprintf(stderr, "FATAL: failed to zero-allocate %zu bytes.\n", n);
-        abort();
-    }
-
-    return p;
-}
-
-void rd_free(void* p) { free(p); }
 
 const char* rd_i_get_file_name(const char* filepath) {
     if(!filepath) return NULL;
@@ -166,7 +142,7 @@ char* rd_i_get_file_stem(const char* filepath) {
     if(filename == fileext) return rd_strdup(fileext);
 
     ptrdiff_t n = (fileext - filename - 1);
-    char* stem = malloc(n + 1);
+    char* stem = rd_alloc(n + 1);
     memcpy(stem, filename, n);
     stem[n] = 0;
     return stem;
@@ -188,7 +164,7 @@ char* rd_i_get_temp_path(const char* suffix) {
         suffix_len--;
     }
 
-    char* p = malloc(tmpdir_len + suffix_len + 2);
+    char* p = rd_alloc(tmpdir_len + suffix_len + 2);
     if(!p) return NULL;
 
     memcpy(p, tmpdir, tmpdir_len);
@@ -226,14 +202,14 @@ char* rd_i_get_unique_temp_path(const char* suffix) {
 
     // +32 covers " (n)" with generous room for the integer digits
     size_t buflen = baselen + extlen + 32;
-    char* p = malloc(buflen);
+    char* p = rd_alloc(buflen);
 
     for(unsigned int i = 1;; i++) {
         snprintf(p, buflen, "%.*s_%d.%s", (int)baselen, tmppath, i, ext);
         if(stat(p, &st) != 0) break;
     }
 
-    free(tmppath);
+    rd_free(tmppath);
     return p;
 }
 

@@ -1,7 +1,8 @@
 #include "graphs/graph.h"
-#include "redasm/graph/layout.h"
 #include "support/containers.h"
 #include <assert.h>
+#include <redasm/allocator.h>
+#include <redasm/graph/layout.h>
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -206,7 +207,7 @@ static void _rd_ll_create_blocks(RDLayeredLayout* ll) {
 
 static void _rd_ll_make_acyclic(RDLayeredLayout* ll) {
     usize total = vect_length(&ll->blocks);
-    bool* visited = calloc(total, sizeof(bool));
+    bool* visited = rd_alloc0(total, sizeof(bool));
     assert(visited);
 
     // simple dynamic queue of node ids
@@ -306,7 +307,7 @@ static void _rd_ll_make_acyclic(RDLayeredLayout* ll) {
         }
     }
 
-    free(visited);
+    rd_free(visited);
     vect_destroy(&queue);
 }
 
@@ -405,9 +406,9 @@ static void _rd_ll_prepare_edge_routing(RDLayeredLayout* ll) {
 
     usize cells = (usize)(ll->rowcount + 1) * (usize)(ll->colcount + 1);
 
-    ll->horiz_lanes = calloc(cells, sizeof(int));
-    ll->vert_lanes = calloc(cells, sizeof(int));
-    ll->edge_valid = malloc(cells * sizeof(bool));
+    ll->horiz_lanes = rd_alloc0(cells, sizeof(int));
+    ll->vert_lanes = rd_alloc0(cells, sizeof(int));
+    ll->edge_valid = rd_alloc(cells * sizeof(bool));
     assert(ll->horiz_lanes && ll->vert_lanes && ll->edge_valid);
 
     // all cells valid by default
@@ -648,8 +649,8 @@ static void _rd_ll_compute_edge_count(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
-    ll->col_edge_count = calloc((usize)cols, sizeof(int));
-    ll->row_edge_count = calloc((usize)rows, sizeof(int));
+    ll->col_edge_count = rd_alloc0((usize)cols, sizeof(int));
+    ll->row_edge_count = rd_alloc0((usize)rows, sizeof(int));
     assert(ll->col_edge_count && ll->row_edge_count);
 
     for(int row = 0; row < rows; row++) {
@@ -671,8 +672,8 @@ static void _rd_ll_compute_row_col_sizes(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
-    ll->col_width = calloc((usize)cols, sizeof(int));
-    ll->row_height = calloc((usize)rows, sizeof(int));
+    ll->col_width = rd_alloc0((usize)cols, sizeof(int));
+    ll->row_height = rd_alloc0((usize)rows, sizeof(int));
     assert(ll->col_width && ll->row_height);
 
     const RDLLBlock* b;
@@ -694,10 +695,10 @@ static void _rd_ll_compute_row_col_positions(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
-    ll->col_x = calloc((usize)ll->colcount, sizeof(int));
-    ll->row_y = calloc((usize)ll->rowcount, sizeof(int));
-    ll->col_edge_x = calloc((usize)cols, sizeof(int));
-    ll->row_edge_y = calloc((usize)rows, sizeof(int));
+    ll->col_x = rd_alloc0((usize)ll->colcount, sizeof(int));
+    ll->row_y = rd_alloc0((usize)ll->rowcount, sizeof(int));
+    ll->col_edge_x = rd_alloc0((usize)cols, sizeof(int));
+    ll->row_edge_y = rd_alloc0((usize)rows, sizeof(int));
     assert(ll->col_x && ll->row_y && ll->col_edge_x && ll->row_edge_y);
 
     int x = RD_LLAYOUT_PADDING;
@@ -859,19 +860,19 @@ static void _rd_ll_destroy(RDLayeredLayout* ll) {
     vect_destroy(&ll->block_order);
 
     // free flat grids
-    free(ll->horiz_lanes);
-    free(ll->vert_lanes);
-    free(ll->edge_valid);
+    rd_free(ll->horiz_lanes);
+    rd_free(ll->vert_lanes);
+    rd_free(ll->edge_valid);
 
     // free sizing arrays
-    free(ll->col_width);
-    free(ll->row_height);
-    free(ll->col_x);
-    free(ll->row_y);
-    free(ll->col_edge_x);
-    free(ll->row_edge_y);
-    free(ll->col_edge_count);
-    free(ll->row_edge_count);
+    rd_free(ll->col_width);
+    rd_free(ll->row_height);
+    rd_free(ll->col_x);
+    rd_free(ll->row_y);
+    rd_free(ll->col_edge_x);
+    rd_free(ll->row_edge_y);
+    rd_free(ll->col_edge_count);
+    rd_free(ll->row_edge_count);
 }
 
 // ---------------------------------------------------------------------------

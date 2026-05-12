@@ -6,7 +6,6 @@
 #include "surface/renderer.h"
 #include "surface/state.h"
 #include <redasm/surface/graph.h>
-#include <stdlib.h>
 
 typedef struct RDSurfaceGraph {
     RDRenderer* renderer;
@@ -34,7 +33,7 @@ static void _rd_surfacegraph_render_finalize(RDSurfaceGraph* self) {
 }
 
 RDSurfaceGraph* rd_surfacegraph_create(RDContext* ctx, usize flags) {
-    RDSurfaceGraph* self = malloc(sizeof(*self));
+    RDSurfaceGraph* self = rd_alloc(sizeof(*self));
     *self = (RDSurfaceGraph){.renderer = rd_i_renderer_create(ctx, flags)};
     return self;
 }
@@ -43,7 +42,7 @@ void rd_surfacegraph_destroy(RDSurfaceGraph* self) {
     if(!self) return;
     rd_i_surfacestate_deinit(&self->state);
     rd_i_renderer_destroy(self->renderer);
-    free(self);
+    rd_free(self);
 }
 
 void rd_surfacegraph_render(RDSurfaceGraph* self) {

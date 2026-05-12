@@ -61,7 +61,7 @@ static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
 }
 
 RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags) {
-    RDRenderer* self = malloc(sizeof(*self));
+    RDRenderer* self = rd_alloc(sizeof(*self));
 
     *self = (RDRenderer){
         .context = ctx,
@@ -84,8 +84,8 @@ void rd_i_renderer_destroy(RDRenderer* self) {
     vect_destroy(&self->rows_back);
     vect_destroy(&self->rows_front);
     vect_destroy(&self->instr_buf);
-    free(self->hl_word);
-    free(self);
+    rd_free(self->hl_word);
+    rd_free(self);
 }
 
 void rd_i_renderer_clear(RDRenderer* self) {
@@ -516,7 +516,7 @@ int rd_i_renderer_last_index_of(const RDRenderer* self, RDAddress address) {
 }
 
 void rd_i_renderer_set_highlight_word(RDRenderer* self, const char* w) {
-    if(self->hl_word) free(self->hl_word);
+    if(self->hl_word) rd_free(self->hl_word);
     self->hl_word = w && *w ? rd_strdup(w) : NULL;
 }
 

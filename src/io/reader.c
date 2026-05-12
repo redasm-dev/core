@@ -1,7 +1,6 @@
 #include "reader.h"
 #include "core/context.h"
 #include "core/segment.h"
-#include <stdlib.h>
 
 typedef struct RDFlagsReader {
     RDReader base;
@@ -35,7 +34,7 @@ static u64 _rd_flagsreader_get_pos(const RDReader* self) {
 }
 
 RDReader* rd_i_reader_create(RDBuffer* buf) {
-    RDReader* self = malloc(sizeof(*self));
+    RDReader* self = rd_alloc(sizeof(*self));
 
     *self = (RDReader){
         .buffer = buf,
@@ -47,7 +46,7 @@ RDReader* rd_i_reader_create(RDBuffer* buf) {
 }
 
 RDReader* rd_i_reader_create_flags(RDContext* ctx) {
-    RDFlagsReader* self = malloc(sizeof(*self));
+    RDFlagsReader* self = rd_alloc(sizeof(*self));
 
     *self = (RDFlagsReader){
         .context = ctx,
@@ -61,7 +60,7 @@ RDReader* rd_i_reader_create_flags(RDContext* ctx) {
     return (RDReader*)self;
 }
 
-void rd_i_reader_destroy(RDReader* self) { free(self); }
+void rd_i_reader_destroy(RDReader* self) { rd_free(self); }
 void rd_reader_seek(RDReader* self, u64 pos) { self->seek(self, pos); }
 usize rd_reader_get_pos(const RDReader* self) { return self->get_pos(self); }
 u64 rd_reader_get_length(const RDReader* self) { return self->buffer->length; }

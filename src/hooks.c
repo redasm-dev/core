@@ -102,7 +102,7 @@ static int _rd_render_hook_search(const void* key, const void* elem) {
     return 0;
 }
 
-RDHooks* rd_i_hooks_create(void) { return calloc(1, sizeof(RDHooks)); }
+RDHooks* rd_i_hooks_create(void) { return rd_alloc0(1, sizeof(RDHooks)); }
 
 void rd_i_hooks_destroy(RDHooks* self) {
     if(!self) return;
@@ -111,7 +111,7 @@ void rd_i_hooks_destroy(RDHooks* self) {
     vect_destroy(&self->address);
     vect_destroy(&self->xref);
     vect_destroy(&self->render);
-    free(self);
+    rd_free(self);
 }
 
 bool rd_register_hook(RDContext* ctx, const char* name, RDHook h) {

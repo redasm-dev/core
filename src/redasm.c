@@ -13,7 +13,6 @@
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader.h>
 #include <redasm/plugins/processor/processor.h>
-#include <stdlib.h>
 
 static bool _rd_part_loaders(const RDContext** ctx) {
     return !((*ctx)->loaderplugin->flags & RD_PF_LAST);
@@ -145,7 +144,7 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
 
                 // Assume true if 'is_enabled' is not implemented
                 if(!p->is_enabled || p->is_enabled(p)) {
-                    RDAnalyzerItem* ai = malloc(sizeof(*ai));
+                    RDAnalyzerItem* ai = rd_alloc(sizeof(*ai));
 
                     *ai = (RDAnalyzerItem){
                         .plugin = p,
@@ -193,7 +192,7 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
     }
 
     LOG_DEBUG("registering loader '%s' [%s]", l->id, l->name);
-    RDPlugin* plugin = malloc(sizeof(*plugin));
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->loader = l;
     vect_push(&rd_i_state.loaders, plugin);
     return true;
@@ -218,7 +217,7 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
     }
 
     LOG_DEBUG("registering processor '%s' [%s]", p->id, p->name);
-    RDPlugin* plugin = malloc(sizeof(*plugin));
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->processor = p;
     vect_push(&rd_i_state.processors, plugin);
     return true;
@@ -238,7 +237,7 @@ bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
     }
 
     LOG_DEBUG("registering analyzer '%s' [%s]", a->id, a->name);
-    RDPlugin* plugin = malloc(sizeof(*plugin));
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->analyzer = a;
     vect_push(&rd_i_state.analyzers, plugin);
     vect_sort(&rd_i_state.analyzers, _rd_analyzers_cmp);
@@ -259,7 +258,7 @@ bool rd_register_command(const RDCommandPlugin* c) {
     }
 
     LOG_DEBUG("registering command '%s' [%s]", c->id, c->name);
-    RDPlugin* plugin = malloc(sizeof(*plugin));
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->command = c;
     vect_push(&rd_i_state.commands, plugin);
     return true;

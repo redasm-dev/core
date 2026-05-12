@@ -1,5 +1,6 @@
 #pragma once
 
+#include <redasm/allocator.h>
 #include <redasm/context.h>
 #include <redasm/function.h>
 #include <redasm/graph/graph.h>

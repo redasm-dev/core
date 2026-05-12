@@ -2,9 +2,9 @@
 #include "support/containers.h"
 #include "support/hash.h"
 #include "support/logging.h"
+#include <redasm/allocator.h>
 #include <redasm/support/utils.h>
 #include <redasm/theme.h>
-#include <stdlib.h>
 
 static void _rd_graph_destroy_edge_attribute(RDEdgeAttributes* ea) {
     vect_destroy(&ea->arrow);
@@ -107,7 +107,7 @@ void rd_i_graph_remove_edges(RDGraph* self, RDGraphNode n) {
     }
 }
 
-RDGraph* rd_graph_create(void) { return calloc(1, sizeof(RDGraph)); }
+RDGraph* rd_graph_create(void) { return rd_alloc0(1, sizeof(RDGraph)); }
 
 void rd_graph_destroy(RDGraph* self) {
     if(!self) return;
@@ -122,7 +122,7 @@ void rd_graph_destroy(RDGraph* self) {
     vect_destroy(&self->dot_buf);
     self->node_id = 0;
     self->root = 0;
-    free(self);
+    rd_free(self);
 }
 
 void rd_graph_clear_layout(RDGraph* self) {

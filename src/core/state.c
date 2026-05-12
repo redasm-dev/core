@@ -41,10 +41,10 @@ void rd_i_state_init(void) {
 
 void rd_i_state_deinit(void) {
     RDPlugin** it;
-    vect_each(it, &rd_i_state.analyzers) { free(*it); }
-    vect_each(it, &rd_i_state.processors) { free(*it); }
-    vect_each(it, &rd_i_state.loaders) { free(*it); }
-    vect_each(it, &rd_i_state.commands) { free(*it); }
+    vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }
+    vect_each(it, &rd_i_state.processors) { rd_free(*it); }
+    vect_each(it, &rd_i_state.loaders) { rd_free(*it); }
+    vect_each(it, &rd_i_state.commands) { rd_free(*it); }
 
     vect_destroy(&rd_i_state.commands);
     vect_destroy(&rd_i_state.analyzers);

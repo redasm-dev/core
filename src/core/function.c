@@ -4,8 +4,8 @@
 #include "io/flags.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
+#include <redasm/allocator.h>
 #include <redasm/function.h>
-#include <stdlib.h>
 
 typedef struct RDFunctionWorkItem {
     RDAddress address;
@@ -39,7 +39,7 @@ static RDGraphNode _rd_function_get_or_add_block(RDGraph* g, RDAddress start,
         if(b->start == start) return *it;
     }
 
-    RDFunctionChunk* b = calloc(1, sizeof(*b));
+    RDFunctionChunk* b = rd_alloc0(1, sizeof(*b));
     b->func_address = ep;
     b->start = start;
     vect_push(chunks, b);
@@ -181,12 +181,12 @@ RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self,
 
 void rd_i_functionchunk_destroy(RDFunctionChunkVect* self) {
     RDFunctionChunk** chunk;
-    vect_each(chunk, self) { free(*chunk); }
+    vect_each(chunk, self) { rd_free(*chunk); }
     vect_destroy(self);
 }
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
-    RDFunction* self = malloc(sizeof(*self));
+    RDFunction* self = rd_alloc(sizeof(*self));
 
     *self = (RDFunction){
         .context = ctx,
@@ -200,7 +200,7 @@ void rd_i_function_destroy(RDFunction* self) {
     if(!self) return;
 
     rd_graph_destroy(self->graph);
-    free(self);
+    rd_free(self);
 }
 
 RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }

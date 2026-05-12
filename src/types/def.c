@@ -5,7 +5,6 @@
 #include "support/logging.h"
 #include "types/type.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define RD_PRIMITIVE(n, s)                                                     \
@@ -42,7 +41,7 @@ static RDTypeDef* _rd_typedef_create(RDContext* ctx, const char* name,
                                      RDTypeKind kind) {
     if(!name) return NULL;
 
-    RDTypeDef* self = malloc(sizeof(*self));
+    RDTypeDef* self = rd_alloc(sizeof(*self));
 
     *self = (RDTypeDef){
         .name = rd_i_strpool_intern(&ctx->strings, name),
@@ -256,7 +255,7 @@ void rd_i_typedef_destroy(RDTypeDef* self) {
     else if(self->kind == RD_TKIND_PRIM)
         return;
 
-    free(self);
+    rd_free(self);
 }
 
 void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {

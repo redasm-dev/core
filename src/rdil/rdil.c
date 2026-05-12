@@ -264,7 +264,7 @@ static void _rd_il_eval(RDIL* self, const RDInstruction* il) {
 }
 
 RDIL* rd_il_create(RDContext* ctx, const RDFunction* f) {
-    RDIL* self = malloc(sizeof(*self));
+    RDIL* self = rd_alloc(sizeof(*self));
     *self = (RDIL){.context = ctx};
     rd_i_registermap_init(&self->registers);
     rd_il_assign(self, f);
@@ -276,7 +276,7 @@ void rd_il_destroy(RDIL* self) {
 
     hmap_destroy(&self->registers);
     vect_destroy(&self->lifted);
-    free(self);
+    rd_free(self);
 }
 
 void rd_il_flush(RDIL* self) {

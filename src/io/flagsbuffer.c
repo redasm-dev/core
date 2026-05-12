@@ -1,6 +1,5 @@
 #include "flagsbuffer.h"
 #include "io/flags.h"
-#include <stdlib.h>
 
 static inline RDFlagsBuffer* _rd_as_flagsbuffer(RDBuffer* self) {
     return (RDFlagsBuffer*)self;
@@ -25,8 +24,8 @@ static bool _rd_flagsbuffer_set_byte(RDBuffer* self, usize idx, u8 b) {
 }
 
 static void _rd_flagsbuffer_destroy(RDBuffer* self) {
-    free(_rd_as_flagsbuffer(self)->data);
-    free(self);
+    rd_free(_rd_as_flagsbuffer(self)->data);
+    rd_free(self);
 }
 
 static void _rd_flagsbuffer_set_tails(RDFlagsBuffer* self, usize idx, usize n) {
@@ -35,12 +34,12 @@ static void _rd_flagsbuffer_set_tails(RDFlagsBuffer* self, usize idx, usize n) {
 }
 
 RDFlagsBuffer* rd_i_flagsbuffer_create(usize n) {
-    RDFlagsBuffer* self = calloc(1, sizeof(*self));
+    RDFlagsBuffer* self = rd_alloc0(1, sizeof(*self));
     self->base.get_byte = _rd_flagsbuffer_get_byte;
     self->base.set_byte = _rd_flagsbuffer_set_byte;
     self->base.destroy = _rd_flagsbuffer_destroy;
     self->base.length = n;
-    self->data = calloc(n, sizeof(*self->data));
+    self->data = rd_alloc0(n, sizeof(*self->data));
     return self;
 }
 

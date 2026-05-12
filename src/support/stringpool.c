@@ -1,6 +1,7 @@
 #include "stringpool.h"
 #include "support/containers.h"
 #include "support/hash.h"
+#include <redasm/allocator.h>
 #include <redasm/support/utils.h>
 #include <stdio.h>
 #include <string.h>

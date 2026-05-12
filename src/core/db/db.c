@@ -6,7 +6,6 @@
 #include "support/utils.h"
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
@@ -19,12 +18,12 @@ static char* _rd_db_get_dbpath(const RDContext* ctx) {
     int id_len = strlen(ctx->loaderplugin->id);
 
     int n = filestem_len + id_len + 5;
-    char* dbname = malloc(n);
+    char* dbname = rd_alloc(n);
     snprintf(dbname, n, "%s_%s.db", filestem, ctx->loaderplugin->id);
 
     char* dbpath = rd_i_get_unique_temp_path(dbname);
-    free(dbname);
-    free(filestem);
+    rd_free(dbname);
+    rd_free(filestem);
     return dbpath;
 }
 
@@ -51,7 +50,7 @@ static RDSegmentRegVect* _rd_db_segmentregs_get_vect(RDDB* db,
 }
 
 RDDB* rd_i_db_create(const RDContext* ctx) {
-    RDDB* self = calloc(1, sizeof(*self));
+    RDDB* self = rd_alloc0(1, sizeof(*self));
     self->filepath = _rd_db_get_dbpath(ctx);
 
     if(self->filepath) // Remove old database (if exists)
@@ -76,8 +75,8 @@ RDDB* rd_i_db_create(const RDContext* ctx) {
     return self;
 
 fail:
-    free(self->filepath);
-    free(self);
+    rd_free(self->filepath);
+    rd_free(self);
     return NULL;
 }
 
@@ -93,7 +92,7 @@ void rd_i_db_destroy(RDDB* self) {
     RDSegmentFull** s;
     vect_each(s, &self->segments) {
         rd_i_buffer_destroy((RDBuffer*)(*s)->flags);
-        free(*s);
+        rd_free(*s);
     }
 
     vect_destroy(&self->segments);
@@ -107,12 +106,12 @@ void rd_i_db_destroy(RDDB* self) {
 
     if(self->filepath) {
         remove(self->filepath);
-        free(self->filepath);
+        rd_free(self->filepath);
     }
 
     self->handle = NULL;
     self->filepath = NULL;
-    free(self);
+    rd_free(self);
 }
 
 void rd_i_db_flush(RDContext* ctx) {}
