@@ -13,7 +13,7 @@ typedef struct RDAnalyzerPlugin {
     RD_PLUGIN_HEADER;
 
     u32 order;
-    bool (*is_enabled)(const struct RDAnalyzerPlugin*);
+    bool (*is_enabled)(RDContext*, const struct RDAnalyzerPlugin*);
     void (*execute)(RDContext*);
 } RDAnalyzerPlugin;
 

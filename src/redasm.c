@@ -26,9 +26,10 @@ static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
     return 0;
 }
 
-static bool _rd_validate_plugin(int level, const char* id, const char* name) {
+static bool _rd_validate_plugin(int level, const char* id, const char* name,
+                                const char* kind) {
     if(!id || !(*id)) {
-        LOG_FAIL("invalid plugin id");
+        LOG_FAIL("invalid %s-plugin id", kind);
         return false;
     }
 
@@ -143,7 +144,7 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
                 const RDAnalyzerPlugin* p = (*it)->analyzer;
 
                 // Assume true if 'is_enabled' is not implemented
-                if(!p->is_enabled || p->is_enabled(p)) {
+                if(!p->is_enabled || p->is_enabled(ctx, p)) {
                     RDAnalyzerItem* ai = rd_alloc(sizeof(*ai));
 
                     *ai = (RDAnalyzerItem){
@@ -179,7 +180,7 @@ void rd_reject(void) {
 }
 
 bool rd_register_loader(const RDLoaderPlugin* l) {
-    if(!_rd_validate_plugin(l->level, l->id, l->name)) return false;
+    if(!_rd_validate_plugin(l->level, l->id, l->name, "loader")) return false;
 
     if(!l->parse) {
         LOG_FAIL("loader '%s' does not have a parser", l->id);
@@ -199,7 +200,8 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
 }
 
 bool rd_register_processor(const RDProcessorPlugin* p) {
-    if(!_rd_validate_plugin(p->level, p->id, p->name)) return false;
+    if(!_rd_validate_plugin(p->level, p->id, p->name, "processor"))
+        return false;
 
     if(!p->decode) {
         LOG_FAIL("processor '%s' does not have a decoder", p->id);
@@ -224,7 +226,7 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
 }
 
 bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
-    if(!_rd_validate_plugin(a->level, a->id, a->name)) return false;
+    if(!_rd_validate_plugin(a->level, a->id, a->name, "analyzer")) return false;
 
     if(!a->execute) {
         LOG_FAIL("analyzer '%s' does not have an execution", a->id);
@@ -245,7 +247,7 @@ bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
 }
 
 bool rd_register_command(const RDCommandPlugin* c) {
-    if(!_rd_validate_plugin(c->level, c->id, c->name)) return false;
+    if(!_rd_validate_plugin(c->level, c->id, c->name, "command")) return false;
 
     if(!c->execute) {
         LOG_FAIL("command '%s' does not have an execution", c->id);
