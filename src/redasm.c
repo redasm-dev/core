@@ -277,6 +277,7 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
     RDByteBuffer* input = rd_i_fromdata(*bytes, *n);
     RDContext* ctx = rd_i_context_create(ldr, NULL, NULL, input);
     ctx->processorplugin = p;
+    ctx->processor = p->create ? p->create(p) : NULL;
     ctx->addressing = (RDLoadAddressing){.address = *addr};
 
     bool ok = ctx->loaderplugin->load(NULL, ctx);
