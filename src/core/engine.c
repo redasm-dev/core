@@ -4,6 +4,17 @@
 #include "support/containers.h"
 #include "support/error.h"
 
+static const char* _rd_engine_queue_name(RDEngineItemKind k) {
+    switch(k) {
+        case RD_EI_FLOW: return "FLOW";
+        case RD_EI_CALL: return "CALL";
+        case RD_EI_JUMP: return "JUMP";
+        default: break;
+    }
+
+    return NULL;
+}
+
 static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
                                                     RDAddress address) {
     const RDSegmentFull* seg = ctx->engine.segment;
@@ -235,19 +246,23 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     usize idx =
         rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
 
-    rd_i_flagsbuffer_undefine_queued(ctx->engine.segment->flags, idx);
-
-    panic_if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx),
-             "TAIL reached tick from %s queue (INDEX: %llx, CURRENT: %llx, "
-             "FROM: %llx)",
-             ctx->engine.current.kind == RD_EI_FLOW   ? "FLOW"
-             : ctx->engine.current.kind == RD_EI_JUMP ? "JUMP"
-                                                      : "CALL",
-             idx, ctx->engine.current.address, ctx->engine.current.from);
-
     RDInstruction instr = {
         .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
     };
+
+    rd_i_flagsbuffer_undefine_queued(ctx->engine.segment->flags, idx);
+
+    if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx)) {
+        const char* queue_kind =
+            _rd_engine_queue_name(ctx->engine.current.kind);
+        assert(queue_kind && "invalid queue kind");
+
+        rd_i_add_problem(
+            ctx, ctx->engine.current.from, ctx->engine.current.address,
+            "%s target points into middle of existing instruction", queue_kind);
+
+        goto done;
+    }
 
     if(rd_flagsbuffer_has_code(ctx->engine.segment->flags, idx)) {
         instr.length =
