@@ -925,12 +925,21 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
         return false;
     }
 
-    if(name) {
-        if(imp->module)
-            name = rd_i_format(&self->imp_buf, "%s_%s", imp->module, name);
-
-        rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
+    if(name && imp->module) {
+        name = rd_i_format(&self->imp_buf, "%s_%s", imp->module, name);
     }
+    else if(imp->ordinal.has_value) {
+        if(imp->module) {
+            name = rd_i_format(&self->imp_buf, "%s_Ordinal_%" PRIu32,
+                               imp->module, imp->ordinal.value);
+        }
+        else {
+            name = rd_i_format(&self->imp_buf, "Ordinal_%" PRIu32,
+                               imp->ordinal.value);
+        }
+    }
+
+    if(name) rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
 
     const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
     const char* ptrtype = rd_integral_from_size(PTR_SIZE);
@@ -1105,8 +1114,8 @@ bool rd_set_imported(RDContext* ctx, RDAddress address, const char* module,
 }
 
 bool rd_set_imported_ord(RDContext* ctx, RDAddress address, const char* module,
-                         const char* name, u64 ord) {
-    return rd_i_set_imported(ctx, address, name,
+                         u32 ord) {
+    return rd_i_set_imported(ctx, address, NULL,
                              &(RDImported){
                                  .module = module,
                                  .ordinal = {.value = ord, .has_value = true},

@@ -42,7 +42,7 @@ typedef struct RDImported {
     const char* module;
 
     struct {
-        u64 value;
+        u32 value;
         bool has_value;
     } ordinal;
 } RDImported;
@@ -144,7 +144,7 @@ RD_API bool rd_set_exported(RDContext* self, RDAddress address,
 RD_API bool rd_set_imported(RDContext* self, RDAddress address,
                             const char* module, const char* name);
 RD_API bool rd_set_imported_ord(RDContext* self, RDAddress address,
-                                const char* module, const char* name, u64 ord);
+                                const char* module, u32 ord);
 RD_API bool rd_get_imported(RDContext* self, RDAddress address,
                             RDImported* imp);
 RD_API void rd_flow(RDContext* self, RDAddress addr);
