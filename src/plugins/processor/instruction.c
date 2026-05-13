@@ -14,6 +14,6 @@ bool rd_instr_equals(const RDContext* ctx, const RDInstruction* self,
 void rd_instr_set_mnemonic(RDInstruction* self, const char* mnem) {
     if(!mnem) return;
 
-    strncpy(self->mnemonic, mnem, RD_MNEMONIC_LENGTH - 1);
-    self->mnemonic[RD_MNEMONIC_LENGTH - 1] = '\0';
+    strncpy(self->mnemonic_buf, mnem, RD_MNEMONIC_LENGTH - 1);
+    self->mnemonic_buf[RD_MNEMONIC_LENGTH - 1] = '\0';
 }

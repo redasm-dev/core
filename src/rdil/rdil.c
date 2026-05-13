@@ -622,7 +622,12 @@ const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
 
 RDInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
     const RDInstructionVect* il = rd_il_lift(ctx, address, &ctx->lift_buf);
-    return vect_to_slice(RDInstructionSlice, il);
+
+    return (RDInstructionSlice){
+        .data = il->data,
+        .length = il->length,
+        .instruction_length = il->real_instr.length,
+    };
 }
 
 RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
@@ -635,6 +640,6 @@ RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
     RDInstruction* instr = vect_back(self);
 
     const RDILStatementInfo* info = &RDIL_OP_TABLE[instr->id];
-    rd_instr_set_mnemonic(instr, info->mnemonic);
+    instr->mnemonic = info->mnemonic;
     return instr;
 }

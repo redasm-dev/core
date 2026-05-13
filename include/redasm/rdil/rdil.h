@@ -11,6 +11,7 @@ typedef struct RDIL RDIL;
 typedef struct RDInstructionSlice {
     const RDInstruction* data;
     usize length;
+    usize instruction_length;
 } RDInstructionSlice;
 
 // clang-format off

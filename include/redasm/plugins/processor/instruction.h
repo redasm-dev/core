@@ -100,7 +100,8 @@ typedef struct RDInstruction {
     union {
         void* userdata2;
         uptr uservalue2;
-        char mnemonic[RD_MNEMONIC_LENGTH];
+        char mnemonic_buf[RD_MNEMONIC_LENGTH];
+        const char* mnemonic;
     };
 } RDInstruction;
 
