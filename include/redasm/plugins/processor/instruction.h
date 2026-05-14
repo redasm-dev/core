@@ -29,6 +29,7 @@ typedef enum {
     RD_IF_CALL_COND,
     RD_IF_STOP,
     RD_IF_NOP,
+    RD_IF_RDIL, // only for RDIL instructions
 } RDInstructionFlow;
 
 typedef struct RDDisplOperand {
@@ -107,10 +108,15 @@ typedef struct RDInstruction {
 
 typedef struct RDInstructionVect RDInstructionVect;
 
-RD_API bool rd_instr_equals(const RDContext* ctx, const RDInstruction* self,
-                            const char* mnemonic);
+RD_API bool rd_instr_is_mnemonic(const RDInstruction* self,
+                                 const char* mnemonic, const RDContext* ctx);
 
 RD_API void rd_instr_set_mnemonic(RDInstruction* self, const char* mnem);
+
+RD_API bool rd_instr_match(const RDContext* ctx, const RDInstruction* self,
+                           const RDInstruction* shape);
+RD_API bool rd_instr_match_n(const RDContext* ctx, const RDInstruction* instrs,
+                             const RDInstruction* shapes, usize n);
 
 static inline void rd_instr_set_op(RDInstruction* instr, int idx,
                                    const RDOperand* op) {
