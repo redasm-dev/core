@@ -5,11 +5,24 @@
 
 typedef struct RDByteBuffer RDByteBuffer;
 
+#ifdef _WIN32
+#include <windows.h>
+#define RD_PATH_SEP '\\'
+#else
+#define RD_PATH_SEP '/'
+#endif
+
 typedef struct RDCharVect {
     char* data;
     usize length;
     usize capacity;
 } RDCharVect;
+
+typedef struct RDPathVect {
+    char** data;
+    usize length;
+    usize capacity;
+} RDPathVect;
 
 typedef struct RDBaseParams {
     unsigned int base;
@@ -20,6 +33,7 @@ typedef struct RDBaseParams {
 
 RDByteBuffer* rd_i_fromdata(const char* bytes, usize n);
 RDByteBuffer* rd_i_readfile(const char* filepath);
+bool rd_i_file_exists(const char* filepath);
 const char* rd_i_tolower(char* s);
 const char* rd_i_get_file_name(const char* filepath);
 const char* rd_i_get_file_ext(const char* filepath);

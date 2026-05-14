@@ -47,7 +47,7 @@ static bool _rd_validate_plugin(int level, const char* id, const char* name,
     return true;
 }
 
-void rd_init(void) { rd_i_state_init(); }
+void rd_init(const RDInitParams* params) { rd_i_state_init(params); }
 void rd_deinit(void) { rd_i_state_deinit(); }
 
 RDContextSlice rd_test(const char* filepath) {

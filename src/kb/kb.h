@@ -1,0 +1,28 @@
+#pragma once
+
+#include "kb/object.h"
+#include "support/utils.h"
+#include <redasm/kb.h>
+#include <tomlc17.h>
+
+typedef struct RDKBFile {
+    char* name;
+    toml_result_t toml;
+    RDKBObject root;
+} RDKBFile;
+
+typedef struct RDKBFileVect {
+    RDKBFile** data;
+    usize length;
+    usize capacity;
+} RDKBFileVect;
+
+typedef struct RDKB {
+    RDPathVect paths;
+    RDKBFileVect files;
+
+    RDCharVect path_buf;
+} RDKB;
+
+void rd_i_kb_init(const char** kb_paths);
+void rd_i_kb_deinit(RDKB* self);

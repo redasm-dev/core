@@ -33,6 +33,8 @@ target_sources(${PROJECT_NAME}
         src/io/flags.c
         src/io/flagsbuffer.c
         src/io/reader.c
+        src/kb/kb.c
+        src/kb/object.c
         src/listing/builder.c
         src/listing/listing.c
         src/plugins/builtin/loaders.c
@@ -78,6 +80,7 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         sqlite3
+        tomlc17
 )
 
 include(GNUInstallDirs)

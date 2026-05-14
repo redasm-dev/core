@@ -6,6 +6,7 @@
 #include <redasm/graph/graph.h>
 #include <redasm/graph/layout.h>
 #include <redasm/hooks.h>
+#include <redasm/kb.h>
 #include <redasm/mapping.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
@@ -23,6 +24,10 @@
 #include <redasm/types/def.h>
 #include <redasm/types/type.h>
 
+typedef struct RDInitParams {
+    const char** kb_paths;
+} RDInitParams;
+
 typedef struct RDContextSlice {
     RDContext* const* data;
     usize length;
@@ -34,7 +39,7 @@ typedef struct RDDecodedInstruction {
     const char* mnemonic;
 } RDDecodedInstruction;
 
-RD_API void rd_init(void);
+RD_API void rd_init(const RDInitParams* params);
 RD_API void rd_deinit(void);
 RD_API RDContextSlice rd_test(const char* filepath);
 RD_API bool rd_module_load(const char* filepath);

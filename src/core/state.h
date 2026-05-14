@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kb/kb.h"
 #include "plugins/module.h"
 #include "support/utils.h"
 #include "theme.h"
@@ -13,6 +14,7 @@ typedef struct RDPluginVect {
 
 typedef struct RDGlobalState {
     RDModule* modules;
+    RDKB kb;
 
     RDPluginVect loaders;
     RDPluginVect processors;
@@ -39,5 +41,5 @@ typedef struct RDGlobalState {
 
 extern RDGlobalState rd_i_state;
 
-void rd_i_state_init(void);
+void rd_i_state_init(const RDInitParams* params);
 void rd_i_state_deinit(void);

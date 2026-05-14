@@ -33,7 +33,11 @@ static RDModule* _rd_module_find(const char* filepath) {
     return NULL;
 }
 
-void rd_i_state_init(void) {
+void rd_i_state_init(const RDInitParams* params) {
+    if(params) {
+        rd_i_kb_init(params->kb_paths);
+    }
+
     rd_i_theme_init(&rd_i_state.theme);
     rd_i_builtin_binary();
     rd_i_builtin_null();
@@ -56,6 +60,7 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.instr_dump_buf);
     vect_destroy(&rd_i_state.mnem_buf);
     _rd_i_state_unload_modules();
+    rd_i_kb_deinit(&rd_i_state.kb);
 }
 
 void rd_set_log_callback(RDLogCallback cb, void* userdata) {

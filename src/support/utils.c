@@ -10,13 +10,6 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#define RD_PATH_SEP '\\'
-#else
-#define RD_PATH_SEP '/'
-#endif
-
 static const char* _rd_get_temp_path(void) {
 #if defined(_WIN32)
     static char tmp[MAX_PATH];
@@ -68,6 +61,13 @@ RDByteBuffer* rd_i_readfile(const char* filepath) {
     fread(b->data, 1, b->base.length, fp);
     fclose(fp);
     return b;
+}
+
+bool rd_i_file_exists(const char* filepath) {
+    assert(filepath);
+
+    struct stat st;
+    return stat(filepath, &st) == 0;
 }
 
 const char* rd_i_tolower(char* s) {
@@ -204,9 +204,7 @@ char* rd_i_get_temp_path(const char* suffix) {
 char* rd_i_get_unique_temp_path(const char* suffix) {
     char* tmppath = rd_i_get_temp_path(suffix);
     if(!tmppath) return NULL;
-
-    struct stat st;
-    if(stat(tmppath, &st) != 0) return tmppath;
+    if(!rd_i_file_exists(tmppath)) return tmppath;
 
     const char* ext = rd_i_get_file_ext(tmppath);
     size_t baselen, extlen;
@@ -227,7 +225,7 @@ char* rd_i_get_unique_temp_path(const char* suffix) {
 
     for(unsigned int i = 1;; i++) {
         snprintf(p, buflen, "%.*s_%d.%s", (int)baselen, tmppath, i, ext);
-        if(stat(p, &st) != 0) break;
+        if(!rd_i_file_exists(p)) break;
     }
 
     rd_free(tmppath);

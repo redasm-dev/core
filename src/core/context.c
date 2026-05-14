@@ -334,7 +334,10 @@ const char* rd_get_name(RDContext* self, RDAddress address) {
     return NULL;
 }
 
-const char* rd_to_hex(const RDContext* self, usize v) {
+const char* rd_to_dec(i64 v) { return rd_i_to_dec(v); }
+const char* rd_to_hex(i64 v) { return rd_i_to_hex(v, 0); }
+
+const char* rd_to_hexaddr(const RDContext* self, usize v) {
     const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
     return rd_i_to_hex((isize)v, PTR_SIZE);
 }
