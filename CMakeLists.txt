@@ -13,10 +13,6 @@ setup_compiler(${PROJECT_NAME})
 
 target_sources(${PROJECT_NAME} 
     PRIVATE
-        src/core/db/db.c
-        src/core/db/queries.c
-        src/core/db/schema.c
-        src/core/db/types.c
         src/core/autorename.c
         src/core/context.c
         src/core/engine.c
@@ -27,6 +23,10 @@ target_sources(${PROJECT_NAME}
         src/core/state.c
         src/core/stringfinder.c
         src/core/worker.c
+        src/db/db.c
+        src/db/queries.c
+        src/db/schema.c
+        src/db/types.c
         src/graphs/graph.c
         src/graphs/layered.c
         src/io/buffer.c

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/db/types.h"
+#include "db/types.h"
 #include "listing/listing.h"
 #include "plugins/processor/processor.h"
 #include "support/utils.h"

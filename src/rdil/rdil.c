@@ -1,6 +1,6 @@
 #include "rdil.h"
 #include "core/context.h"
-#include "core/db/db.h"
+#include "db/db.h"
 #include "rdil/opcodes.h"
 #include "support/error.h"
 #include "support/logging.h"

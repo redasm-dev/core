@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/db/types.h"
 #include "core/segment.h"
+#include "db/types.h"
 #include "types/def.h"
 #include "types/type.h"
 #include <redasm/context.h>

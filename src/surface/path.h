@@ -1,7 +1,8 @@
 #pragma once
 
-#include "core/db/db.h"
-#include "surface/renderer.h"
+#include "db/types.h"
+#include "listing/listing.h"
+#include "surface/row.h"
 #include <redasm/surface/surface.h>
 
 typedef struct RDSurfacePathVect {

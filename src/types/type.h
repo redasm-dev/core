@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/db/types.h"
 #include <redasm/config.h>
 #include <redasm/types/type.h>
 

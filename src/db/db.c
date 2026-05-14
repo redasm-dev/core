@@ -1,6 +1,6 @@
 #include "db.h"
 #include "core/context.h"
-#include "core/db/schema.h"
+#include "db/schema.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/utils.h"
