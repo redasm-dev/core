@@ -33,6 +33,7 @@ void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
 
     // compact first: slide live elements back to index 0
     if(*head > 0) {
+        if(*head + len > *cap) return; // bounds check: source must fit within buffer
         memmove(d, d + (*head * itemsz), len * itemsz);
         *head = 0;
     }
@@ -81,7 +82,7 @@ size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
                          VectPredicate pred) {
     if(!len) return 0;
 
-    char* tmp_data = (char*)malloc(len * itemsz);
+    char* tmp_data = (char*)calloc(len, itemsz);
     char* in_data = (char*)data;
     size_t i = 0;
 
