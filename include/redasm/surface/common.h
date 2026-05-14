@@ -27,7 +27,7 @@ typedef enum {
     ((RDRenderFlags)(RD_RF_NO_ADDRESS | RD_RF_NO_CURSOR | RD_RF_NO_SELECTION | \
                      RD_RF_NO_CURSOR_LINE))
 
-#define RD_RF_TEXT ((RDRenderFlags)~0U)
+#define RD_RF_TEXT ((RDRenderFlags)~0U & ~RD_RF_NO_NAMES)
 
 typedef enum {
     RD_RM_NORMAL = 0,
