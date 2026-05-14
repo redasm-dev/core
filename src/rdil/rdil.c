@@ -365,8 +365,8 @@ RDAddress rd_il_current_address(const RDIL* self) {
     return self->current_address;
 }
 
-RDInstructionSlice rd_il_current_il(const RDIL* self) {
-    return vect_to_slice(RDInstructionSlice, &self->lifted);
+RDILInstructionSlice rd_il_current_il(const RDIL* self) {
+    return vect_to_slice(RDILInstructionSlice, &self->lifted);
 }
 
 const RDInstruction* rd_il_current_instr(const RDIL* self) {
@@ -620,10 +620,10 @@ const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
     return v;
 }
 
-RDInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
+RDILInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
     const RDInstructionVect* il = rd_il_lift(ctx, address, &ctx->lift_buf);
 
-    return (RDInstructionSlice){
+    return (RDILInstructionSlice){
         .data = il->data,
         .length = il->length,
         .instruction_length = il->real_instr.length,
@@ -636,10 +636,21 @@ RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
         return NULL;
     }
 
-    vect_push(self, (RDInstruction){.id = (u32)s});
+    vect_push(self, (RDInstruction){.id = (u32)s, .flow = RD_IF_RDIL});
     RDInstruction* instr = vect_back(self);
 
     const RDILStatementInfo* info = &RDIL_OP_TABLE[instr->id];
     instr->mnemonic = info->mnemonic;
     return instr;
+}
+
+bool rd_il_instr_match(const RDContext* ctx, const RDILInstructionSlice* il,
+                       const RDInstruction* shapes, usize count) {
+    if(!count || !il->length || il->length != count) return false;
+
+    for(usize i = 0; i < count; i++) {
+        if(!rd_instr_match(ctx, &il->data[i], &shapes[i])) return false;
+    }
+
+    return true;
 }

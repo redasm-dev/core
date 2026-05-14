@@ -8,15 +8,17 @@
 
 typedef struct RDIL RDIL;
 
-typedef struct RDInstructionSlice {
+typedef struct RDILInstructionSlice {
     const RDInstruction* data;
     usize length;
     usize instruction_length;
-} RDInstructionSlice;
+} RDILInstructionSlice;
 
 // clang-format off
-RD_API RDInstructionSlice rd_lift(RDContext* ctx, RDAddress address);
+RD_API RDILInstructionSlice rd_lift(RDContext* ctx, RDAddress address);
 RD_API RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s);
+RD_API bool rd_il_instr_match(const RDContext* ctx, const RDILInstructionSlice* il,
+                              const RDInstruction* shapes, usize count);
 
 RD_API RDIL* rd_il_create(RDContext* ctx, const RDFunction* f);
 RD_API void rd_il_destroy(RDIL* self);
@@ -25,7 +27,7 @@ RD_API void rd_il_assign(RDIL* self, const RDFunction* f);
 RD_API bool rd_il_run(RDIL* self);
 RD_API bool rd_il_step(RDIL* self);
 RD_API RDAddress rd_il_current_address(const RDIL* self);
-RD_API RDInstructionSlice rd_il_current_il(const RDIL* self);
+RD_API RDILInstructionSlice rd_il_current_il(const RDIL* self);
 RD_API const RDInstruction* rd_il_current_instr(const RDIL* self);
 RD_API bool rd_il_get_target(const RDIL* self, RDAddress* target);
 RD_API bool rd_il_get_regval(const RDIL* self, const char* regname, RDRegValue* value);
