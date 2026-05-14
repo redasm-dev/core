@@ -1,7 +1,7 @@
 CPMAddPackage(
     NAME sqlite3
-    URL https://www.sqlite.org/2024/sqlite-amalgamation-3470100.zip
-    URL_HASH SHA3_256=71c08f4c890000094a6781169927de8f87ad8569410d9a4310c07dbca1f14b37
+    URL https://sqlite.org/2026/sqlite-amalgamation-3530100.zip
+    URL_HASH SHA3_256=3c07136e4f6b5dd0c395be86455014039597bc65b6851f7111e88f71b6e06114
 )
 
 if(sqlite3_ADDED)
