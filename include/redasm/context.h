@@ -98,6 +98,8 @@ RD_API bool rd_is_busy(const RDContext* self);
 RD_API void rd_disassemble(RDContext* self);
 RD_API const char* rd_str_intern(RDContext* self, const char* s);
 RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
+RD_API bool rd_decode_n(RDContext* ctx, RDAddress address,
+                        RDInstruction* instrs, usize n);
 RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address,
                            RDInstruction* instr);
 RD_API RDProblemSlice rd_get_all_problems(const RDContext* self);

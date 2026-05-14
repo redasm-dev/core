@@ -388,6 +388,16 @@ bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     return rd_i_engine_decode(ctx, address, seg, idx, instr);
 }
 
+bool rd_decode_n(RDContext* ctx, RDAddress address, RDInstruction* instrs,
+                 usize n) {
+    for(usize i = 0; i < n; i++) {
+        if(!rd_decode(ctx, address, &instrs[i])) return false;
+        address += instrs[i].length;
+    }
+
+    return true;
+}
+
 bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
