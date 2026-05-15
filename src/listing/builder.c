@@ -116,7 +116,8 @@ static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
                                        bool isroot) {
     RDAddress startaddr = b->address;
     LIndex idx = rd_i_listing_add_type(&b->listing, b->segment, b->address, t);
-    const RDTypeDef* tdef = rd_i_typedef_find(b->context, t->name, true);
+    const RDTypeDef* tdef = rd_i_typedef_find(b->context, t->name);
+    panic_if(!tdef, "type '%s' not found in registry", t->name);
 
     if(t->count > 0) {
         // char arrays are strings: don't expand elements

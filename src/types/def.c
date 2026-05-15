@@ -144,51 +144,48 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
     return true;
 }
 
-RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name,
-                             bool required) {
+RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
     RDTypeDef** it;
     vect_each(it, &ctx->types) {
         if(strcmp((*it)->name, name) == 0) return *it;
     }
 
-    panic_if(required, "type '%s' not found in registry", name);
     return NULL;
 }
 
 bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
-    if(rd_i_typedef_find(ctx, self->name, false)) {
+    if(rd_i_typedef_find(ctx, self->name)) {
         LOG_FAIL("'%s' already registered", self->name);
-        return false;
+        goto fail;
     }
 
     if(rd_i_typedef_is_compound(self)) {
         if(vect_is_empty(&self->compound_)) {
             LOG_FAIL("at least one member required for '%s'", self->name);
-            return false;
+            goto fail;
         }
 
         RDParam* m;
         vect_each(m, &self->compound_) {
-            const RDTypeDef* tdef = rd_i_typedef_find(ctx, m->type.name, false);
+            const RDTypeDef* tdef = rd_i_typedef_find(ctx, m->type.name);
             if(!tdef) {
                 LOG_FAIL("type '%s' not found for '%s.%s'", m->type.name,
                          self->name, m->name);
-                return false;
+                goto fail;
             }
         }
     }
     else if(self->kind == RD_TKIND_ENUM) {
-        const RDTypeDef* tdef =
-            rd_i_typedef_find(ctx, self->enum_.base_type, false);
+        const RDTypeDef* tdef = rd_i_typedef_find(ctx, self->enum_.base_type);
         if(!tdef) {
             LOG_FAIL("type '%s' not found in enum '%s'", self->enum_.base_type,
                      self->name);
-            return false;
+            goto fail;
         }
 
         if(tdef->kind != RD_TKIND_PRIM) {
             LOG_FAIL("type '%s' is not primitive", self->enum_.base_type);
-            return false;
+            goto fail;
         }
 
         RDEnumCase* c1;
@@ -196,7 +193,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             if(!_rd_typedef_enum_in_range(self->enum_.base_type, c1->value)) {
                 LOG_FAIL("value '%lld' out of range for type '%s' in enum '%s'",
                          c1->value, self->enum_.base_type, self->name);
-                return false;
+                goto fail;
             }
 
             RDEnumCase* c2;
@@ -204,7 +201,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                 if(c1 != c2 && !strcmp(c1->name, c2->name)) {
                     LOG_FAIL("duplicate case '%s' in enum '%s'", c1->name,
                              self->enum_.base_type);
-                    return false;
+                    goto fail;
                 }
             }
         }
@@ -216,13 +213,13 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             if(!arg1->name) {
                 LOG_FAIL("function '%s': argument %d has no name", self->name,
                          i + 1);
-                return false;
+                goto fail;
             }
 
             if(rd_i_is_void(&arg1->type)) {
                 LOG_FAIL("function '%s': argument %d '%s' cannot be void",
                          self->name, i + 1, arg1->name);
-                return false;
+                goto fail;
             }
 
             for(usize j = i + 1; j < vect_length(&self->func_.args); j++) {
@@ -232,7 +229,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                     LOG_FAIL(
                         "function '%s': argument %d has duplicate name '%s'",
                         self->name, i + 1, arg1->name);
-                    return false;
+                    goto fail;
                 }
             }
         }
@@ -244,9 +241,13 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     vect_push(&ctx->types, self);
     LOG_DEBUG("definition '%s' registered", self->name);
     return true;
+
+fail:
+    rd_typedef_destroy(self);
+    return false;
 }
 
-void rd_i_typedef_destroy(RDTypeDef* self) {
+void rd_typedef_destroy(RDTypeDef* self) {
     if(rd_i_typedef_is_compound(self))
         vect_destroy(&self->compound_);
     else if(self->kind == RD_TKIND_ENUM) {

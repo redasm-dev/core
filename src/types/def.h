@@ -51,9 +51,7 @@ typedef struct RDTypeDef {
     };
 } RDTypeDef;
 
-RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name,
-                             bool required);
-void rd_i_typedef_destroy(RDTypeDef* self);
+RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef);
 void rd_i_register_primitives(RDContext* ctx);
 

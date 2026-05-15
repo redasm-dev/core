@@ -492,7 +492,7 @@ void rd_destroy(RDContext* self) {
     rd_i_db_destroy(self->db);
 
     RDTypeDef** def;
-    vect_each(def, &self->types) rd_i_typedef_destroy(*def);
+    vect_each(def, &self->types) rd_typedef_destroy(*def);
     vect_destroy(&self->types);
 
     RDAnalyzerItem** ai;

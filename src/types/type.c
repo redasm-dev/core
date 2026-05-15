@@ -2,6 +2,7 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/error.h"
+#include "support/logging.h"
 #include "types/def.h"
 #include <string.h>
 
@@ -12,7 +13,13 @@ usize rd_size_of(const RDContext* ctx, const char* name, usize n) {
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeModifier mod) {
     const RDProcessorPlugin* p = ctx->processorplugin;
-    RDTypeDef* tdef = rd_i_typedef_find(ctx, name, true);
+    RDTypeDef* tdef = rd_i_typedef_find(ctx, name);
+
+    if(!tdef) {
+        LOG_FAIL("cannot get the size of '%s', type not found", name);
+        return 0;
+    }
+
     usize sz;
 
     if(tdef->kind == RD_TKIND_FUNC || mod == RD_TYPE_CPTR) {

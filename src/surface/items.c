@@ -365,7 +365,8 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
     assert(item->type.name && "_rd_surface_render_type: invalid type");
 
     RDContext* ctx = r->context;
-    const RDTypeDef* tdef = rd_i_typedef_find(ctx, item->type.name, true);
+    const RDTypeDef* tdef = rd_i_typedef_find(ctx, item->type.name);
+    panic_if(!tdef, "type '%s' not found in registry", item->type.name);
 
     rd_i_renderer_new_row(r, item);
     _rd_render_modifiers(r, item, RD_THEME_TYPE, RD_THEME_BACKGROUND);

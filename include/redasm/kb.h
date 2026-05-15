@@ -1,5 +1,6 @@
 #pragma once
 
+#include <redasm/common.h>
 #include <redasm/config.h>
 
 typedef enum {
@@ -13,7 +14,7 @@ typedef enum {
     RD_KB_DATETIME,
     RD_KB_ARRAY,
     RD_KB_TABLE,
-} RDKBObjectType;
+} RDKBObjectKind;
 
 typedef struct RDKBTime {
     i16 hour, minute, second;
@@ -32,10 +33,13 @@ typedef struct RDKBDateTime {
 
 typedef struct RDKBObject RDKBObject;
 
-RD_API const RDKBObject* rd_kb_load(const char* name);
+RD_API const RDKBObject* rd_kb_load(const char* kb);
+RD_API bool rd_kb_load_types(const char* kb, RDContext* ctx);
 
 RD_API usize rd_kbobject_get_length(const RDKBObject* self);
-RD_API RDKBObjectType rd_kbobject_get_type(const RDKBObject* self);
+RD_API RDKBObjectKind rd_kbobject_get_kind(const RDKBObject* self);
+RD_API const RDKBObject* rd_kbobject_get(const RDKBObject* self,
+                                         const char* key);
 RD_API const char* rd_kbobject_get_str(const RDKBObject* self, const char* key);
 RD_API bool rd_kbobject_get_bool(const RDKBObject* self, const char* key,
                                  bool* val);

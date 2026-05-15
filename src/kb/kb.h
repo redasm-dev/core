@@ -20,6 +20,7 @@ typedef struct RDKB {
     RDPathVect paths;
     RDKBFileVect files;
 
+    RDCharVect schema_buf;
     RDCharVect path_buf;
     RDCharVect key_buf;
 } RDKB;

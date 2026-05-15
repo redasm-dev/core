@@ -27,6 +27,7 @@ target_sources(${PROJECT_NAME}
         src/db/queries.c
         src/db/schema.c
         src/db/types.c
+        src/db/schema.c
         src/graphs/graph.c
         src/graphs/layered.c
         src/io/buffer.c
@@ -35,6 +36,7 @@ target_sources(${PROJECT_NAME}
         src/io/reader.c
         src/kb/kb.c
         src/kb/object.c
+        src/kb/schema.c
         src/listing/builder.c
         src/listing/listing.c
         src/plugins/builtin/loaders.c

@@ -1,7 +1,9 @@
 #include "kb.h"
 #include "core/state.h"
 #include "kb/object.h"
+#include "kb/schema.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "support/logging.h"
 #include <redasm/allocator.h>
 
@@ -44,6 +46,35 @@ static const char* _rd_kb_find_path(const char* name) {
     return NULL;
 }
 
+static void _rd_kb_load_struct(const char* name, const RDKBObject* def,
+                               RDContext* ctx) {
+    RDTypeDef* tdef = rd_typedef_create_struct(name, ctx);
+
+    const RDKBObject* members = rd_kbobject_get_array(def, "members");
+    assert(members);
+
+    const RDKBObject* m;
+    rd_kbobject_each(m, members) {
+        if(!rd_i_kb_validate_member(m)) {
+            rd_typedef_destroy(tdef);
+            return;
+        }
+
+        i64 count = 0;
+        i64 mod = RD_TYPE_NONE;
+
+        const char* type = rd_kbobject_get_str(m, "type");
+        const char* name = rd_kbobject_get_str(m, "name");
+        rd_kbobject_get_int(m, "count", &count);
+        rd_kbobject_get_int(m, "mod", &mod);
+
+        rd_typedef_add_member(tdef, type, name, count, (RDTypeModifier)mod,
+                              ctx);
+    }
+
+    rd_typedef_register(tdef, ctx);
+}
+
 void rd_i_kb_init(const char** kb_paths) {
     if(!kb_paths) return;
 
@@ -64,16 +95,17 @@ void rd_i_kb_deinit(RDKB* self) {
 
     vect_destroy(&self->key_buf);
     vect_destroy(&self->path_buf);
+    vect_destroy(&self->schema_buf);
     vect_destroy(&self->files);
 }
 
-const RDKBObject* rd_kb_load(const char* name) {
-    if(!name) return NULL;
+const RDKBObject* rd_kb_load(const char* kb) {
+    if(!kb) return NULL;
 
-    RDKBFile* kbfile = _rd_kb_find(name);
+    RDKBFile* kbfile = _rd_kb_find(kb);
     if(kbfile) return kbfile->root;
 
-    const char* kb_path = _rd_kb_find_path(name);
+    const char* kb_path = _rd_kb_find_path(kb);
     toml_result_t toml = toml_parse_file_ex(kb_path);
 
     if(!toml.ok) {
@@ -82,10 +114,34 @@ const RDKBObject* rd_kb_load(const char* name) {
     }
 
     kbfile = _rd_kbfile_create();
-    kbfile->name = rd_strdup(name);
+    kbfile->name = rd_strdup(kb);
     kbfile->toml = toml;
     kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
 
     vect_push(&rd_i_state.kb.files, kbfile);
     return kbfile->root;
+}
+
+bool rd_kb_load_types(const char* kb, RDContext* ctx) {
+    const RDKBObject* kbfile = rd_kb_load(kb);
+    if(!kbfile) return false;
+
+    const RDKBObject* types = rd_kbobject_get_table(kbfile, "types");
+    if(!types) return false;
+
+    const char* name;
+    const RDKBObject* def;
+
+    rd_kbobject_each_pair(name, def, types) {
+        if(!rd_i_kb_validate_type(def)) continue;
+
+        const char* kind = rd_kbobject_get_str(def, "kind");
+
+        if(!strcmp(kind, "struct"))
+            _rd_kb_load_struct(name, def, ctx);
+        else
+            unreachable();
+    }
+
+    return true;
 }

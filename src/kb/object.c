@@ -23,12 +23,12 @@ static const toml_datum_t* _rd_kbobject_get(const toml_datum_t* datum,
 
 // we need pointers, do now use toml_seek
 static const RDKBObject* _rd_kbobject_seek(const RDKBObject* self,
-                                           const char* path) {
+                                           const char* key) {
     const toml_datum_t* datum = rd_i_kb_to_datum(self);
-    if(!self || datum->type != TOML_TABLE || !path) return NULL;
+    if(!self || datum->type != TOML_TABLE || !key) return NULL;
 
     str_clear(&rd_i_state.kb.key_buf);
-    str_append(&rd_i_state.kb.key_buf, path);
+    str_append(&rd_i_state.kb.key_buf, key);
 
     char* p = rd_i_state.kb.key_buf.data;
     const toml_datum_t* cur = datum;
@@ -56,7 +56,7 @@ usize rd_kbobject_get_length(const RDKBObject* self) {
     return 0;
 }
 
-RDKBObjectType rd_kbobject_get_type(const RDKBObject* self) {
+RDKBObjectKind rd_kbobject_get_kind(const RDKBObject* self) {
     const toml_datum_t* datum = rd_i_kb_to_datum(self);
 
     if(datum) {
@@ -79,6 +79,10 @@ RDKBObjectType rd_kbobject_get_type(const RDKBObject* self) {
     }
 
     return RD_KB_UNKNOWN;
+}
+
+const RDKBObject* rd_kbobject_get(const RDKBObject* self, const char* key) {
+    return self ? _rd_kbobject_seek(self, key) : NULL;
 }
 
 const char* rd_kbobject_get_str(const RDKBObject* self, const char* key) {
@@ -139,7 +143,7 @@ const RDKBObject* rd_kbobject_get_table(const RDKBObject* self,
     if(!self) return NULL;
 
     const RDKBObject* v = _rd_kbobject_seek(self, key);
-    if(!v || rd_kbobject_get_type(v) != RD_KB_TABLE) return NULL;
+    if(!v || rd_kbobject_get_kind(v) != RD_KB_TABLE) return NULL;
     return v;
 }
 
@@ -148,12 +152,12 @@ const RDKBObject* rd_kbobject_get_array(const RDKBObject* self,
     if(!self) return NULL;
 
     const RDKBObject* v = _rd_kbobject_seek(self, key);
-    if(!v || rd_kbobject_get_type(v) != RD_KB_ARRAY) return NULL;
+    if(!v || rd_kbobject_get_kind(v) != RD_KB_ARRAY) return NULL;
     return v;
 }
 
 const RDKBObject* rd_kbobject_array_at(const RDKBObject* self, usize idx) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_ARRAY) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_ARRAY) return NULL;
 
     if(idx < rd_kbobject_get_length(self)) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
@@ -164,7 +168,7 @@ const RDKBObject* rd_kbobject_array_at(const RDKBObject* self, usize idx) {
 }
 
 const char* rd_kbobject_key_at(const RDKBObject* self, usize idx) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_TABLE) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_TABLE) return NULL;
 
     if(idx < rd_kbobject_get_length(self)) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
@@ -175,7 +179,7 @@ const char* rd_kbobject_key_at(const RDKBObject* self, usize idx) {
 }
 
 const RDKBObject* rd_kbobject_value_at(const RDKBObject* self, usize idx) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_TABLE) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_TABLE) return NULL;
 
     if(idx < rd_kbobject_get_length(self)) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
@@ -186,30 +190,30 @@ const RDKBObject* rd_kbobject_value_at(const RDKBObject* self, usize idx) {
 }
 
 const char* rd_kbobject_to_str(const RDKBObject* self) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_STR) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_STR) return NULL;
     return rd_i_kb_to_datum(self)->u.s;
 }
 
 bool rd_kbobject_to_bool(const RDKBObject* self, bool* val) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_BOOL) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_BOOL) return NULL;
     if(val) *val = rd_i_kb_to_datum(self)->u.boolean;
     return true;
 }
 
 bool rd_kbobject_to_int(const RDKBObject* self, i64* val) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_INT) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_INT) return NULL;
     if(val) *val = rd_i_kb_to_datum(self)->u.int64;
     return true;
 }
 
 bool rd_kbobject_to_float(const RDKBObject* self, double* val) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_FLOAT) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_FLOAT) return NULL;
     if(val) *val = rd_i_kb_to_datum(self)->u.fp64;
     return true;
 }
 
 bool rd_kbobject_to_time(const RDKBObject* self, RDKBTime* val) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_TIME) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_TIME) return NULL;
 
     if(val) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
@@ -226,7 +230,7 @@ bool rd_kbobject_to_time(const RDKBObject* self, RDKBTime* val) {
 }
 
 bool rd_kbobject_to_date(const RDKBObject* self, RDKBDate* val) {
-    if(!self || rd_kbobject_get_type(self) != RD_KB_DATE) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_DATE) return NULL;
 
     if(val) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
