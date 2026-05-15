@@ -1,5 +1,6 @@
 #include "kb.h"
 #include "core/state.h"
+#include "kb/object.h"
 #include "support/containers.h"
 #include "support/logging.h"
 #include <redasm/allocator.h>
@@ -61,15 +62,16 @@ void rd_i_kb_deinit(RDKB* self) {
     vect_each(p, &self->paths) { rd_free(*p); }
     vect_destroy(&self->paths);
 
+    vect_destroy(&self->key_buf);
     vect_destroy(&self->path_buf);
     vect_destroy(&self->files);
 }
 
-RDKBObject* rd_kb_load(const char* name) {
+const RDKBObject* rd_kb_load(const char* name) {
     if(!name) return NULL;
 
     RDKBFile* kbfile = _rd_kb_find(name);
-    if(kbfile) return &kbfile->root;
+    if(kbfile) return kbfile->root;
 
     const char* kb_path = _rd_kb_find_path(name);
     toml_result_t toml = toml_parse_file_ex(kb_path);
@@ -82,8 +84,8 @@ RDKBObject* rd_kb_load(const char* name) {
     kbfile = _rd_kbfile_create();
     kbfile->name = rd_strdup(name);
     kbfile->toml = toml;
-    kbfile->root.datum = toml.toptab;
+    kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
 
     vect_push(&rd_i_state.kb.files, kbfile);
-    return &kbfile->root;
+    return kbfile->root;
 }

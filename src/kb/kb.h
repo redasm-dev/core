@@ -1,6 +1,5 @@
 #pragma once
 
-#include "kb/object.h"
 #include "support/utils.h"
 #include <redasm/kb.h>
 #include <tomlc17.h>
@@ -8,7 +7,7 @@
 typedef struct RDKBFile {
     char* name;
     toml_result_t toml;
-    RDKBObject root;
+    const RDKBObject* root;
 } RDKBFile;
 
 typedef struct RDKBFileVect {
@@ -22,6 +21,7 @@ typedef struct RDKB {
     RDKBFileVect files;
 
     RDCharVect path_buf;
+    RDCharVect key_buf;
 } RDKB;
 
 void rd_i_kb_init(const char** kb_paths);
