@@ -4,10 +4,13 @@
 
 typedef struct RDReader RDReader;
 
+RD_API void rd_reader_begin(RDReader* self);
+RD_API u64 rd_reader_end(RDReader* self);
 RD_API void rd_reader_seek(RDReader* self, u64 pos);
-RD_API u64 rd_reader_get_pos(const RDReader* self);
+RD_API u64 rd_reader_tell(const RDReader* self);
 RD_API u64 rd_reader_get_length(const RDReader* self);
 RD_API bool rd_reader_has_error(const RDReader* self);
+RD_API void rd_reader_clear_error(RDReader* self);
 RD_API bool rd_reader_at_end(const RDReader* self);
 RD_API bool rd_reader_read(RDReader* self, void* v, usize n);
 RD_API bool rd_reader_read_u8(RDReader* self, u8* v);

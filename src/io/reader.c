@@ -1,6 +1,8 @@
 #include "reader.h"
 #include "core/context.h"
 #include "core/segment.h"
+#include "support/error.h"
+#include "support/logging.h"
 
 typedef struct RDFlagsReader {
     RDReader base;
@@ -39,7 +41,7 @@ RDReader* rd_i_reader_create(RDBuffer* buf) {
     *self = (RDReader){
         .buffer = buf,
         .seek = _rd_reader_seek,
-        .get_pos = _rd_reader_get_pos,
+        .tell = _rd_reader_get_pos,
     };
 
     return self;
@@ -53,18 +55,36 @@ RDReader* rd_i_reader_create_flags(RDContext* ctx) {
         .base =
             {
                 .seek = _rd_flagsreader_seek,
-                .get_pos = _rd_flagsreader_get_pos,
+                .tell = _rd_flagsreader_get_pos,
             },
     };
 
     return (RDReader*)self;
 }
 
-void rd_i_reader_destroy(RDReader* self) { rd_free(self); }
+void rd_i_reader_destroy(RDReader* self) {
+    if(!vect_is_empty(&self->stack))
+        LOG_WARN("reader stack is not empty (begin/end mismatch)");
+
+    vect_destroy(&self->stack);
+    rd_free(self);
+}
+
+void rd_reader_begin(RDReader* self) {
+    vect_push(&self->stack, rd_reader_tell(self));
+}
+
+u64 rd_reader_end(RDReader* self) {
+    panic_if(vect_is_empty(&self->stack), "reader begin/end mismatch");
+    rd_reader_seek(self, vect_pop_back(&self->stack));
+    return rd_reader_tell(self);
+}
+
 void rd_reader_seek(RDReader* self, u64 pos) { self->seek(self, pos); }
-usize rd_reader_get_pos(const RDReader* self) { return self->get_pos(self); }
+usize rd_reader_tell(const RDReader* self) { return self->tell(self); }
 u64 rd_reader_get_length(const RDReader* self) { return self->buffer->length; }
 bool rd_reader_has_error(const RDReader* self) { return self->error; }
+void rd_reader_clear_error(RDReader* self) { self->error = false; }
 
 bool rd_reader_at_end(const RDReader* self) {
     return self->error || self->position >= self->buffer->length;

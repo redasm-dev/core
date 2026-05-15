@@ -118,6 +118,7 @@ const RDKBObject* rd_kb_load(const char* kb) {
     kbfile->toml = toml;
     kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
 
+    LOG_INFO("loading KB '%s'", kb);
     vect_push(&rd_i_state.kb.files, kbfile);
     return kbfile->root;
 }

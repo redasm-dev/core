@@ -15,12 +15,6 @@ typedef struct RDType {
     RDTypeModifier mod;
 } RDType;
 
-// rd_size_of: returns the size of a registered type in bytes, without padding.
-// Use this instead of sizeof() for struct types to avoid platform-specific
-// padding issues when parsing binary formats.
-// For primitive types (u8, u16, u32, u64), sizeof() is always safe.
-RD_API usize rd_size_of(const RDContext* ctx, const char* name, usize n);
-
 RD_API const char* rd_integral_from_size(unsigned int size);
 
 RD_API bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t);

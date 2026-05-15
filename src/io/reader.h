@@ -10,8 +10,15 @@ typedef struct RDReader {
     RDBuffer* buffer;
     usize position;
     bool error;
+
+    struct {
+        usize* data;
+        usize length;
+        usize capacity;
+    } stack;
+
     void (*seek)(RDReader* self, u64 pos);
-    u64 (*get_pos)(const RDReader* self);
+    u64 (*tell)(const RDReader* self);
 } RDReader;
 
 RDReader* rd_i_reader_create(RDBuffer* buf);
