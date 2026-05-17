@@ -5,9 +5,11 @@
 typedef struct RDKBFieldSchema {
     const char* key;
     RDKBObjectKind kind;
+    const char* mod;
     bool required;
     const char* const* str_values;
 } RDKBFieldSchema;
 
+bool rd_i_kb_validate_function(const RDKBObject* obj);
 bool rd_i_kb_validate_type(const RDKBObject* obj);
-bool rd_i_kb_validate_member(const RDKBObject* obj);
+bool rd_i_kb_validate_param(const RDKBObject* obj);

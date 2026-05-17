@@ -11,6 +11,19 @@ static const char* const RD_KB_KIND_VALUES[] = {
     NULL,
 };
 
+static const char* const RD_KB_MOD_VALUES[] = {
+    "ptr",
+    "cptr",
+    NULL,
+};
+
+static const RDKBFieldSchema RD_KB_SCHEMA_FUNCTION[] = {
+    {.key = "cc", .kind = RD_KB_STR, .required = false},
+    {.key = "noret", .kind = RD_KB_BOOL, .required = false},
+    {.key = "ret", .kind = RD_KB_STR, .required = true},
+    {.key = "args", .kind = RD_KB_ARRAY, .required = true},
+};
+
 static const RDKBFieldSchema RD_KB_SCHEMA_TYPE[] = {
     {
         .key = "kind",
@@ -22,11 +35,17 @@ static const RDKBFieldSchema RD_KB_SCHEMA_TYPE[] = {
     {.key = "members", .kind = RD_KB_ARRAY, .required = true},
 };
 
-static const RDKBFieldSchema RD_KB_SCHEMA_MEMBER[] = {
+static const RDKBFieldSchema RD_KB_SCHEMA_PARAM[] = {
     {.key = "type", .kind = RD_KB_STR, .required = true},
     {.key = "name", .kind = RD_KB_STR, .required = true},
     {.key = "count", .kind = RD_KB_INT, .required = false},
-    {.key = "mod", .kind = RD_KB_STR, .required = false},
+
+    {
+        .key = "mod",
+        .kind = RD_KB_STR,
+        .required = false,
+        .str_values = RD_KB_MOD_VALUES,
+    },
 };
 
 static const char* _rd_kb_kind_str(RDKBObjectKind kind) {
@@ -135,12 +154,17 @@ static bool _rd_kb_validate_schema(const RDKBObject* obj,
     return true;
 }
 
+bool rd_i_kb_validate_function(const RDKBObject* obj) {
+    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_FUNCTION,
+                                  rd_count_of(RD_KB_SCHEMA_FUNCTION));
+}
+
 bool rd_i_kb_validate_type(const RDKBObject* obj) {
     return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_TYPE,
                                   rd_count_of(RD_KB_SCHEMA_TYPE));
 }
 
-bool rd_i_kb_validate_member(const RDKBObject* obj) {
-    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_MEMBER,
-                                  rd_count_of(RD_KB_SCHEMA_MEMBER));
+bool rd_i_kb_validate_param(const RDKBObject* obj) {
+    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_PARAM,
+                                  rd_count_of(RD_KB_SCHEMA_PARAM));
 }
