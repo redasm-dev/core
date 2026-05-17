@@ -42,7 +42,7 @@ static sqlite3_stmt* _rd_db_prepare_query(RDContext* ctx, int id,
 static sqlite3_stmt* _rd_db_prepare_typedef_params_query(RDContext* ctx) {
     return _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
         INSERT INTO TypeParams \
-            VALUES (:owner, :type, :name, :count, :mod, :member_idx) \
+            VALUES (:owner, :type, :name, :count, :modifier, :member_idx) \
         ON CONFLICT DO \
             UPDATE SET type = EXCLUDED.type, \
                        name = EXCLUDED.name, \
@@ -542,16 +542,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         const RDParam* m;
         usize i = 0;
         vect_each(m, &tdef->compound_) {
-            stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
-                    INSERT INTO TypeParams \
-                        VALUES (:owner, :type, :name, :count, :modifier, :member_idx) \
-                    ON CONFLICT DO \
-                        UPDATE SET type = EXCLUDED.type, \
-                                   count = EXCLUDED.count, \
-                                   modifier = EXCLUDED.modifier, \
-                                   member_idx = EXCLUDED.member_idx \
-                    ");
-
+            stmt = _rd_db_prepare_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":type", m->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", m->name);
@@ -578,7 +569,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             _rd_db_bind_param_str(ctx, stmt, ":type", tdef->func_.ret.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", ""); // return has no name
             _rd_db_bind_param_int(ctx, stmt, ":count", tdef->func_.ret.count);
-            _rd_db_bind_param_int(ctx, stmt, ":mod", tdef->func_.ret.mod);
+            _rd_db_bind_param_int(ctx, stmt, ":modifier", tdef->func_.ret.mod);
             _rd_db_bind_param_int(ctx, stmt, ":member_idx", 0);
             _rd_db_step(ctx, stmt);
         }
@@ -592,7 +583,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             _rd_db_bind_param_str(ctx, stmt, ":type", p->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", p->name);
             _rd_db_bind_param_int(ctx, stmt, ":count", p->type.count);
-            _rd_db_bind_param_int(ctx, stmt, ":mod", p->type.mod);
+            _rd_db_bind_param_int(ctx, stmt, ":modifier", p->type.mod);
             _rd_db_bind_param_int(ctx, stmt, ":member_idx", i++);
             _rd_db_step(ctx, stmt);
         }
