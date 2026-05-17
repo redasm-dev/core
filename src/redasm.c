@@ -213,6 +213,16 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
         return false;
     }
 
+    if(!p->ptr_size) {
+        LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
+        return false;
+    }
+
+    if(!p->int_size) {
+        LOG_FAIL("invalid integer-size for processor '%s'", p->id);
+        return false;
+    }
+
     if(rd_processor_find(p->id)) {
         LOG_WARN("processor '%s' already registered", p->id);
         return false;
