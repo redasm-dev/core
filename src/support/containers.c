@@ -33,6 +33,7 @@ void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
 
     // compact first: slide live elements back to index 0
     if(*head > 0) {
+        assert(*head + len == *cap);
         memmove(d, d + (*head * itemsz), len * itemsz);
         *head = 0;
     }
