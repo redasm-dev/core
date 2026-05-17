@@ -9,33 +9,33 @@
 // agnostic flags to be preserved during clears
 static const RDFlags FL_VALUE = 1U << 8;
 static const RDFlags FL_NAME = 1U << 9;
-static const RDFlags FL_COMMENT = 1U << 10;
-static const RDFlags FL_XREFOUT = 1U << 11;
-static const RDFlags FL_XREFIN = 1U << 12;
-static const RDFlags FL_EXPORTED = 1U << 13;
-static const RDFlags FL_IMPORTED = 1U << 14;
+static const RDFlags FL_NORET = 1U << 10;
+static const RDFlags FL_COMMENT = 1U << 11;
+static const RDFlags FL_XREFOUT = 1U << 12;
+static const RDFlags FL_XREFIN = 1U << 13;
+static const RDFlags FL_EXPORTED = 1U << 14;
+static const RDFlags FL_IMPORTED = 1U << 15;
 
 // covers bits 0-13 (NOTE: always add the last flag above)
 static const RDFlags FL_PRESERVE_MASK = (FL_IMPORTED << 1) - 1;
 static const RDFlags FL_HAS_INFO = FL_PRESERVE_MASK & ~(FL_VALUE | 0xFF);
 
-static const RDFlags FL_CODE = 1U << 15;
-static const RDFlags FL_DATA = 1U << 16;
-static const RDFlags FL_TAIL = 1U << 17;
+static const RDFlags FL_CODE = 1U << 16;
+static const RDFlags FL_DATA = 1U << 17;
+static const RDFlags FL_TAIL = 1U << 18;
 
 // [CODE] bits
-static const RDFlags FL_FLOW = 1U << 18;
-static const RDFlags FL_JUMP = 1U << 19;
-static const RDFlags FL_JMPDST = 1U << 20;
-static const RDFlags FL_CALL = 1U << 21;
-static const RDFlags FL_FUNC = 1U << 22;
-static const RDFlags FL_NORET = 1U << 23;
+static const RDFlags FL_FLOW = 1U << 19;
+static const RDFlags FL_JUMP = 1U << 20;
+static const RDFlags FL_JMPDST = 1U << 21;
+static const RDFlags FL_CALL = 1U << 22;
+static const RDFlags FL_FUNC = 1U << 23;
 static const RDFlags FL_COND = 1U << 24;
 static const RDFlags FL_DSLOT = 1U << 25;
 static const RDFlags FL_OPOVER = 1U << 26;
 
 // [DATA] bits
-static const RDFlags FL_TYPE = 1U << 18;
+static const RDFlags FL_TYPE = 1U << 19;
 
 // transient bits
 static const RDFlags FL_QUEUED = 1U << 31; // address is pending in a queue
@@ -75,9 +75,7 @@ bool rd_i_flags_has_func(RDFlags self) {
     return (self & FL_CODE) && (self & FL_FUNC);
 }
 
-bool rd_i_flags_has_noret(RDFlags self) {
-    return rd_i_flags_has_func(self) && (self & FL_NORET);
-}
+bool rd_i_flags_has_noret(RDFlags self) { return (self & FL_NORET); }
 
 bool rd_i_flags_has_cond(RDFlags self) {
     return (self & FL_CODE) && (self & FL_COND);
@@ -156,7 +154,6 @@ void rd_i_flags_set_func(RDFlags* self) {
 }
 
 void rd_i_flags_set_noret(RDFlags* self) {
-    assert(rd_i_flags_has_func(*self));
     *self |= FL_NORET;
     *self &= ~FL_FLOW; // NORET and FLOW are mutually exclusive
 }

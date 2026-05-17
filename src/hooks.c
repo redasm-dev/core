@@ -8,7 +8,7 @@
         if(!name) return;                                                      \
                                                                                \
         const char* interned = rd_i_strpool_intern(&ctx->strings, name);       \
-        size_t _i = vect_lower_bound(interned, hooks, searchcb);               \
+        size_t _i = vect_lower_bound(hooks, interned, searchcb);               \
                                                                                \
         while(_i < vect_length(hooks) &&                                       \
               vect_at(hooks, _i)->name == interned) {                          \
@@ -22,7 +22,7 @@
     do {                                                                       \
         if(!name) return false;                                                \
         const char* interned = rd_i_strpool_intern(&ctx->strings, name);       \
-        size_t _i = vect_lower_bound(interned, hooks, searchcb);               \
+        size_t _i = vect_lower_bound(hooks, interned, searchcb);               \
                                                                                \
         if(_i < vect_length(hooks) && vect_at(hooks, _i)->name == interned) {  \
             it = vect_at(hooks, _i);                                           \
@@ -120,7 +120,7 @@ bool rd_register_hook(RDContext* ctx, const char* name, RDHook h) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
     size_t i =
-        vect_lower_bound(interned, &ctx->hooks->general, _rd_hook_search);
+        vect_lower_bound(&ctx->hooks->general, interned, _rd_hook_search);
 
     // check for duplicate
     while(i < vect_length(&ctx->hooks->general) &&
@@ -148,7 +148,7 @@ bool rd_register_instruction_hook(RDContext* ctx, const char* name,
 
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
-    size_t i = vect_lower_bound(interned, &ctx->hooks->instruction,
+    size_t i = vect_lower_bound(&ctx->hooks->instruction, interned,
                                 _rd_instruction_hook_search);
 
     // check for duplicate
@@ -178,7 +178,7 @@ bool rd_register_address_hook(RDContext* ctx, const char* name,
 
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
-    size_t i = vect_lower_bound(interned, &ctx->hooks->address,
+    size_t i = vect_lower_bound(&ctx->hooks->address, interned,
                                 _rd_address_hook_search);
 
     // check for duplicate
@@ -208,7 +208,7 @@ bool rd_register_xref_hook(RDContext* ctx, const char* name, RDXRefHook h) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
     size_t i =
-        vect_lower_bound(interned, &ctx->hooks->xref, _rd_xref_hook_search);
+        vect_lower_bound(&ctx->hooks->xref, interned, _rd_xref_hook_search);
 
     // check for duplicate
     while(i < vect_length(&ctx->hooks->xref) &&
@@ -237,7 +237,7 @@ bool rd_register_render_mnemonic_hook(RDContext* ctx, const char* name,
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
     size_t i =
-        vect_lower_bound(interned, &ctx->hooks->render, _rd_render_hook_search);
+        vect_lower_bound(&ctx->hooks->render, interned, _rd_render_hook_search);
 
     if(i < vect_length(&ctx->hooks->render) &&
        vect_at(&ctx->hooks->render, i)->name == interned) {
@@ -264,7 +264,7 @@ bool rd_register_render_operand_hook(RDContext* ctx, const char* name,
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
     size_t i =
-        vect_lower_bound(interned, &ctx->hooks->render, _rd_render_hook_search);
+        vect_lower_bound(&ctx->hooks->render, interned, _rd_render_hook_search);
 
     if(i < vect_length(&ctx->hooks->render) &&
        vect_at(&ctx->hooks->render, i)->name == interned) {

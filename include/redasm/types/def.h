@@ -15,5 +15,6 @@ RD_API bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char*
 RD_API bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value, RDContext* ctx);
 RD_API bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name, usize n, RDTypeModifier mod, RDContext* ctx);
 RD_API bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n, RDTypeModifier mod, RDContext* ctx);
+RD_API bool rd_typedef_set_noret(RDTypeDef* self, bool b);
 RD_API bool rd_typedef_register(RDTypeDef* self, RDContext* ctx);
 // clang-format on

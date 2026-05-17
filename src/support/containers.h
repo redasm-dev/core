@@ -46,18 +46,7 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_clear(self) (self)->length = 0
 
-#define vect_del(self, it, n)                                                  \
-    do {                                                                       \
-        assert((it) >= (self)->data &&                                         \
-               (it) + (n) <= (self)->data + (self)->length &&                  \
-               "vect_del: out of bounds");                                     \
-        memmove((it), (it) + (n),                                              \
-                ((self)->data + (self)->length - (it) - (n)) *                 \
-                    sizeof(*(self)->data));                                    \
-        (self)->length -= (n);                                                 \
-    } while(0)
-
-#define vect_del_at(self, i, n)                                                \
+#define vect_del(self, i, n)                                                   \
     do {                                                                       \
         assert((i) + (n) <= (self)->length && "vect_del_at: out of bounds");   \
         memmove(&(self)->data[(i)], &(self)->data[(i) + (n)],                  \
@@ -65,9 +54,13 @@ typedef bool (*VectPredicate)(const void*);
         (self)->length -= (n);                                                 \
     } while(0)
 
-#define vect_at(slice, n)                                                      \
-    (assert((usize)(n) < (slice)->length && "vect_at: index out of bounds"),   \
-     &(slice)->data[(n)])
+#define vect_at(self, n)                                                       \
+    (assert((usize)(n) < (self)->length && "vect_at: index out of bounds"),    \
+     &(self)->data[(n)])
+
+#define vect_idx(self, it)                                                     \
+    _vect_idx((const void*)(it), (const void*)(self)->data, (self)->length,    \
+              sizeof(*(self)->data))
 
 #define vect_sort(self, cb)                                                    \
     do {                                                                       \
@@ -77,20 +70,19 @@ typedef bool (*VectPredicate)(const void*);
         }                                                                      \
     } while(0)
 
-#define vect_bsearch(key, self, cb)                                            \
-    ((self)->data ? bsearch((void*)(key), (void*)(self)->data, (self)->length, \
-                            sizeof(*(self)->data), (VectCompare)(cb))          \
-                  : NULL);
+#define vect_bsearch(self, key, cb)                                            \
+    _vect_bsearch((const void*)(key), (const void*)(self)->data,               \
+                  (self)->length, sizeof(*(self)->data), (VectCompare)(cb))
 
 #define vect_stable_part(self, pred)                                           \
     _vect_stable_part((void*)(self)->data, (self)->length,                     \
                       sizeof(*(self)->data), (VectPredicate)(pred));
 
-#define vect_lower_bound(key, self, cb)                                        \
+#define vect_lower_bound(self, key, cb)                                        \
     _vect_lower_bound((const void*)(key), (void*)(self)->data, (self)->length, \
                       sizeof(*(self)->data), (VectCompare)(cb))
 
-#define vect_upper_bound(key, self, cb)                                        \
+#define vect_upper_bound(self, key, cb)                                        \
     _vect_upper_bound((const void*)(key), (void*)(self)->data, (self)->length, \
                       sizeof(*(self)->data), (VectCompare)(cb))
 
@@ -313,24 +305,30 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
         *(b) = _swap_tmp;                                                      \
     } while(0)
 
-void _vect_grow(void** data, size_t* cap, size_t len, size_t itemsz);
-void _vect_reserve(void** data, size_t* currcap, size_t newcap, size_t itemsz);
+void _vect_grow(void** data, size_t* cap, size_t len, size_t elem_size);
+void _vect_reserve(void** data, size_t* currcap, size_t newcap,
+                   size_t elem_size);
 void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
-                 size_t itemsz);
-void _queue_reserve(void** data, size_t* currcap, size_t newcap, size_t itemsz);
+                 size_t elem_size);
+void _queue_reserve(void** data, size_t* currcap, size_t newcap,
+                    size_t elem_size);
 void _str_append(char** data, size_t* cap, size_t* len, const char* cstr);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
-size_t _vect_stable_part(void* data, size_t len, size_t itemsz,
+size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred);
-size_t _vect_lower_bound(const void* key, void* data, size_t len, size_t itemsz,
-                         VectCompare cb);
-size_t _vect_upper_bound(const void* key, void* data, size_t len, size_t itemsz,
-                         VectCompare cb);
+size_t _vect_lower_bound(const void* key, void* data, size_t len,
+                         size_t elem_size, VectCompare cb);
+size_t _vect_upper_bound(const void* key, void* data, size_t len,
+                         size_t elem_size, VectCompare cb);
+size_t _vect_bsearch(const void* key, const void* data, size_t length,
+                     size_t elem_size, VectCompare cb);
+size_t _vect_idx(const void* p, const void* data, size_t length,
+                 size_t elem_size);
 void _hmap_rehash(void** data, size_t* capacity, size_t newcapacity,
-                  size_t length, size_t itemsz);
-void* _hmap_get(void* data, size_t capacity, const void* entry, size_t itemsz,
-                HMapHash hash_fn, HMapEqual eq_fn);
+                  size_t length, size_t elem_size);
+void* _hmap_get(void* data, size_t capacity, const void* entry,
+                size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);
 void _hmap_set(void** data, size_t* capacity, size_t* length, const void* entry,
-               size_t itemsz, HMapHash hash_fn, HMapEqual eq_fn);
+               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);
 void _hmap_del(void* data, size_t capacity, size_t* length, const void* entry,
-               size_t itemsz, HMapHash hash_fn, HMapEqual eq_fn);
+               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);

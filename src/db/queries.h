@@ -32,8 +32,11 @@ enum {
     RD_QUERY_SET_TYPEDEF_ENUM,
     RD_QUERY_SET_TYPEDEF_FUNC,
     RD_QUERY_GET_TYPEDEF,
+    RD_QUERY_GET_TYPEDEF_PARAMS,
     RD_QUERY_GET_TYPEDEF_COMPOUND,
     RD_QUERY_GET_TYPEDEF_ENUM,
+    RD_QUERY_GET_TYPEDEF_FUNC,
+    RD_QUERY_GET_TYPEDEF_FUNC_NORET,
     RD_QUERY_SET_TYPE,
     RD_QUERY_GET_TYPE,
     RD_QUERY_DEL_TYPE,
@@ -101,6 +104,8 @@ void _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
 void _rd_i_db_query_del_type_range(RDContext* ctx, RDAddress startaddr,
                                    RDAddress endaddr);
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
+RDTypeDefVect* _rd_i_db_query_get_typedef_func_noret(RDContext* ctx,
+                                                     RDTypeDefVect* v);
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address);
 void _rd_i_db_query_set_comment(RDContext* ctx, RDAddress address,

@@ -157,10 +157,22 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
     return true;
 }
 
+bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
+    if(self->kind != RD_TKIND_FUNC) {
+        LOG_FAIL("cannot noret to '%s'", self->name);
+        return false;
+    }
+
+    self->func_.is_noret = b;
+    return true;
+}
+
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
-    RDTypeDef** it;
-    vect_each(it, &ctx->types) {
-        if(strcmp((*it)->name, name) == 0) return *it;
+    for(usize i = 0; i < rd_count_of(ctx->types); i++) {
+        RDTypeDef** it;
+        vect_each(it, &ctx->types[i]) {
+            if(strcmp((*it)->name, name) == 0) return *it;
+        }
     }
 
     return NULL;
@@ -251,7 +263,17 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
         unreachable();
 
     rd_i_db_set_type_def(ctx, self);
-    vect_push(&ctx->types, self);
+    vect_push(&ctx->types[self->kind], self);
+
+    if(self->kind == RD_TKIND_FUNC && self->func_.is_noret) {
+        usize idx = vect_lower_bound(&ctx->noret_names, &self->name,
+                                     rd_i_strcmp_intern_pred);
+
+        if(idx == vect_length(&ctx->noret_names) ||
+           self->name != *vect_at(&ctx->noret_names, idx)) {
+            vect_ins(&ctx->noret_names, idx, self->name);
+        }
+    }
 
     if(self->kind != RD_TKIND_PRIM) {
         LOG_INFO("%s definition '%s' registered",

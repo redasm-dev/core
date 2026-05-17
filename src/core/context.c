@@ -239,22 +239,25 @@ const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
     const RDFunctionChunkVect* chunks = &self->listing.chunks;
     if(vect_is_empty(chunks)) return NULL;
 
-    const RDFunctionChunk** chunk = (const RDFunctionChunk**)vect_bsearch(
-        &address, chunks, rd_i_function_find_chunk_pred);
-    if(!chunk) return NULL;
+    usize idx = vect_bsearch(chunks, &address, rd_i_function_find_chunk_pred);
+    if(idx == vect_length(chunks)) return NULL;
 
-    const RDFunction** f = (const RDFunction**)vect_bsearch(
-        &(*chunk)->func_address, &self->listing.functions,
-        rd_i_function_find_pred);
-    return f ? *f : NULL;
+    const RDFunctionChunk* chunk = *vect_at(chunks, idx);
+
+    idx = vect_bsearch(&self->listing.functions, &chunk->func_address,
+                       rd_i_function_find_pred);
+    if(idx == vect_length(&self->listing.functions)) return NULL;
+
+    return *vect_at(&self->listing.functions, idx);
 }
 
 bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
     const RDMappingVect* mappings = rd_i_db_get_mappings(self);
 
-    RDInputMapping* m = (RDInputMapping*)vect_bsearch(&address, mappings,
-                                                      rd_i_mapping_find_pred);
-    if(!m) return false;
+    usize idx = vect_bsearch(mappings, &address, rd_i_mapping_find_pred);
+    if(idx == vect_length(mappings)) return NULL;
+
+    RDInputMapping* m = vect_at(mappings, idx);
     if(offset) *offset = (address - m->start_address) + m->offset;
     return true;
 }
@@ -486,14 +489,17 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->xrefs_from_type);
     hmap_destroy(&self->engine.current.registers);
     vect_destroy(&self->lift_buf);
+    vect_destroy(&self->noret_names);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
     rd_i_db_destroy(self->db);
 
-    RDTypeDef** def;
-    vect_each(def, &self->types) rd_typedef_destroy(*def);
-    vect_destroy(&self->types);
+    for(unsigned i = 0; i < rd_count_of(self->types); i++) {
+        RDTypeDef** def;
+        vect_each(def, &self->types[i]) rd_typedef_destroy(*def);
+        vect_destroy(&self->types[i]);
+    }
 
     RDAnalyzerItem** ai;
     vect_each(ai, &self->analyzerplugins) rd_free(*ai);
@@ -928,18 +934,21 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
         return false;
     }
 
-    if(name && imp->module) {
-        name = rd_i_format(&self->imp_buf, "%s_%s", imp->module, name);
-    }
-    else if(imp->ordinal.has_value) {
+    if(imp->ordinal.has_value) {
         if(imp->module) {
-            name = rd_i_format(&self->imp_buf, "%s_Ordinal_%" PRIu32,
-                               imp->module, imp->ordinal.value);
-        }
-        else {
-            name = rd_i_format(&self->imp_buf, "Ordinal_%" PRIu32,
+            name = rd_i_format(&self->imp_buf, "__imp_%s_%" PRIu32, imp->module,
                                imp->ordinal.value);
         }
+        else {
+            name = rd_i_format(&self->imp_buf, "__imp__%" PRIu32,
+                               imp->ordinal.value);
+        }
+    }
+    else if(name)
+        name = rd_i_format(&self->imp_buf, "__imp_%s", name);
+    else {
+        rd_i_add_problem(self, address, address, "invalid import name");
+        return false;
     }
 
     if(name) rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);

@@ -39,7 +39,7 @@ static sqlite3_stmt* _rd_db_prepare_query(RDContext* ctx, int id,
     return ctx->db->queries[id];
 }
 
-static sqlite3_stmt* _rd_db_prepare_typedef_params_query(RDContext* ctx) {
+static sqlite3_stmt* _rd_db_prepare_set_typedef_params_query(RDContext* ctx) {
     return _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
         INSERT INTO TypeParams \
             VALUES (:owner, :type, :name, :count, :modifier, :member_idx) \
@@ -50,6 +50,32 @@ static sqlite3_stmt* _rd_db_prepare_typedef_params_query(RDContext* ctx) {
                        modifier = EXCLUDED.modifier, \
                        member_idx = EXCLUDED.member_idx \
         ");
+}
+
+static sqlite3_stmt* _rd_db_prepare_get_typedef_params_query(RDContext* ctx) {
+    return _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPEDEF_PARAMS, "\
+        SELECT type, name, count, modifier, member_idx \
+        FROM TypeParams \
+        WHERE owner = :owner \
+        ORDER BY member_idx \
+        ");
+}
+
+static int _rd_db_step_params(sqlite3_stmt* stmt, RDContext* ctx, RDParam* p) {
+    if(_rd_db_step(ctx, stmt) != SQLITE_ROW) return -1;
+
+    p->type = (RDType){
+        .name = rd_i_strpool_intern(&ctx->strings,
+                                    (const char*)sqlite3_column_text(stmt, 0)),
+        .count = sqlite3_column_int(stmt, 2),
+        .mod = (RDTypeModifier)sqlite3_column_int(stmt, 3),
+
+    };
+
+    p->name = rd_i_strpool_intern(&ctx->strings,
+                                  (const char*)sqlite3_column_text(stmt, 1));
+
+    return sqlite3_column_int(stmt, 4);
 }
 
 static void _rd_db_bind_param_null(const RDContext* ctx, sqlite3_stmt* stmt,
@@ -542,7 +568,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         const RDParam* m;
         usize i = 0;
         vect_each(m, &tdef->compound_) {
-            stmt = _rd_db_prepare_typedef_params_query(ctx);
+            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":type", m->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", m->name);
@@ -555,7 +581,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     else if(tdef->kind == RD_TKIND_ENUM) {
         const RDEnumCase* c;
         vect_each(c, &tdef->enum_) {
-            stmt = _rd_db_prepare_typedef_params_query(ctx);
+            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":name", c->name);
             _rd_db_bind_param_int(ctx, stmt, ":value", c->value);
@@ -564,7 +590,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     }
     else if(tdef->kind == RD_TKIND_FUNC) {
         if(!rd_i_is_void(&tdef->func_.ret)) { // return type at member_idx=0
-            stmt = _rd_db_prepare_typedef_params_query(ctx);
+            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":type", tdef->func_.ret.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", ""); // return has no name
@@ -578,7 +604,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         const RDParam* p;
         usize i = 1;
         vect_each(p, &tdef->func_.args) {
-            stmt = _rd_db_prepare_typedef_params_query(ctx);
+            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":type", p->type.name);
             _rd_db_bind_param_str(ctx, stmt, ":name", p->name);
@@ -590,6 +616,53 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     }
     else
         unreachable();
+}
+
+RDTypeDefVect* _rd_i_db_query_get_typedef_func_noret(RDContext* ctx,
+                                                     RDTypeDefVect* v) {
+    RDTypeDef** it;
+    vect_each(it, v) { rd_typedef_destroy(*it); }
+    vect_clear(v);
+
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPEDEF_FUNC_NORET, "\
+        SELECT name \
+        FROM TypeDefs \
+        WHERE kind = :kind \
+        AND is_noret = TRUE \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":kind", RD_TKIND_FUNC);
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        const char* interned = rd_i_strpool_intern(
+            &ctx->strings, (const char*)sqlite3_column_text(stmt, 0));
+
+        RDTypeDef* tdef = rd_typedef_create_func(interned, ctx);
+        rd_typedef_set_noret(tdef, true);
+
+        sqlite3_stmt* param_stmt = _rd_db_prepare_get_typedef_params_query(ctx);
+        _rd_db_bind_param_str(ctx, param_stmt, ":owner", interned);
+
+        int member_idx = -1;
+        RDParam p;
+
+        while((member_idx = _rd_db_step_params(param_stmt, ctx, &p)) != -1) {
+            if(member_idx == 0) { // return value
+                rd_typedef_set_ret(tdef, p.type.name, p.type.count, p.type.mod,
+                                   ctx);
+
+                continue;
+            }
+
+            rd_typedef_add_arg(tdef, p.type.name, p.name, p.type.count,
+                               p.type.mod, ctx);
+        }
+
+        vect_push(v, tdef);
+    }
+
+    return v;
 }
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address) {

@@ -44,6 +44,14 @@ static const RDBaseParams RD_BASE_DEFAULTS = {
     .fill = 0,
 };
 
+int rd_i_strcmp_pred(const void* a, const void* b) {
+    return strcmp(*(const char**)a, *(const char**)b);
+}
+
+int rd_i_strcmp_intern_pred(const void* a, const void* b) {
+    return (*(const char**)a) - (*(const char**)b);
+}
+
 RDByteBuffer* rd_i_fromdata(const char* bytes, usize n) {
     RDByteBuffer* b = rd_i_buffer_create(n);
     memcpy(b->data, bytes, n);
@@ -68,6 +76,14 @@ bool rd_i_file_exists(const char* filepath) {
 
     struct stat st;
     return stat(filepath, &st) == 0;
+}
+
+const char* rd_i_strip_prefix(const char* s) {
+    if(!s) return s;
+
+    if(strstr(s, "__imp_") == s) s += sizeof("__imp_") - 1;
+
+    return s;
 }
 
 const char* rd_i_tolower(char* s) {

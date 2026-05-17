@@ -63,11 +63,13 @@ typedef struct RDContext {
     RDListing listing;
     RDHooks* hooks;
 
+    RDTypeDefVect types[RD_TKIND_COUNT];
+
     struct {
-        RDTypeDef** data;
+        const char** data;
         usize length;
         usize capacity;
-    } types;
+    } noret_names;
 
     struct {
         RDAddress value;

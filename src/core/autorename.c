@@ -2,6 +2,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/logging.h"
+#include "support/utils.h"
 #include <rdil/rdil.h>
 
 #define RD_AUTORENAME_DEPTH 8
@@ -14,8 +15,19 @@ static void _rd_autorename_trampoline(RDContext* ctx, const RDFunction* f,
 
     for(int depth = 0; depth < RD_AUTORENAME_DEPTH; depth++) {
         if(rd_i_get_name(ctx, target, false, &n)) {
-            const char* new_name = rd_i_format(namebuf, "j_%s", n.value);
-            rd_auto_name(ctx, f->address, new_name);
+            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, target);
+            assert(seg);
+
+            usize idx = rd_i_address2index(seg, target);
+            const char* name = NULL;
+
+            if(rd_flagsbuffer_has_imported(seg->flags, idx))
+                name = rd_i_strip_prefix(n.value);
+            else
+                name = rd_i_format(namebuf, "j_%s", n.value);
+
+            assert(name);
+            rd_auto_name(ctx, f->address, name);
             return;
         }
 

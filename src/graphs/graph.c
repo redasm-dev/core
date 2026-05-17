@@ -101,7 +101,7 @@ void rd_i_graph_remove_edges(RDGraph* self, RDGraphNode n) {
         RDGraphEdge* e = vect_at(&self->edges, i);
 
         if(e->src == n || e->dst == n)
-            vect_del(&self->edges, e, 1);
+            vect_del(&self->edges, vect_idx(&self->edge_attributes, e), 1);
         else
             i++;
     }
@@ -165,8 +165,8 @@ void rd_graph_remove_node(RDGraph* self, RDGraphNode n) {
     RDGraphNode* it;
     vect_each(it, &self->nodes) {
         if(*it == n) {
-            vect_del(&self->nodes, it, 1);
-            vect_del_at(&self->node_attributes, rd_i_node2index(n), 1);
+            vect_del(&self->nodes, vect_idx(&self->nodes, it), 1);
+            vect_del(&self->node_attributes, rd_i_node2index(n), 1);
             break;
         }
     }
@@ -178,12 +178,13 @@ void rd_graph_remove_edge(RDGraph* self, const RDGraphEdge* e) {
     RDGraphEdge* it;
     vect_each(it, &self->edges) {
         if(it->src == e->src && it->dst == e->dst) {
-            vect_del(&self->edges, it, 1);
+            vect_del(&self->edges, vect_idx(&self->edges, it), 1);
 
             RDEdgeAttributes* ea = _rd_graph_find_edge_attributes(self, e);
             assert(ea && "invalid edge attributes");
             _rd_graph_destroy_edge_attribute(ea);
-            vect_del(&self->edge_attributes, ea, 1);
+            vect_del(&self->edge_attributes,
+                     vect_idx(&self->edge_attributes, ea), 1);
             break;
         }
     }

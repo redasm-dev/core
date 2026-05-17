@@ -198,10 +198,13 @@ bool rd_kb_load_functions(const char* kb, RDContext* ctx) {
         const RDKBObject* args = rd_kbobject_get_array(f, "args");
         assert(args);
 
-        const char* ret = rd_kbobject_get_str(f, "ret");
-        assert(ret);
+        bool is_noret = false;
+        rd_kbobject_get_bool(f, "noret", &is_noret);
+        rd_typedef_set_noret(tdef, is_noret);
 
         // TODO: davide - fully express type
+        const char* ret = rd_kbobject_get_str(f, "ret");
+        assert(ret);
         rd_typedef_set_ret(tdef, ret, 0, RD_TYPE_NONE, ctx);
 
         const RDKBObject* a;

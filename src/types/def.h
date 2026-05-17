@@ -8,6 +8,8 @@ typedef enum {
     RD_TKIND_UNION,
     RD_TKIND_ENUM,
     RD_TKIND_FUNC,
+
+    RD_TKIND_COUNT,
 } RDTypeKind;
 
 typedef struct RDParam {
@@ -50,6 +52,12 @@ typedef struct RDTypeDef {
         RDFunctionType func_;
     };
 } RDTypeDef;
+
+typedef struct RDTypeDefVect {
+    RDTypeDef** data;
+    usize length;
+    usize capacity;
+} RDTypeDefVect;
 
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef);

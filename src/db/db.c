@@ -141,9 +141,11 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
 
 const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
                                           RDAddress address) {
-    RDSegmentFull** res = (RDSegmentFull**)vect_bsearch(
-        &address, &ctx->db->segments, _rd_i_db_segment_find_pred);
-    return res ? *res : NULL;
+    usize idx =
+        vect_bsearch(&ctx->db->segments, &address, _rd_i_db_segment_find_pred);
+    if(idx == vect_length(&ctx->db->segments)) return NULL;
+
+    return *vect_at(&ctx->db->segments, idx);
 }
 
 const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx) {
@@ -283,6 +285,11 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     _rd_i_db_query_set_type_def(ctx, tdef);
 }
 
+RDTypeDefVect* rd_i_db_get_typedef_func_noret(RDContext* ctx,
+                                              RDTypeDefVect* v) {
+    return _rd_i_db_query_get_typedef_func_noret(ctx, v);
+}
+
 void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
                       usize count, RDTypeModifier mod, RDConfidence c) {
     _rd_i_db_query_set_type(ctx, address, name, count, mod, c);
@@ -339,7 +346,7 @@ bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
     };
 
     RDSegmentReg key = {.address = address};
-    usize idx = vect_lower_bound(&key, rv, _rd_i_db_segmentreg_cmp);
+    usize idx = vect_lower_bound(rv, &key, _rd_i_db_segmentreg_cmp);
 
     if(idx < vect_length(rv) && vect_at(rv, idx)->address == address) {
         if(c < vect_at(rv, idx)->confidence) return false;
@@ -367,7 +374,7 @@ bool rd_i_db_del_sregval(RDContext* ctx, RDAddress address, const char* regname,
     };
 
     RDSegmentReg key = {.address = address};
-    usize idx = vect_lower_bound(&key, rv, _rd_i_db_segmentreg_cmp);
+    usize idx = vect_lower_bound(rv, &key, _rd_i_db_segmentreg_cmp);
 
     if(idx < vect_length(rv) && vect_at(rv, idx)->address == address) {
         if(c < vect_at(rv, idx)->confidence) return false;
@@ -388,7 +395,7 @@ bool rd_i_db_get_sregval(RDContext* ctx, RDAddress address, const char* regname,
 
     // upper_bound then step back: largest address <= query_address
     RDSegmentReg key = {.address = address};
-    usize idx = vect_upper_bound(&key, rv, _rd_i_db_segmentreg_cmp);
+    usize idx = vect_upper_bound(rv, &key, _rd_i_db_segmentreg_cmp);
     if(!idx) return false;
 
     const RDSegmentReg* e = &rv->data[idx - 1];
