@@ -250,6 +250,9 @@ fail:
 void rd_typedef_destroy(RDTypeDef* self) {
     if(rd_i_typedef_is_compound(self))
         vect_destroy(&self->compound_);
+    else if(self->kind == RD_TKIND_FUNC) {
+        vect_destroy(&self->func_.args);
+    }
     else if(self->kind == RD_TKIND_ENUM) {
         vect_destroy(&self->enum_);
     }
