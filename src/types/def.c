@@ -51,6 +51,19 @@ static RDTypeDef* _rd_typedef_create(RDContext* ctx, const char* name,
     return self;
 }
 
+static const char* _rd_typedef_kind_str(RDTypeKind kind) {
+    switch(kind) {
+        case RD_TKIND_PRIM: return "primitive";
+        case RD_TKIND_STRUCT: return "struct";
+        case RD_TKIND_UNION: return "union";
+        case RD_TKIND_ENUM: return "enum";
+        case RD_TKIND_FUNC: return "function";
+        default: break;
+    }
+
+    return "???";
+}
+
 RDTypeDef* rd_typedef_create_func(const char* name, RDContext* ctx) {
     return _rd_typedef_create(ctx, name, RD_TKIND_FUNC);
 }
@@ -239,7 +252,12 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
 
     rd_i_db_set_type_def(ctx, self);
     vect_push(&ctx->types, self);
-    LOG_DEBUG("definition '%s' registered", self->name);
+
+    if(self->kind != RD_TKIND_PRIM) {
+        LOG_INFO("%s definition '%s' registered",
+                 _rd_typedef_kind_str(self->kind), self->name);
+    }
+
     return true;
 
 fail:
