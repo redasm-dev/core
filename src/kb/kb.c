@@ -133,7 +133,7 @@ static bool _rd_kb_load_struct(const char* name, const RDKBObject* def,
     return rd_typedef_register(tdef, ctx);
 }
 
-static void rd_i_db_apply_noret(RDContext* ctx) {
+static void _rd_kb_apply_noret(RDContext* ctx) {
     const char** it;
     vect_each(it, &ctx->kb->noret_names) {
         RDAddress address;
@@ -145,6 +145,86 @@ static void rd_i_db_apply_noret(RDContext* ctx) {
         usize idx = rd_i_address2index(seg, address);
         rd_i_set_noret(ctx, seg, idx);
     }
+}
+
+static void _rd_kb_load_dependencies(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* manifest = rd_kbobject_get_table(root, "manifest");
+    if(!manifest) return;
+
+    const RDKBObject* dependencies =
+        rd_kbobject_get_array(manifest, "dependencies");
+    if(!dependencies) return;
+
+    const RDKBObject* dep;
+    rd_kbobject_each(dep, dependencies) {
+        const char* dep_path = rd_kbobject_to_str(dep);
+        if(dep_path) rd_kb_load(ctx, dep_path);
+    }
+}
+
+static bool _rd_kb_load_types(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* types = rd_kbobject_get_table(root, "types");
+    if(!types) return false;
+
+    const char* name;
+    const RDKBObject* def;
+    rd_kbobject_each_pair(name, def, types) {
+        if(!rd_i_kb_validate_type(def)) continue;
+
+        const char* kind = rd_kbobject_get_str(def, "kind");
+
+        if(!strcmp(kind, "struct"))
+            _rd_kb_load_struct(name, def, ctx);
+        else
+            unreachable();
+    }
+
+    return true;
+}
+
+static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* functions = rd_kbobject_get_table(root, "functions");
+    if(!functions) return false;
+
+    const char* name;
+    const RDKBObject* f;
+    rd_kbobject_each_pair(name, f, functions) {
+        if(!rd_i_kb_validate_function(f)) continue;
+
+        RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
+        bool is_noret = false;
+        rd_kbobject_get_bool(f, "noret", &is_noret);
+        rd_typedef_set_noret(tdef, is_noret);
+
+        const RDKBObject* ret = rd_kbobject_get(f, "ret");
+        assert(ret);
+
+        RDType ret_type;
+        _rd_kb_get_ret(ret, &ret_type, ctx);
+        rd_typedef_set_ret(tdef, ret_type.name, ret_type.count, ret_type.mod,
+                           ctx);
+
+        const RDKBObject* args = rd_kbobject_get_array(f, "args");
+        assert(args);
+
+        const RDKBObject* a;
+        rd_kbobject_each(a, args) {
+            RDType t;
+            const char* arg_name = _rd_kb_get_param(a, &t, ctx);
+
+            if(!arg_name) {
+                rd_typedef_destroy(tdef);
+                return false;
+            }
+
+            rd_typedef_add_arg(tdef, t.name, arg_name, t.count, t.mod, ctx);
+        }
+
+        rd_typedef_register(tdef, ctx);
+    }
+
+    _rd_kb_apply_noret(ctx);
+    return true;
 }
 
 void rd_i_kb_paths_init(const char** kb_paths) {
@@ -201,7 +281,11 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     if(kbfile) return kbfile->root;
 
     const char* kb_path = _rd_kb_find_path(kb);
-    if(!kb_path) return NULL;
+
+    if(!kb_path) {
+        LOG_FAIL("KB '%s' not found", kb);
+        return NULL;
+    }
 
     toml_result_t toml = toml_parse_file_ex(kb_path);
 
@@ -215,78 +299,12 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     kbfile->toml = toml;
     kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
 
+    vect_push(&ctx->kb->files, kbfile); // avoid recursion
+    _rd_kb_load_dependencies(kbfile->root, ctx);
+
     LOG_INFO("loading KB '%s'", kb);
-    vect_push(&ctx->kb->files, kbfile);
+    _rd_kb_load_types(kbfile->root, ctx);
+    _rd_kb_load_functions(kbfile->root, ctx);
+
     return kbfile->root;
-}
-
-bool rd_kb_load_types(RDContext* ctx, const char* kb) {
-    const RDKBObject* kbfile = rd_kb_load(ctx, kb);
-    if(!kbfile) return false;
-
-    const RDKBObject* types = rd_kbobject_get_table(kbfile, "types");
-    if(!types) return false;
-
-    const char* name;
-    const RDKBObject* def;
-    rd_kbobject_each_pair(name, def, types) {
-        if(!rd_i_kb_validate_type(def)) continue;
-
-        const char* kind = rd_kbobject_get_str(def, "kind");
-
-        if(!strcmp(kind, "struct"))
-            _rd_kb_load_struct(name, def, ctx);
-        else
-            unreachable();
-    }
-
-    return true;
-}
-
-bool rd_kb_load_functions(RDContext* ctx, const char* kb) {
-    const RDKBObject* kbfile = rd_kb_load(ctx, kb);
-    if(!kbfile) return false;
-
-    const RDKBObject* functions = rd_kbobject_get_table(kbfile, "functions");
-    if(!functions) return false;
-
-    const char* name;
-    const RDKBObject* f;
-    rd_kbobject_each_pair(name, f, functions) {
-        if(!rd_i_kb_validate_function(f)) continue;
-
-        RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
-        bool is_noret = false;
-        rd_kbobject_get_bool(f, "noret", &is_noret);
-        rd_typedef_set_noret(tdef, is_noret);
-
-        const RDKBObject* ret = rd_kbobject_get(f, "ret");
-        assert(ret);
-
-        RDType ret_type;
-        _rd_kb_get_ret(ret, &ret_type, ctx);
-        rd_typedef_set_ret(tdef, ret_type.name, ret_type.count, ret_type.mod,
-                           ctx);
-
-        const RDKBObject* args = rd_kbobject_get_array(f, "args");
-        assert(args);
-
-        const RDKBObject* a;
-        rd_kbobject_each(a, args) {
-            RDType t;
-            const char* arg_name = _rd_kb_get_param(a, &t, ctx);
-
-            if(!arg_name) {
-                rd_typedef_destroy(tdef);
-                return false;
-            }
-
-            rd_typedef_add_arg(tdef, t.name, arg_name, t.count, t.mod, ctx);
-        }
-
-        rd_typedef_register(tdef, ctx);
-    }
-
-    rd_i_db_apply_noret(ctx);
-    return true;
 }
