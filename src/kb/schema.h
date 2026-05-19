@@ -13,3 +13,4 @@ typedef struct RDKBFieldSchema {
 bool rd_i_kb_validate_function(const RDKBObject* obj);
 bool rd_i_kb_validate_type(const RDKBObject* obj);
 bool rd_i_kb_validate_param(const RDKBObject* obj);
+bool rd_i_kb_validate_ret(const RDKBObject* obj);

@@ -47,43 +47,67 @@ static const char* _rd_kb_find_path(const char* name) {
     return NULL;
 }
 
-static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
-                                    const RDContext* ctx) {
-    if(!rd_i_kb_validate_param(obj)) return NULL;
-
+static const char* _rd_kb_get_param_impl(const RDKBObject* obj, RDType* t,
+                                         const RDContext* ctx) {
     const RDProcessorPlugin* plugin = ctx->processorplugin;
     i64 count = 0;
-    i64 mod = RD_TYPE_NONE;
 
-    const char* name = rd_kbobject_get_str(obj, "name");
-    assert(name);
+    t->mod = RD_TYPE_NONE;
 
     t->name = rd_kbobject_get_str(obj, "type");
     assert(t->name);
+    bool is_type_size = !strcmp(t->name, "size");
+    bool is_type_cptr = !strcmp(t->name, "cptr");
+    bool is_type_ptr = !strcmp(t->name, "ptr");
 
     rd_kbobject_get_int(obj, "count", &count);
     t->count = count;
 
-    rd_kbobject_get_int(obj, "mod", &mod);
-    t->mod = mod;
+    const char* mod_str = rd_kbobject_get_str(obj, "mod");
+    bool is_mod_str_cptr = mod_str && !strcmp(mod_str, "cptr");
+    bool is_mod_str_ptr = mod_str && !strcmp(mod_str, "ptr");
 
-    if(!strcmp(t->name, "cptr")) {
+    if(is_type_cptr) {
         if(plugin->code_ptr_size) {
             t->name = rd_integral_from_size(plugin->code_ptr_size);
             panic_if(!t->name, "cannot get code-pointer size");
-            mod = RD_TYPE_PTR; // always pointer
+            t->mod = RD_TYPE_CPTR;
         }
         else
-            t->name = "ptr";
+            is_type_ptr = true;
     }
 
-    if(!strcmp(t->name, "ptr")) {
+    if(is_type_ptr) {
         t->name = rd_integral_from_size(plugin->ptr_size);
         panic_if(!t->name, "cannot get pointer size");
-        mod = RD_TYPE_PTR; // always pointer
+        t->mod = RD_TYPE_PTR;
     }
 
-    return name;
+    if(is_type_size) {
+        t->name = rd_integral_from_size(plugin->int_size);
+        panic_if(!t->name, "cannot get integer size");
+    }
+
+    if(t->mod == RD_TYPE_NONE) {
+        if(is_mod_str_cptr)
+            t->mod = RD_TYPE_CPTR;
+        else if(is_mod_str_ptr)
+            t->mod = RD_TYPE_PTR;
+    }
+
+    return rd_kbobject_get_str(obj, "name");
+}
+
+static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
+                                    const RDContext* ctx) {
+    if(!rd_i_kb_validate_param(obj)) return NULL;
+    return _rd_kb_get_param_impl(obj, t, ctx);
+}
+
+static void _rd_kb_get_ret(const RDKBObject* obj, RDType* t,
+                           const RDContext* ctx) {
+    if(!rd_i_kb_validate_ret(obj)) return;
+    _rd_kb_get_param_impl(obj, t, ctx);
 }
 
 static bool _rd_kb_load_struct(const char* name, const RDKBObject* def,
@@ -232,29 +256,32 @@ bool rd_kb_load_functions(RDContext* ctx, const char* kb) {
         if(!rd_i_kb_validate_function(f)) continue;
 
         RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
-        const RDKBObject* args = rd_kbobject_get_array(f, "args");
-        assert(args);
-
         bool is_noret = false;
         rd_kbobject_get_bool(f, "noret", &is_noret);
         rd_typedef_set_noret(tdef, is_noret);
 
-        // TODO: davide - fully express type
-        const char* ret = rd_kbobject_get_str(f, "ret");
+        const RDKBObject* ret = rd_kbobject_get(f, "ret");
         assert(ret);
-        rd_typedef_set_ret(tdef, ret, 0, RD_TYPE_NONE, ctx);
+
+        RDType ret_type;
+        _rd_kb_get_ret(ret, &ret_type, ctx);
+        rd_typedef_set_ret(tdef, ret_type.name, ret_type.count, ret_type.mod,
+                           ctx);
+
+        const RDKBObject* args = rd_kbobject_get_array(f, "args");
+        assert(args);
 
         const RDKBObject* a;
         rd_kbobject_each(a, args) {
             RDType t;
-            const char* name = _rd_kb_get_param(a, &t, ctx);
+            const char* arg_name = _rd_kb_get_param(a, &t, ctx);
 
-            if(!name) {
+            if(!arg_name) {
                 rd_typedef_destroy(tdef);
                 return false;
             }
 
-            rd_typedef_add_arg(tdef, t.name, name, t.count, t.mod, ctx);
+            rd_typedef_add_arg(tdef, t.name, arg_name, t.count, t.mod, ctx);
         }
 
         rd_typedef_register(tdef, ctx);

@@ -35,6 +35,18 @@ static const RDKBFieldSchema RD_KB_SCHEMA_TYPE[] = {
     {.key = "members", .kind = RD_KB_ARRAY, .required = true},
 };
 
+static const RDKBFieldSchema RD_KB_SCHEMA_RET[] = {
+    {.key = "type", .kind = RD_KB_STR, .required = true},
+    {.key = "count", .kind = RD_KB_INT, .required = false},
+
+    {
+        .key = "mod",
+        .kind = RD_KB_STR,
+        .required = false,
+        .str_values = RD_KB_MOD_VALUES,
+    },
+};
+
 static const RDKBFieldSchema RD_KB_SCHEMA_PARAM[] = {
     {.key = "type", .kind = RD_KB_STR, .required = true},
     {.key = "name", .kind = RD_KB_STR, .required = true},
@@ -167,4 +179,9 @@ bool rd_i_kb_validate_type(const RDKBObject* obj) {
 bool rd_i_kb_validate_param(const RDKBObject* obj) {
     return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_PARAM,
                                   rd_count_of(RD_KB_SCHEMA_PARAM));
+}
+
+bool rd_i_kb_validate_ret(const RDKBObject* obj) {
+    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_RET,
+                                  rd_count_of(RD_KB_SCHEMA_RET));
 }
