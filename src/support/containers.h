@@ -102,9 +102,12 @@ typedef bool (*VectPredicate)(const void*);
     do {                                                                       \
         (dst)->length = (src)->length;                                         \
         (dst)->capacity = (src)->capacity;                                     \
-        (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));          \
-        memcpy((dst)->data, (src)->data,                                       \
-               (src)->length * sizeof(*(src)->data));                          \
+        if(((src)->capacity)) {                                                \
+            (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));      \
+            assert((dst)->data);                                               \
+            memcpy((dst)->data, (src)->data,                                   \
+                   (src)->length * sizeof(*(src)->data));                      \
+        }                                                                      \
     } while(0)
 
 #define vect_to_slice(SliceType, self)                                         \
