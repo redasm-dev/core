@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/utils.h"
 #include <redasm/config.h>
 #include <redasm/types/type.h>
 
@@ -8,9 +9,11 @@ typedef struct RDTypeFull {
     RDConfidence confidence;
 } RDTypeFull;
 
-static inline bool rd_i_is_void(const RDType* t) {
+static inline bool rd_i_type_is_void(const RDType* t) {
     return !t->name || !(*t->name);
 }
+
+const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf);
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeModifier flags);

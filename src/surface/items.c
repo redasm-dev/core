@@ -331,20 +331,24 @@ static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
 
     if(p->render_function) {
         p->render_function(r, item->func, r->context->processor);
+        return;
     }
-    else {
-        RDName n;
-        bool hasname = rd_i_get_name(r->context, item->address, true, &n);
-        assert(hasname && "cannot get function name");
 
-        _rd_render_modifiers(r, item, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    _rd_render_modifiers(r, item, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    const char* func_str = rd_i_function_to_str(item->func, r->context);
 
-        rd_renderer_text(r, "function ", RD_THEME_FUNCTION,
-                         RD_THEME_BACKGROUND);
-
-        rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-        rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    if(func_str) {
+        rd_renderer_text(r, func_str, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+        return;
     }
+
+    RDName n;
+    bool hasname = rd_i_get_name(r->context, item->address, true, &n);
+    assert(hasname);
+
+    rd_renderer_text(r, "function ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
 }
 
 static void _rd_render_label_item(RDRenderer* r, const RDListingItem* item) {

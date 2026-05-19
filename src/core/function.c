@@ -51,6 +51,40 @@ static RDGraphNode _rd_function_get_or_add_block(RDGraph* g, RDAddress start,
     return n;
 }
 
+const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
+    RDName n;
+    if(!rd_i_get_name(ctx, self->address, false, &n)) return NULL;
+
+    const RDTypeDef* func_def = rd_i_typedef_find(ctx, n.value);
+    if(!func_def || func_def->kind != RD_TKIND_FUNC) return NULL;
+
+    RDCharVect* t_buf = &ctx->type_buf;
+    str_clear(&ctx->tdef_buf);
+
+    const RDFunctionType* f_type = &func_def->func_;
+
+    str_append(&ctx->tdef_buf, rd_i_type_to_str(&f_type->ret, t_buf));
+    str_push(&ctx->tdef_buf, ' ');
+    str_append(&ctx->tdef_buf, func_def->name);
+
+    str_push(&ctx->tdef_buf, '(');
+
+    const RDParam* arg;
+    vect_each(arg, &f_type->args) {
+        assert(arg->name);
+        if(arg != vect_first(&f_type->args)) str_push(&ctx->tdef_buf, ',');
+
+        str_append(&ctx->tdef_buf, rd_i_type_to_str(&arg->type, t_buf));
+        str_push(&ctx->tdef_buf, ' ');
+        str_append(&ctx->tdef_buf, arg->name);
+    }
+
+    str_push(&ctx->tdef_buf, ')');
+
+    assert(!vect_is_empty(&ctx->tdef_buf));
+    return ctx->tdef_buf.data;
+}
+
 void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
     RDContext* ctx = self->context;
     RDGraph* g = rd_graph_create();

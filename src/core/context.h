@@ -48,6 +48,8 @@ typedef struct RDContext {
     RDCharVect sym_buf;
     RDCharVect imp_buf;
     RDCharVect problem_buf;
+    RDCharVect tdef_buf;
+    RDCharVect type_buf;
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
 

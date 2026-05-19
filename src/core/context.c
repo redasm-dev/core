@@ -555,6 +555,8 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->imp_buf);
     vect_destroy(&self->name_buf);
     vect_destroy(&self->ovr_ops_buf);
+    vect_destroy(&self->tdef_buf);
+    vect_destroy(&self->type_buf);
     vect_destroy(&self->problems);
     vect_destroy(&self->xrefs_to);
     vect_destroy(&self->und_xrefs);

@@ -41,6 +41,30 @@ const char* rd_integral_from_size(unsigned int size) {
     panic("integral type not found for size: %u", size);
 }
 
+const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
+    if(rd_i_type_is_void(t)) return "void";
+
+    assert(t->name);
+
+    str_clear(buf);
+    str_append(buf, t->name);
+
+    if(t->count > 0) {
+        str_push(buf, '[');
+        str_append(buf, rd_i_to_dec(t->count));
+        str_push(buf, ']');
+    }
+
+    switch(t->mod) {
+        case RD_TYPE_PTR:
+        case RD_TYPE_CPTR: str_push(buf, '*'); break;
+
+        default: break;
+    }
+
+    return buf->data;
+}
+
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier flags, RDConfidence c) {
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);

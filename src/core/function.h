@@ -17,6 +17,7 @@ typedef struct RDFunctionChunkVect {
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_destroy(RDFunction* self);
+const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx);
 void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks);
 RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);
 
