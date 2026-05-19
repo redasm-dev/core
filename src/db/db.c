@@ -46,7 +46,7 @@ static RDSegmentRegVect* _rd_db_segmentregs_get_vect(RDDB* db,
     // new register, add to both vects
     vect_push(&db->segment_regs, (RDSegmentRegVect){.name = reg});
     vect_push(&db->segment_reg_names, reg);
-    return vect_back(&db->segment_regs);
+    return vect_last(&db->segment_regs);
 }
 
 RDDB* rd_i_db_create(const RDContext* ctx) {
@@ -114,6 +114,18 @@ void rd_i_db_destroy(RDDB* self) {
     rd_free(self);
 }
 
+void rd_i_db_begin(RDContext* ctx) {
+    sqlite3_exec(ctx->db->handle, "BEGIN", NULL, NULL, NULL);
+}
+
+void rd_i_db_commit(RDContext* ctx) {
+    sqlite3_exec(ctx->db->handle, "COMMIT", NULL, NULL, NULL);
+}
+
+void rd_i_db_rollback(RDContext* ctx) {
+    sqlite3_exec(ctx->db->handle, "ROLLBACK", NULL, NULL, NULL);
+}
+
 void rd_i_db_flush(RDContext* ctx) {}
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
@@ -141,11 +153,26 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
 
 const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
                                           RDAddress address) {
+    if(vect_is_empty(&ctx->db->segments)) return NULL;
+
+    // check if before the first address
+    if(address < (*vect_first(&ctx->db->segments))->base.start_address)
+        return NULL;
+
+    // check if after the last address
+    if(address >= (*vect_last(&ctx->db->segments))->base.end_address)
+        return NULL;
+
+    if(ctx->db->last_segment &&
+       rd_i_segment_contains(ctx->db->last_segment, address))
+        return ctx->db->last_segment;
+
     usize idx =
         vect_bsearch(&ctx->db->segments, &address, _rd_i_db_segment_find_pred);
     if(idx == vect_length(&ctx->db->segments)) return NULL;
 
-    return *vect_at(&ctx->db->segments, idx);
+    ctx->db->last_segment = *vect_at(&ctx->db->segments, idx);
+    return ctx->db->last_segment;
 }
 
 const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx) {
@@ -227,33 +254,32 @@ void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
     _rd_i_db_query_add_xref(ctx, from, to, type, c);
 }
 
-void rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to) {
-    _rd_i_db_query_del_xref(ctx, from, to);
+bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
+                      RDConfidence c) {
+    return _rd_i_db_query_del_xref(ctx, from, to, c);
 }
 
-RDConfidence rd_i_db_get_xref_confidence(RDContext* ctx, RDAddress from,
-                                         RDAddress to) {
-    return _rd_i_db_query_get_xref_confidence(ctx, from, to);
-}
-
-RDXRefVect* rd_i_db_get_xrefs_from_type(RDContext* ctx, RDAddress from,
-                                        RDXRefType type, RDXRefVect* refs) {
-    return _rd_i_db_query_get_xrefs_from_type(ctx, from, type, refs);
+bool rd_i_db_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
+                      RDXRefFull* xref) {
+    return _rd_i_db_query_get_xref(ctx, from, to, xref);
 }
 
 RDXRefVect* rd_i_db_get_xrefs_from(RDContext* ctx, RDAddress from,
-                                   RDXRefVect* refs) {
-    return _rd_i_db_query_get_xrefs_from(ctx, from, refs);
+                                   RDXRefType type, RDXRefVect* refs) {
+    return _rd_i_db_query_get_xrefs_from(ctx, from, type, refs);
 }
 
-RDXRefVect* rd_i_db_get_xrefs_to_type(RDContext* ctx, RDAddress to,
-                                      RDXRefType type, RDXRefVect* refs) {
-    return _rd_i_db_query_get_xrefs_to_type(ctx, to, type, refs);
-}
-
-RDXRefVect* rd_i_db_get_xrefs_to(RDContext* ctx, RDAddress to,
+RDXRefVect* rd_i_db_get_xrefs_to(RDContext* ctx, RDAddress to, RDXRefType type,
                                  RDXRefVect* refs) {
-    return _rd_i_db_query_get_xrefs_to(ctx, to, refs);
+    return _rd_i_db_query_get_xrefs_to(ctx, to, type, refs);
+}
+
+bool rd_i_db_del_xrefs_from(RDContext* ctx, RDAddress from, RDConfidence c) {
+    return _rd_i_db_query_del_xrefs_from(ctx, from, c);
+}
+
+bool rd_i_db_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c) {
+    return _rd_i_db_query_del_xrefs_to(ctx, to, c);
 }
 
 bool rd_i_db_has_xrefs_from(RDContext* ctx, RDAddress address) {
@@ -277,17 +303,12 @@ void rd_i_db_set_name(RDContext* ctx, RDAddress address, const char* name,
     _rd_i_db_query_set_name(ctx, address, name, c);
 }
 
-void rd_i_db_del_name(RDContext* ctx, RDAddress address) {
-    _rd_i_db_query_del_name(ctx, address);
+bool rd_i_db_del_name(RDContext* ctx, RDAddress address) {
+    return _rd_i_db_query_del_name(ctx, address);
 }
 
 void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     _rd_i_db_query_set_type_def(ctx, tdef);
-}
-
-RDTypeDefVect* rd_i_db_get_typedef_func_noret(RDContext* ctx,
-                                              RDTypeDefVect* v) {
-    return _rd_i_db_query_get_typedef_func_noret(ctx, v);
 }
 
 void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
@@ -299,8 +320,8 @@ bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
     return _rd_i_db_query_get_type(ctx, address, t);
 }
 
-void rd_i_db_del_type(RDContext* ctx, RDAddress address) {
-    _rd_i_db_query_del_type(ctx, address);
+bool rd_i_db_del_type(RDContext* ctx, RDAddress address) {
+    return _rd_i_db_query_del_type(ctx, address);
 }
 
 void rd_i_db_del_type_range(RDContext* ctx, RDAddress startaddr,
@@ -431,4 +452,9 @@ bool rd_i_db_has_ovr_operand(RDContext* ctx, RDAddress address) {
 RDOvrOperandVect* rd_i_db_get_all_ovr_operand(RDContext* ctx,
                                               RDAddress address) {
     return _rd_i_db_query_get_all_ovr_operand(ctx, address);
+}
+
+RDConfidence rd_i_db_get_max_confidence(RDContext* ctx, RDAddress start,
+                                        RDAddress end) {
+    return _rd_i_db_query_get_max_confidence(ctx, start, end);
 }

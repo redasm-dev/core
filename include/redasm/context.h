@@ -24,7 +24,8 @@ typedef enum {
 } RDSegmentPerm;
 
 typedef enum {
-    RD_DR_READ = 1,
+    RD_XR_NONE = 0,
+    RD_DR_READ,
     RD_DR_WRITE,
     RD_DR_ADDRESS,
 
@@ -127,7 +128,12 @@ RD_API const char* rd_to_dec(i64 v);
 RD_API const char* rd_to_hex(i64 v);
 RD_API const char* rd_to_hexaddr(const RDContext* self, usize v);
 RD_API const char* rd_render_text(RDContext* self, RDAddress address);
-RD_API bool rd_undefine(RDContext* self, RDAddress address);
+RD_API bool rd_auto_undefine(RDContext* self, RDAddress address);
+RD_API bool rd_library_undefine(RDContext* self, RDAddress address);
+RD_API bool rd_user_undefine(RDContext* self, RDAddress address);
+RD_API bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n);
+RD_API bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n);
+RD_API bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n);
 RD_API bool rd_set_noreturn(RDContext* self, RDAddress address);
 RD_API bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt);
 RD_API bool rd_auto_name(RDContext* self, RDAddress address, const char* name);
@@ -171,12 +177,10 @@ RD_API bool rd_map_input_n(RDContext* self, RDOffset off, RDAddress addr,
 RD_API bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                         RDXRefType type);
 
-RD_API RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr);
-RD_API RDXRefSlice rd_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,
-                                          usize type);
-RD_API RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr);
-RD_API RDXRefSlice rd_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
-                                        usize type);
+RD_API RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr,
+                                     RDXRefType type);
+RD_API RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr,
+                                   RDXRefType type);
 RD_API bool rd_operand_as_address(RDContext* self, RDAddress address,
                                   int index);
 RD_API bool rd_operand_as_immediate(RDContext* self, RDAddress address,

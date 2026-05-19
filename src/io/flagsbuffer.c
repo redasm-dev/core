@@ -353,6 +353,8 @@ void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
 
     while(*end < self->base.length && rd_i_flags_has_tail(self->data[*end]))
         (*end)++;
+
+    assert(*start < *end);
 }
 
 RDFlags rd_i_flagsbuffer_get(const RDFlagsBuffer* self, usize idx) {
@@ -406,6 +408,15 @@ bool rd_i_flagsbuffer_undefine_xref_out(RDFlagsBuffer* self, usize idx) {
 bool rd_i_flagsbuffer_undefine_xref_in(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
         rd_i_flags_undefine_xref_in(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_undefine_flow(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_flow(&self->data[idx]);
         return true;
     }
 

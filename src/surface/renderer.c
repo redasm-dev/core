@@ -43,7 +43,7 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
 static void _rd_renderer_calc_auto_column(RDRenderer* self) {
     if(self->columns || vect_is_empty(&self->rows_back)) return;
 
-    usize lastlen = rd_i_row_length(vect_back(&self->rows_back));
+    usize lastlen = rd_i_row_length(vect_last(&self->rows_back));
     self->auto_columns = rd_i_max(self->auto_columns, lastlen);
 }
 
@@ -211,7 +211,7 @@ void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
     rd_i_rowvect_push(&self->rows_back, self->listing_idx, item->address);
 
     if(self->columns)
-        rd_i_row_reserve(vect_back(&self->rows_back), self->columns);
+        rd_i_row_reserve(vect_last(&self->rows_back), self->columns);
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
         rd_renderer_norm(self, item->segment->base.name);
@@ -236,7 +236,7 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                       RDThemeKind bg) {
     assert(s && "invalid chunk string");
 
-    RDRow* r = vect_back(&self->rows_back);
+    RDRow* r = vect_last(&self->rows_back);
 
     for(char ch = *s; ch; ch = *++s) {
         if(self->columns && rd_i_row_length(r) >= self->columns) break;
@@ -293,6 +293,7 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         {rd_flagsbuffer_has_call, "CALL", RD_THEME_CALL},
         {rd_flagsbuffer_has_jump, "JUMP", RD_THEME_JUMP},
         {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},
+        {rd_flagsbuffer_has_noret, "NORET", RD_THEME_FAIL},
         {rd_flagsbuffer_has_dslot, "DSLOT", RD_THEME_MUTED},
         {rd_flagsbuffer_has_flow, "FLOW", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_tail, "TAIL", RD_THEME_FOREGROUND},
@@ -543,8 +544,8 @@ void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col) {
 bool rd_i_renderer_is_index_visible(const RDRenderer* self, LIndex index) {
     if(vect_is_empty(&self->rows_front)) return false;
 
-    const RDRow* first = vect_front(&self->rows_front);
-    const RDRow* last = vect_back(&self->rows_front);
+    const RDRow* first = vect_first(&self->rows_front);
+    const RDRow* last = vect_last(&self->rows_front);
     return index >= first->index && index < last->index;
 }
 
@@ -595,12 +596,12 @@ RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx) {
 }
 
 RDCellData* rd_i_renderer_get_current_cell_data(const RDRenderer* self) {
-    RDRow* r = vect_back(&self->rows_back);
+    RDRow* r = vect_last(&self->rows_back);
     return &r->curr_meta;
 }
 
 void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m) {
-    RDRow* r = vect_back(&self->rows_back);
+    RDRow* r = vect_last(&self->rows_back);
     r->curr_meta = m;
 }
 

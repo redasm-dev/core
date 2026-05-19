@@ -265,15 +265,8 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     rd_i_db_set_type_def(ctx, self);
     vect_push(&ctx->types[self->kind], self);
 
-    if(self->kind == RD_TKIND_FUNC && self->func_.is_noret) {
-        usize idx = vect_lower_bound(&ctx->noret_names, &self->name,
-                                     rd_i_strcmp_intern_pred);
-
-        if(idx == vect_length(&ctx->noret_names) ||
-           self->name != *vect_at(&ctx->noret_names, idx)) {
-            vect_ins(&ctx->noret_names, idx, self->name);
-        }
-    }
+    if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
+        rd_i_kb_add_noret(ctx, self->name);
 
     if(self->kind != RD_TKIND_PRIM) {
         LOG_INFO("%s definition '%s' registered",

@@ -303,7 +303,7 @@ RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
         RDListingItem item = {
             .kind = RD_LK_INSTRUCTION,
             .address = *addr,
-            .segment = *vect_front(segments),
+            .segment = *vect_first(segments),
         };
 
         rd_i_renderer_new_row(r, &item);

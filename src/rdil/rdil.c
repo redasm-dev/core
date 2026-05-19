@@ -637,7 +637,7 @@ RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
     }
 
     vect_push(self, (RDInstruction){.id = (u32)s, .flow = RD_IF_RDIL});
-    RDInstruction* instr = vect_back(self);
+    RDInstruction* instr = vect_last(self);
 
     const RDILStatementInfo* info = &RDIL_OP_TABLE[instr->id];
     instr->mnemonic = info->mnemonic;

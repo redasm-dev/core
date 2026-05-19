@@ -58,6 +58,12 @@ typedef struct RDXRefVect {
     usize capacity;
 } RDXRefVect;
 
+typedef struct RDXRefFull {
+    RDXRef base;
+    RDAddress from_address;
+    RDConfidence confidence;
+} RDXRefFull;
+
 int _rd_i_db_segment_cmp_pred(const void* a, const void* b);
 int _rd_i_db_segment_find_pred(const void* key, const void* item);
 

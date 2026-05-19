@@ -4,6 +4,7 @@
 #include "core/segment.h"
 #include "db/db.h"
 #include "io/buffer.h"
+#include "kb/kb.h"
 #include "listing/listing.h"
 #include "plugins/processor/processor.h"
 #include "support/stringpool.h"
@@ -39,9 +40,8 @@ typedef struct RDContext {
 
     RDStringPool strings;
     RDXRefVect xrefs_from;
-    RDXRefVect xrefs_from_type;
     RDXRefVect xrefs_to;
-    RDXRefVect xrefs_to_type;
+    RDXRefVect und_xrefs;
 
     RDCharVect name_buf;
     RDCharVect str_buf;
@@ -60,16 +60,12 @@ typedef struct RDContext {
     RDLoadAddressing addressing;
 
     RDDB* db;
+    RDKB* kb;
     RDListing listing;
     RDHooks* hooks;
 
     RDTypeDefVect types[RD_TKIND_COUNT];
-
-    struct {
-        const char** data;
-        usize length;
-        usize capacity;
-    } noret_names;
+    RDAddressVect noret_seeds;
 
     struct {
         RDAddress value;
@@ -115,22 +111,20 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c);
 
-const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr);
-const RDXRefVect* rd_i_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,
-                                           usize type);
-const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr);
-const RDXRefVect* rd_i_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
-                                         usize type);
+bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c);
+bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
+                     RDConfidence c);
 
+const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
+                                      RDXRefType type);
+const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr,
+                                    RDXRefType type);
 const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
-                                         RDXRefVect* r);
-const RDXRefVect* rd_i_get_xrefs_from_type_ex(RDContext* self,
-                                              RDAddress fromaddr, usize type,
-                                              RDXRefVect* r);
+                                         RDXRefType type, RDXRefVect* r);
 const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
-                                       RDXRefVect* r);
-const RDXRefVect* rd_i_get_xrefs_to_type_ex(RDContext* self, RDAddress toaddr,
-                                            usize type, RDXRefVect* r);
+                                       RDXRefType type, RDXRefVect* r);
+
+bool rd_i_set_noret(RDContext* self, const RDSegmentFull* seg, usize idx);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
                       const char* fmt, ...);

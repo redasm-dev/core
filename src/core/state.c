@@ -1,4 +1,5 @@
 #include "state.h"
+#include "kb/kb.h"
 #include "plugins/builtin/loaders.h"
 #include "plugins/builtin/processors.h"
 #include "plugins/module.h"
@@ -35,7 +36,7 @@ static RDModule* _rd_module_find(const char* filepath) {
 
 void rd_i_state_init(const RDInitParams* params) {
     if(params) {
-        rd_i_kb_init(params->kb_paths);
+        rd_i_kb_paths_init(params->kb_paths);
     }
 
     rd_i_theme_init(&rd_i_state.theme);
@@ -56,11 +57,14 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.loaders);
     vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
+    vect_destroy(&rd_i_state.kb_path_buf);
+    vect_destroy(&rd_i_state.kb_schema_buf);
+    vect_destroy(&rd_i_state.kb_key_buf);
     vect_destroy(&rd_i_state.instr_text_buf);
     vect_destroy(&rd_i_state.instr_dump_buf);
     vect_destroy(&rd_i_state.mnem_buf);
     _rd_i_state_unload_modules();
-    rd_i_kb_deinit(&rd_i_state.kb);
+    rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
 }
 
 void rd_set_log_callback(RDLogCallback cb, void* userdata) {

@@ -44,12 +44,24 @@ static const RDBaseParams RD_BASE_DEFAULTS = {
     .fill = 0,
 };
 
+int rd_i_address_pred(const void* a, const void* b) {
+    RDAddress addr1 = *(RDAddress*)a;
+    RDAddress addr2 = *(RDAddress*)b;
+    if(addr1 < addr2) return -1;
+    if(addr1 > addr2) return 1;
+    return 0;
+}
+
 int rd_i_strcmp_pred(const void* a, const void* b) {
     return strcmp(*(const char**)a, *(const char**)b);
 }
 
 int rd_i_strcmp_intern_pred(const void* a, const void* b) {
     return (*(const char**)a) - (*(const char**)b);
+}
+
+int rd_i_strcmp_key_pred(const void* key, const void* s) {
+    return strcmp((const char*)key, *(const char**)s);
 }
 
 RDByteBuffer* rd_i_fromdata(const char* bytes, usize n) {

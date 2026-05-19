@@ -97,7 +97,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
         bool b = rd_i_flagsbuffer_has_jmpdst(seg->flags, idx);
 
         if(b) {
-            const RDXRefVect* xrefs = rd_i_get_xrefs_to_type_ex(
+            const RDXRefVect* xrefs = rd_i_get_xrefs_to_ex(
                 ctx, item->address, RD_CR_JUMP, &self->xrefs);
 
             const RDXRef* r;
@@ -116,7 +116,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
         }
 
         if(rd_flagsbuffer_has_jump(seg->flags, idx)) {
-            const RDXRefVect* xrefs = rd_i_get_xrefs_from_type_ex(
+            const RDXRefVect* xrefs = rd_i_get_xrefs_from_ex(
                 ctx, item->address, RD_CR_JUMP, &self->xrefs);
 
             const RDXRef* r;

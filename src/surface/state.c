@@ -17,7 +17,7 @@ void rd_i_surfacestate_push_history(RDSurfaceState* self,
     };
 
     if(vect_is_empty(history) ||
-       !_rd_history_item_equals(vect_back(history), &item)) {
+       !_rd_history_item_equals(vect_last(history), &item)) {
         vect_push(history, item);
     }
 }
@@ -38,7 +38,7 @@ bool rd_i_surfacestate_has_selection(const RDSurfaceState* self) {
 bool rd_i_surfacestate_go_back(RDSurfaceState* self) {
     if(vect_is_empty(&self->back_history)) return false;
 
-    RDHistoryItem item = vect_pop_back(&self->back_history);
+    RDHistoryItem item = vect_pop_last(&self->back_history);
     rd_i_surfacestate_push_history(self, &self->fwd_history);
 
     rd_i_surfacestate_with_locked_history(self, {
@@ -52,7 +52,7 @@ bool rd_i_surfacestate_go_back(RDSurfaceState* self) {
 bool rd_i_surfacestate_go_forward(RDSurfaceState* self) {
     if(vect_is_empty(&self->fwd_history)) return false;
 
-    RDHistoryItem item = vect_pop_back(&self->fwd_history);
+    RDHistoryItem item = vect_pop_last(&self->fwd_history);
     rd_i_surfacestate_push_history(self, &self->back_history);
 
     rd_i_surfacestate_with_locked_history(self, {

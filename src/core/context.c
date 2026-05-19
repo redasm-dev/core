@@ -53,6 +53,7 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
     self->hooks = rd_i_hooks_create();
     self->min_string = RD_MIN_STRING_LENGTH;
     self->db = rd_i_db_create(self);
+    self->kb = rd_i_kb_create();
 
     rd_i_registermap_init(&self->engine.current.registers);
     rd_i_strpool_init(&self->strings);
@@ -166,6 +167,10 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
 
         rd_i_db_set_name(self, address, finalname, c);
         rd_i_flagsbuffer_set_name(seg->flags, idx);
+
+        if(rd_i_kb_is_noret(self, rd_i_strip_prefix(finalname)))
+            rd_i_set_noret(self, seg, idx);
+
         return true;
     }
 
@@ -263,9 +268,10 @@ bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
 }
 
 bool rd_to_address(const RDContext* self, RDOffset offset, RDAddress* address) {
-    RDInputMapping* m;
+    const RDMappingVect* mappings = rd_i_db_get_mappings(self);
 
-    vect_each(m, rd_i_db_get_mappings(self)) {
+    RDInputMapping* m;
+    vect_each(m, mappings) {
         usize size = m->end_address - m->start_address;
         if(offset >= m->offset && offset < m->offset + size) {
             if(address) *address = (offset - m->offset) + m->start_address;
@@ -376,16 +382,28 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
     return self->str_buf.data;
 }
 
-bool rd_undefine(RDContext* ctx, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-    if(!seg) return false;
+bool rd_auto_undefine(RDContext* self, RDAddress address) {
+    return rd_i_undefine(self, address, RD_CONFIDENCE_AUTO);
+}
 
-    usize idx = rd_i_address2index(seg, address);
-    usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+bool rd_library_undefine(RDContext* self, RDAddress address) {
+    return rd_i_undefine(self, address, RD_CONFIDENCE_LIBRARY);
+}
 
-    rd_i_flagsbuffer_undefine(seg->flags, idx, len);
-    rd_i_db_del_type(ctx, address); // remove type link from DB if any
-    return true;
+bool rd_user_undefine(RDContext* self, RDAddress address) {
+    return rd_i_undefine(self, address, RD_CONFIDENCE_USER);
+}
+
+bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n) {
+    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_AUTO);
+}
+
+bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n) {
+    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_LIBRARY);
+}
+
+bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n) {
+    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_USER);
 }
 
 bool rd_auto_function(RDContext* self, RDAddress address, const char* name) {
@@ -454,6 +472,61 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
     return false;
 }
 
+bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c) {
+    return rd_i_undefine_n(self, address, 1, c);
+}
+
+bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
+                     RDConfidence c) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    usize startidx = rd_i_address2index(seg, address), endidx = startidx + n;
+    rd_i_flagsbuffer_expand_range(seg->flags, &startidx, &endidx);
+
+    RDAddress startaddr = rd_i_index2address(seg, startidx);
+    RDAddress endaddr = startaddr + (endidx - startidx);
+
+    RDConfidence maxc = rd_i_db_get_max_confidence(self, startaddr, endaddr);
+    if(maxc > c) return false;
+
+    RDAddress curr = startaddr;
+
+    for(usize i = startidx; i < endidx; i++, curr++) {
+        if(rd_i_flagsbuffer_has_type(seg->flags, i)) {
+            rd_i_db_del_type(self, curr);
+            // FL_TYPE cleared by rd_i_flagsbuffer_undefine below
+        }
+
+        if(rd_flagsbuffer_has_name(seg->flags, i)) {
+            rd_i_db_del_name(self, curr);
+            rd_i_flagsbuffer_undefine_name(seg->flags, i);
+        }
+
+        if(rd_i_flagsbuffer_has_xref_out(seg->flags, i)) {
+            const RDXRefVect* refs = rd_i_get_xrefs_from_ex(
+                self, curr, RD_XR_NONE, &self->und_xrefs);
+
+            const RDXRef* r;
+            vect_each(r, refs) rd_i_del_xref(self, curr, r->address, c);
+        }
+
+        // collect sources before deleting so we can fix remote FL_XREFOUT
+        if(rd_i_flagsbuffer_has_xref_in(seg->flags, i)) {
+            const RDXRefVect* refs =
+                rd_i_get_xrefs_to_ex(self, curr, RD_XR_NONE, &self->und_xrefs);
+
+            const RDXRef* r;
+            vect_each(r, refs) rd_i_del_xref(self, r->address, curr, c);
+        }
+    }
+
+    // clears FL_CODE/FL_DATA/FL_TAIL
+    // preserves FL_NAME/FL_XREFIN/FL_XREFOUT (handled explicitly above)
+    rd_i_flagsbuffer_undefine(seg->flags, startidx, endidx - startidx);
+    return true;
+}
+
 bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
                        RDConfidence c) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
@@ -484,15 +557,15 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->ovr_ops_buf);
     vect_destroy(&self->problems);
     vect_destroy(&self->xrefs_to);
-    vect_destroy(&self->xrefs_to_type);
+    vect_destroy(&self->und_xrefs);
     vect_destroy(&self->xrefs_from);
-    vect_destroy(&self->xrefs_from_type);
-    hmap_destroy(&self->engine.current.registers);
     vect_destroy(&self->lift_buf);
-    vect_destroy(&self->noret_names);
+    vect_destroy(&self->noret_seeds);
+    hmap_destroy(&self->engine.current.registers);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
+    rd_i_kb_destroy(self->kb);
     rd_i_db_destroy(self->db);
 
     for(unsigned i = 0; i < rd_count_of(self->types); i++) {
@@ -795,7 +868,7 @@ RDSymbolSlice rd_get_all_symbols(const RDContext* self) {
 }
 
 const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
-                                         RDXRefVect* r) {
+                                         RDXRefType type, RDXRefVect* r) {
     vect_clear(r);
 
     const RDSegmentFull* seg = rd_i_db_find_segment(self, fromaddr);
@@ -804,27 +877,12 @@ const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
     usize idx = rd_i_address2index(seg, fromaddr);
     if(!rd_i_flagsbuffer_has_xref_out(seg->flags, idx)) return r;
 
-    rd_i_db_get_xrefs_from(self, fromaddr, r);
-    return r;
-}
-
-const RDXRefVect* rd_i_get_xrefs_from_type_ex(RDContext* self,
-                                              RDAddress fromaddr, usize type,
-                                              RDXRefVect* r) {
-    vect_clear(r);
-
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, fromaddr);
-    if(!seg) return r;
-
-    usize idx = rd_i_address2index(seg, fromaddr);
-    if(!rd_i_flagsbuffer_has_xref_out(seg->flags, idx)) return r;
-
-    rd_i_db_get_xrefs_from_type(self, fromaddr, type, r);
+    rd_i_db_get_xrefs_from(self, fromaddr, type, r);
     return r;
 }
 
 const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
-                                       RDXRefVect* r) {
+                                       RDXRefType type, RDXRefVect* r) {
     vect_clear(r);
 
     const RDSegmentFull* seg = rd_i_db_find_segment(self, toaddr);
@@ -833,41 +891,18 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
     usize idx = rd_i_address2index(seg, toaddr);
     if(!rd_i_flagsbuffer_has_xref_in(seg->flags, idx)) return r;
 
-    rd_i_db_get_xrefs_to(self, toaddr, r);
+    rd_i_db_get_xrefs_to(self, toaddr, type, r);
     return r;
 }
 
-const RDXRefVect* rd_i_get_xrefs_to_type_ex(RDContext* self, RDAddress toaddr,
-                                            usize type, RDXRefVect* r) {
-    vect_clear(r);
-
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, toaddr);
-    if(!seg) return r;
-
-    usize idx = rd_i_address2index(seg, toaddr);
-    if(!rd_i_flagsbuffer_has_xref_in(seg->flags, idx)) return r;
-
-    rd_i_db_get_xrefs_to_type(self, toaddr, type, r);
-    return r;
+const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
+                                      RDXRefType type) {
+    return rd_i_get_xrefs_from_ex(self, fromaddr, type, &self->xrefs_from);
 }
 
-const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr) {
-    return rd_i_get_xrefs_from_ex(self, fromaddr, &self->xrefs_from);
-}
-
-const RDXRefVect* rd_i_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,
-                                           usize type) {
-    return rd_i_get_xrefs_from_type_ex(self, fromaddr, type,
-                                       &self->xrefs_from_type);
-}
-
-const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr) {
-    return rd_i_get_xrefs_to_ex(self, toaddr, &self->xrefs_to);
-}
-
-const RDXRefVect* rd_i_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
-                                         usize type) {
-    return rd_i_get_xrefs_to_type_ex(self, toaddr, type, &self->xrefs_to_type);
+const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr,
+                                    RDXRefType type) {
+    return rd_i_get_xrefs_to_ex(self, toaddr, type, &self->xrefs_to);
 }
 
 const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
@@ -981,7 +1016,9 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     if(isreftotail) // report only
         rd_i_add_problem(self, fromaddr, toaddr, "ref TO tail byte");
 
-    if(rd_i_db_get_xref_confidence(self, fromaddr, toaddr) > c) return true;
+    RDXRefFull xref;
+    if(rd_i_db_get_xref(self, fromaddr, toaddr, &xref) && xref.confidence > c)
+        return false;
 
     switch(type) {
         case RD_DR_READ:
@@ -1034,10 +1071,9 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
     usize toidx = rd_i_address2index(toseg, toaddr);
 
+    if(!rd_i_flagsbuffer_has_xref_out(fromseg->flags, fromidx)) return false;
     if(!rd_i_flagsbuffer_has_xref_in(toseg->flags, toidx)) return false;
-    if(rd_i_db_get_xref_confidence(self, fromaddr, toaddr) > c) return false;
-
-    rd_i_db_del_xref(self, fromaddr, toaddr);
+    if(!rd_i_db_del_xref(self, fromaddr, toaddr, c)) return false;
 
     if(!rd_i_db_has_xrefs_from(self, fromaddr))
         rd_i_flagsbuffer_undefine_xref_out(fromseg->flags, fromidx);
@@ -1058,7 +1094,7 @@ bool rd_get_entry_point(const RDContext* self, RDAddress* address) {
     const RDSegmentVect* segments = rd_i_db_get_segments(self);
 
     if(!vect_is_empty(segments)) {
-        if(address) *address = (*vect_front(segments))->base.start_address;
+        if(address) *address = (*vect_first(segments))->base.start_address;
 
         return true;
     }
@@ -1143,6 +1179,28 @@ bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
     return rd_i_db_get_imported(ctx, address, imp);
 }
 
+bool rd_i_set_noret(RDContext* self, const RDSegmentFull* seg, usize idx) {
+    RDAddress address = rd_i_index2address(seg, idx);
+    usize i = vect_lower_bound(&self->noret_seeds, &address, rd_i_address_pred);
+
+    if(i < vect_length(&self->noret_seeds) &&
+       *vect_at(&self->noret_seeds, i) == address)
+        return false;
+
+    vect_ins(&self->noret_seeds, i, address);
+    rd_i_flagsbuffer_set_noret(seg->flags, idx);
+
+    usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+    assert(len > 0);
+
+    idx += len; // un-FLOW next instruction
+
+    if(rd_flagsbuffer_has_flow(seg->flags, idx))
+        rd_i_flagsbuffer_undefine_flow(seg->flags, idx);
+
+    return true;
+}
+
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
                       const char* fmt, ...) {
     va_list args;
@@ -1165,25 +1223,15 @@ bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     return rd_i_add_xref(self, fromaddr, toaddr, type, RD_CONFIDENCE_AUTO);
 }
 
-RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr) {
-    const RDXRefVect* refs = rd_i_get_xrefs_from(self, fromaddr);
+RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr,
+                              RDXRefType type) {
+    const RDXRefVect* refs = rd_i_get_xrefs_from(self, fromaddr, type);
     return vect_to_slice(RDXRefSlice, refs);
 }
 
-RDXRefSlice rd_get_xrefs_from_type(RDContext* self, RDAddress fromaddr,
-                                   usize type) {
-    const RDXRefVect* refs = rd_i_get_xrefs_from_type(self, fromaddr, type);
-    return vect_to_slice(RDXRefSlice, refs);
-}
-
-RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr) {
-    const RDXRefVect* refs = rd_i_get_xrefs_to(self, toaddr);
-    return vect_to_slice(RDXRefSlice, refs);
-}
-
-RDXRefSlice rd_get_xrefs_to_type(RDContext* self, RDAddress toaddr,
-                                 usize type) {
-    const RDXRefVect* refs = rd_i_get_xrefs_to_type(self, toaddr, type);
+RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr,
+                            RDXRefType type) {
+    const RDXRefVect* refs = rd_i_get_xrefs_to(self, toaddr, type);
     return vect_to_slice(RDXRefSlice, refs);
 }
 

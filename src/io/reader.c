@@ -76,7 +76,7 @@ void rd_reader_begin(RDReader* self) {
 
 u64 rd_reader_end(RDReader* self) {
     panic_if(vect_is_empty(&self->stack), "reader begin/end mismatch");
-    rd_reader_seek(self, vect_pop_back(&self->stack));
+    rd_reader_seek(self, vect_pop_last(&self->stack));
     return rd_reader_tell(self);
 }
 

@@ -2,6 +2,7 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
+#include "io/flagsbuffer.h"
 #include "listing/builder.h"
 #include "support/containers.h"
 #include "support/error.h"
@@ -12,13 +13,12 @@ typedef enum {
     RD_WS_INIT = 0,
 
     // 1st pass
-    RD_WS_EMULATE1, RD_WS_ANALYZE1, 
-    RD_WS_SIGNATURE1, RD_WS_MERGEDATA1, 
+    RD_WS_EMULATE1, RD_WS_KB1, RD_WS_ANALYZE1, 
+    RD_WS_MERGEDATA1, 
 
     // 2nd pass
-    RD_WS_MERGECODE, 
-    RD_WS_EMULATE2, RD_WS_ANALYZE2, 
-    RD_WS_SIGNATURE2, RD_WS_MERGEDATA2, 
+    RD_WS_EMULATE2, RD_WS_KB2, RD_WS_ANALYZE2, 
+    RD_WS_MERGEDATA2, 
 
     // Finalize pass
     RD_WS_FINALIZE, RD_WS_DONE, 
@@ -28,11 +28,10 @@ typedef enum {
 
 static const char* const RD_STEP_NAMES[] = {
     "Init",
-    "Emulate #1", "Analyze #1", 
-    "Signature #1", "Merge Data #1",
-    "Merge Code",
-    "Emulate #2", "Analyze #2", 
-    "Signature #2", "Merge Data #2",
+    "Emulate #1", "Knowledge Base #1", "Analyze #1", 
+    "Merge Data #1",
+    "Emulate #2", "Knowledge Base #2", "Analyze #2", 
+    "Merge Data #2",
     "Finalize", "Done",
 };
 
@@ -67,6 +66,37 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     }
 }
 
+static void _rd_worker_apply_noret(RDContext* ctx) {
+    RDXRefVect xrefs = {0};
+
+    RDAddressVect norets;
+    vect_dup(&norets, &ctx->noret_seeds);
+    rd_i_db_begin(ctx);
+
+    RDAddress* address;
+    vect_each(address, &norets) {
+        rd_i_get_xrefs_to_ex(ctx, *address, RD_XR_NONE, &xrefs);
+
+        const RDXRef* r;
+        vect_each(r, &xrefs) {
+            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, r->address);
+            assert(seg);
+
+            usize idx = rd_i_address2index(seg, r->address);
+            if(rd_flagsbuffer_has_cond(seg->flags, idx)) continue;
+
+            if(rd_flagsbuffer_has_jump(seg->flags, idx) ||
+               rd_flagsbuffer_has_call(seg->flags, idx)) {
+                rd_i_set_noret(ctx, seg, idx);
+            }
+        }
+    }
+
+    rd_i_db_commit(ctx);
+    vect_destroy(&norets);
+    vect_destroy(&xrefs);
+}
+
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx); // Show pre-analysis listing
     if(status) status->is_listing_changed = true;
@@ -87,6 +117,12 @@ static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
         ctx->engine.emulate_start = 0;
         ctx->engine.step++;
     }
+}
+
+static void _rd_worker_step_kb(RDContext* ctx) {
+    if(!vect_is_empty(&ctx->kb->noret_names)) _rd_worker_apply_noret(ctx);
+
+    ctx->engine.step++;
 }
 
 static void _rd_worker_step_analyze(RDContext* ctx) {
@@ -117,14 +153,10 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
         ctx->engine.step++;
 }
 
-static void _rd_worker_step_mergecode(RDContext* ctx) { ctx->engine.step++; }
-
 static void _rd_worker_step_mergedata(RDContext* ctx) {
     rd_i_find_strings(ctx);
     ctx->engine.step++;
 }
-
-static void _rd_worker_step_signature(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx);
@@ -169,16 +201,14 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
             case RD_WS_EMULATE1:
             case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
 
+            case RD_WS_KB1:
+            case RD_WS_KB2: _rd_worker_step_kb(self); break;
+
             case RD_WS_ANALYZE1:
             case RD_WS_ANALYZE2: _rd_worker_step_analyze(self); break;
 
-            case RD_WS_MERGECODE: _rd_worker_step_mergecode(self); break;
-
             case RD_WS_MERGEDATA1:
             case RD_WS_MERGEDATA2: _rd_worker_step_mergedata(self); break;
-
-            case RD_WS_SIGNATURE1:
-            case RD_WS_SIGNATURE2: _rd_worker_step_signature(self); break;
 
             case RD_WS_FINALIZE: _rd_worker_step_finalize(self, status); break;
             default: unreachable();

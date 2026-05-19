@@ -25,6 +25,7 @@ typedef struct RDSymbolVect {
 
 typedef enum {
     RD_LK_EMPTY = 0,
+    RD_LK_COMMENT,
     RD_LK_HEX_DUMP,
     RD_LK_FILL,
     RD_LK_INSTRUCTION,
@@ -69,6 +70,7 @@ typedef struct RDListingItem {
         };
         const RDFunction* func; // RD_LK_FUNCTION
         RDListingFillByte fill; // RD_LK_FILL
+        const char* comment;    // RD_LK_COMMENT
     };
 } RDListingItem;
 
@@ -95,6 +97,8 @@ void rd_i_listing_deinit(RDListing* self);
 void rd_i_listing_push_indent(RDListing* self, int c);
 void rd_i_listing_pop_indent(RDListing* self, int c);
 LIndex rd_i_listing_lower_bound(const RDListing* self, RDAddress address);
+LIndex rd_i_listing_add_comment(RDListing* self, const RDSegmentFull* s,
+                                RDAddress address, const char* comment);
 LIndex rd_i_listing_add_segment(RDListing* self, const RDSegmentFull* s);
 LIndex rd_i_listing_add_function(RDListing* self, const RDSegmentFull* s,
                                  const RDFunction* f);

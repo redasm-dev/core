@@ -28,7 +28,7 @@ static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
 static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
                                       RDEngineQueue* q) {
     // consecutive duplicate fast reject
-    if(!queue_is_empty(q) && queue_peek_back(q).address == address)
+    if(!queue_is_empty(q) && queue_peek_last(q).address == address)
         return false;
 
     // non-existing or non-executable segment
@@ -149,7 +149,7 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
             .from = ctx->engine.current.address,
         };
 
-        hmap_clone(&item.registers, &ctx->engine.current.registers);
+        hmap_dup(&item.registers, &ctx->engine.current.registers);
         queue_push(&ctx->engine.qjump, item);
         return true;
     }
@@ -180,7 +180,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
             .name = name ? rd_strdup(name) : NULL,
         };
 
-        hmap_clone(&item.registers, &ctx->engine.current.registers);
+        hmap_dup(&item.registers, &ctx->engine.current.registers);
         queue_push(&ctx->engine.qcall, item);
         return true;
     }
@@ -339,30 +339,34 @@ done:
 }
 
 void rd_flow(RDContext* ctx, RDAddress address) {
+    // unset and do checks
+    optional_unset(&ctx->engine.flow);
+
     const RDSegmentFull* seg = ctx->engine.segment;
+
+    // don't falltrough NORET locations
+    usize curr_idx = rd_i_address2index(seg, ctx->engine.current.address);
+    if(rd_flagsbuffer_has_noret(seg->flags, curr_idx)) return;
 
     // avoid inter-segment flow
     if(!rd_i_segment_contains(seg, address)) return;
 
-    usize idx = rd_i_address2index(seg, address);
+    usize flow_idx = rd_i_address2index(seg, address);
 
-    // unset and do checks
-    optional_unset(&ctx->engine.flow);
-
-    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_tail(seg->flags, flow_idx)) {
         rd_i_add_problem(ctx, address, address,
                          "flow into the middle of an existing instruction "
                          "(processor plugin bug: wrong instruction length?)");
         return;
     }
 
-    if(rd_flagsbuffer_has_data(seg->flags, idx)) {
+    if(rd_flagsbuffer_has_data(seg->flags, flow_idx)) {
         rd_i_add_problem(ctx, address, address, "flow into data region");
         return;
     }
 
-    if(rd_flagsbuffer_has_code(seg->flags, idx)) {
-        rd_i_flagsbuffer_set_flow(seg->flags, idx);
+    if(rd_flagsbuffer_has_code(seg->flags, flow_idx)) {
+        rd_i_flagsbuffer_set_flow(seg->flags, flow_idx);
         return;
     }
 

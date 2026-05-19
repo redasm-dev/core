@@ -33,9 +33,9 @@ typedef struct RDKBDateTime {
 
 typedef struct RDKBObject RDKBObject;
 
-RD_API const RDKBObject* rd_kb_load(const char* kb);
-RD_API bool rd_kb_load_types(const char* kb, RDContext* ctx);
-RD_API bool rd_kb_load_functions(const char* kb, RDContext* ctx);
+RD_API const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb);
+RD_API bool rd_kb_load_types(RDContext* ctx, const char* kb);
+RD_API bool rd_kb_load_functions(RDContext* ctx, const char* kb);
 
 RD_API usize rd_kbobject_get_length(const RDKBObject* self);
 RD_API RDKBObjectKind rd_kbobject_get_kind(const RDKBObject* self);

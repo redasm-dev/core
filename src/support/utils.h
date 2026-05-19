@@ -31,8 +31,10 @@ typedef struct RDBaseParams {
     bool with_sign;
 } RDBaseParams;
 
+int rd_i_address_pred(const void* a, const void* b);
 int rd_i_strcmp_pred(const void* a, const void* b);
 int rd_i_strcmp_intern_pred(const void* a, const void* b);
+int rd_i_strcmp_key_pred(const void* key, const void* s);
 
 RDByteBuffer* rd_i_fromdata(const char* bytes, usize n);
 RDByteBuffer* rd_i_readfile(const char* filepath);

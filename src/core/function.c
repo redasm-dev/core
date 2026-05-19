@@ -65,7 +65,7 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
     rd_graph_set_root(g, root);
 
     while(!vect_is_empty(&w)) {
-        RDFunctionWorkItem wi = vect_pop_back(&w);
+        RDFunctionWorkItem wi = vect_pop_last(&w);
         RDAddress addr = wi.address;
         RDGraphNode src = wi.node;
 
@@ -86,7 +86,7 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
             RDAddress nextaddr = addr + len;
 
             if(rd_i_flags_has_jump(flags)) {
-                rd_i_get_xrefs_from_type_ex(ctx, addr, RD_CR_JUMP, &refs);
+                rd_i_get_xrefs_from_ex(ctx, addr, RD_CR_JUMP, &refs);
 
                 // consume all delay slot instructions into current block
                 while(nextaddr < seg->base.end_address) {

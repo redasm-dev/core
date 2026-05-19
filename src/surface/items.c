@@ -164,7 +164,8 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_REFS)) return;
 
     RDContext* ctx = r->context;
-    if(!rd_i_get_xrefs_from_ex(ctx, item->address, &r->xrefs)) return;
+    if(!rd_i_get_xrefs_from_ex(ctx, item->address, RD_XR_NONE, &r->xrefs))
+        return;
 
     const RDXRef* xref;
     vect_each(xref, &r->xrefs) {
@@ -232,6 +233,15 @@ static void _rd_render_comment(RDRenderer* r, const RDListingItem* item) {
         rd_renderer_text(r, r->comment_buf.data, RD_THEME_COMMENT,
                          RD_THEME_BACKGROUND);
     }
+}
+
+static void _rd_render_comment_item(RDRenderer* r, const RDListingItem* item) {
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
+
+    rd_i_renderer_new_row(r, item);
+    rd_renderer_text(r, "<", RD_THEME_MUTED, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, item->comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, ">", RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
 static void _rd_render_hex_dump_item(RDRenderer* r, const RDListingItem* item) {
@@ -436,6 +446,7 @@ void rd_i_render_item_at(RDRenderer* r, LIndex idx) {
     // clang-format off
     switch(item->kind) {
         case RD_LK_EMPTY:       rd_i_renderer_new_row(r, item);       break;
+        case RD_LK_COMMENT:     _rd_render_comment_item(r, item);     break;
         case RD_LK_HEX_DUMP:    _rd_render_hex_dump_item(r, item);    break;
         case RD_LK_FILL:        _rd_render_fill_item(r, item);        break;
         case RD_LK_SEGMENT:     _rd_render_segment_item(r, item);     break;

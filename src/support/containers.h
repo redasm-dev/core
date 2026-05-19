@@ -22,12 +22,8 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_ins(self, idx, ...)                                               \
     do {                                                                       \
-        _vect_grow((void**)(&(self)->data), &(self)->capacity, (self)->length, \
-                   sizeof(*(self)->data));                                     \
-        if(idx < (self)->length) {                                             \
-            memmove(&(self)->data[(idx) + 1], &(self)->data[(idx)],            \
-                    ((self)->length - (idx)) * sizeof(*(self)->data));         \
-        }                                                                      \
+        _vect_ins((void**)(&(self)->data), &(self)->capacity, (self)->length,  \
+                  (idx), sizeof(*(self)->data));                               \
         (self)->data[(idx)] = __VA_ARGS__;                                     \
         (self)->length++;                                                      \
     } while(0)
@@ -86,21 +82,30 @@ typedef bool (*VectPredicate)(const void*);
     _vect_upper_bound((const void*)(key), (void*)(self)->data, (self)->length, \
                       sizeof(*(self)->data), (VectCompare)(cb))
 
-#define vect_front(self)                                                       \
-    (assert((self)->length && "vect_front: container is empty"),               \
+#define vect_first(self)                                                       \
+    (assert((self)->length && "vect_first: container is empty"),               \
      &(self)->data[0])
 
-#define vect_back(self)                                                        \
-    (assert((self)->length && "vect_back: container is empty"),                \
+#define vect_last(self)                                                        \
+    (assert((self)->length && "vect_last: container is empty"),                \
      &(self)->data[(self)->length - 1])
 
-#define vect_pop_back(self)                                                    \
-    (assert((self)->length && "vect_pop_back: container is empty"),            \
+#define vect_pop_last(self)                                                    \
+    (assert((self)->length && "vect_pop_last: container is empty"),            \
      (self)->data[--(self)->length])
 
 #define vect_reserve(self, n)                                                  \
     _vect_reserve((void**)(&(self)->data), &(self)->capacity, n,               \
                   sizeof(*(self)->data))
+
+#define vect_dup(dst, src)                                                     \
+    do {                                                                       \
+        (dst)->length = (src)->length;                                         \
+        (dst)->capacity = (src)->capacity;                                     \
+        (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));          \
+        memcpy((dst)->data, (src)->data,                                       \
+               (src)->length * sizeof(*(src)->data));                          \
+    } while(0)
 
 #define vect_to_slice(SliceType, self)                                         \
     ((SliceType){.data = (self)->data, .length = (self)->length})
@@ -183,10 +188,10 @@ typedef bool (*VectPredicate)(const void*);
 #define queue_length(self) ((self)->length)
 #define queue_is_empty(self) ((self)->length == 0)
 
-#define queue_peek_front(self)                                                 \
+#define queue_peek_first(self)                                                 \
     (assert(!queue_is_empty(self)), (self)->data[(self)->head])
 
-#define queue_peek_back(self)                                                  \
+#define queue_peek_last(self)                                                  \
     (assert(!queue_is_empty(self)),                                            \
      (self)->data[(self)->head + (self)->length - 1])
 
@@ -248,7 +253,7 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
                          (self)->length, sizeof(*(self)->data));               \
     } while(0)
 
-#define hmap_clone(dst, src)                                                   \
+#define hmap_dup(dst, src)                                                     \
     do {                                                                       \
         (dst)->length = (src)->length;                                         \
         (dst)->capacity = (src)->capacity;                                     \
@@ -314,6 +319,8 @@ void _queue_reserve(void** data, size_t* currcap, size_t newcap,
                     size_t elem_size);
 void _str_append(char** data, size_t* cap, size_t* len, const char* cstr);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
+void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
+               size_t elem_size);
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred);
 size_t _vect_lower_bound(const void* key, void* data, size_t len,

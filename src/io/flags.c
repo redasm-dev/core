@@ -153,10 +153,7 @@ void rd_i_flags_set_func(RDFlags* self) {
     *self &= ~FL_FLOW; // function entries break flow
 }
 
-void rd_i_flags_set_noret(RDFlags* self) {
-    *self |= FL_NORET;
-    *self &= ~FL_FLOW; // NORET and FLOW are mutually exclusive
-}
+void rd_i_flags_set_noret(RDFlags* self) { *self |= FL_NORET; }
 
 void rd_i_flags_set_cond(RDFlags* self) {
     assert(rd_i_flags_has_jump(*self) || rd_i_flags_has_call(*self));
@@ -228,6 +225,11 @@ void rd_i_flags_undefine_xref_out(RDFlags* self) {
 void rd_i_flags_undefine_xref_in(RDFlags* self) {
     assert(!rd_i_flags_has_tail(*self));
     *self &= ~FL_XREFIN;
+}
+
+void rd_i_flags_undefine_flow(RDFlags* self) {
+    assert(rd_i_flags_has_code(*self));
+    *self &= ~FL_FLOW;
 }
 
 void rd_i_flags_undefine_op_over(RDFlags* self) {

@@ -67,7 +67,7 @@ static const char* _rd_kb_kind_str(RDKBObjectKind kind) {
 }
 
 static const char* _rd_kb_get_str_values(const RDKBFieldSchema* s) {
-    RDCharVect* schema_buf = &rd_i_state.kb.schema_buf;
+    RDCharVect* schema_buf = &rd_i_state.kb_schema_buf;
     const char* const* str_v = s->str_values;
     str_clear(schema_buf);
 
@@ -77,7 +77,7 @@ static const char* _rd_kb_get_str_values(const RDKBFieldSchema* s) {
         str_v++;
     }
 
-    return rd_i_state.kb.schema_buf.data;
+    return rd_i_state.kb_schema_buf.data;
 }
 
 static bool _rd_kb_validate_kind(const RDKBObject* o,

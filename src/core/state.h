@@ -1,6 +1,5 @@
 #pragma once
 
-#include "kb/kb.h"
 #include "plugins/module.h"
 #include "support/utils.h"
 #include "theme.h"
@@ -14,7 +13,6 @@ typedef struct RDPluginVect {
 
 typedef struct RDGlobalState {
     RDModule* modules;
-    RDKB kb;
 
     RDPluginVect loaders;
     RDPluginVect processors;
@@ -25,6 +23,11 @@ typedef struct RDGlobalState {
 
     RDLogCallback log_callback;
     void* log_userdata;
+
+    RDPathVect kb_paths;
+    RDCharVect kb_path_buf;
+    RDCharVect kb_schema_buf;
+    RDCharVect kb_key_buf;
 
     RDCharVect fmt_buf;
     RDCharVect log_buf;

@@ -57,6 +57,15 @@ void rd_i_listing_pop_indent(RDListing* self, int c) {
     }
 }
 
+LIndex rd_i_listing_add_comment(RDListing* self, const RDSegmentFull* s,
+                                RDAddress address, const char* comment) {
+    assert(comment);
+
+    LIndex idx = _rd_listing_add_item(self, s, RD_LK_COMMENT, address);
+    self->data[idx].comment = comment;
+    return idx;
+}
+
 LIndex rd_i_listing_add_segment(RDListing* self, const RDSegmentFull* s) {
     return _rd_listing_add_item(self, s, RD_LK_SEGMENT, s->base.start_address);
 }

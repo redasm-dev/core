@@ -79,6 +79,16 @@ void _str_push(char** data, size_t* cap, size_t* len, char c) {
     (*data)[*len] = '\0';
 }
 
+void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
+               size_t elem_size) {
+    _vect_grow(data, capacity, length, elem_size);
+
+    if(idx < length) {
+        memmove((char*)*data + ((idx + 1) * elem_size),
+                (char*)*data + (idx * elem_size), (length - idx) * elem_size);
+    }
+}
+
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred) {
     if(!len) return 0;

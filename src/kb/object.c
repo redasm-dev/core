@@ -27,10 +27,10 @@ static const RDKBObject* _rd_kbobject_seek(const RDKBObject* self,
     const toml_datum_t* datum = rd_i_kb_to_datum(self);
     if(!self || datum->type != TOML_TABLE || !key) return NULL;
 
-    str_clear(&rd_i_state.kb.key_buf);
-    str_append(&rd_i_state.kb.key_buf, key);
+    str_clear(&rd_i_state.kb_key_buf);
+    str_append(&rd_i_state.kb_key_buf, key);
 
-    char* p = rd_i_state.kb.key_buf.data;
+    char* p = rd_i_state.kb_key_buf.data;
     const toml_datum_t* cur = datum;
 
     while(cur && datum->type == TOML_TABLE) {

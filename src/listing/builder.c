@@ -214,6 +214,11 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
 
     rd_i_listing_add_instruction(&b->listing, b->segment, b->address);
 
+    if(rd_flagsbuffer_has_noret(b->flags, index)) {
+        rd_i_listing_add_comment(&b->listing, b->segment, b->address,
+                                 "does not return");
+    }
+
     usize len = rd_i_flagsbuffer_get_range_length(b->flags, index);
     panic_if(!len, "invalid code length");
     b->address += len;

@@ -53,6 +53,7 @@ bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_xref_out(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_xref_in(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_undefine_flow(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_op_over(RDFlagsBuffer* self, usize idx);
 
 bool rd_i_flagsbuffer_set_queued(RDFlagsBuffer* self, usize idx);
