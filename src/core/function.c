@@ -27,10 +27,14 @@ static int _rd_functionchunk_cmp(const void* arg1, const void* arg2) {
     return 0;
 }
 
-static RDGraphNode _rd_function_get_or_add_block(RDGraph* g, RDAddress start,
-                                                 RDAddress ep,
+static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
+                                                 RDAddress start, RDAddress ep,
                                                  RDFunctionWorkVect* w,
                                                  RDFunctionChunkVect* chunks) {
+    // don't create phantom blocks to invalid or non-executable segments
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
+    if(!seg || !(seg->base.perm & RD_SP_X)) return 0;
+
     const RDNodeVect* nodes = rd_i_graph_get_nodes(g);
     const RDGraphNode* it;
 
@@ -98,9 +102,9 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     self->n_instructions = 0;
 
     // set function entry
-    RDGraphNode root = _rd_function_get_or_add_block(g, self->address,
+    RDGraphNode root = _rd_function_get_or_add_block(ctx, g, self->address,
                                                      self->address, &w, chunks);
-    rd_graph_set_root(g, root);
+    if(root) rd_graph_set_root(g, root);
 
     while(!vect_is_empty(&w)) {
         RDFunctionWorkItem wi = vect_pop_last(&w);
@@ -108,7 +112,8 @@ void rd_i_function_rebuild_graph(RDFunction* self,
         RDGraphNode src = wi.node;
 
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, addr);
-        if(!seg) continue;
+        assert(seg);
+        assert(seg->base.perm & RD_SP_X);
 
         bool has_noret = false;
 
@@ -145,25 +150,33 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     const RDXRef* r;
                     vect_each(r, &refs) {
                         RDGraphNode dst = _rd_function_get_or_add_block(
-                            g, r->address, self->address, &w, chunks);
-                        RDGraphEdge e = rd_graph_add_edge(g, src, dst);
-                        const char* c = rd_get_theme_color(RD_THEME_SUCCESS);
-                        rd_graph_set_edge_color(g, &e, c);
+                            ctx, g, r->address, self->address, &w, chunks);
+
+                        if(dst) {
+                            RDGraphEdge e = rd_graph_add_edge(g, src, dst);
+                            const char* c =
+                                rd_get_theme_color(RD_THEME_SUCCESS);
+                            rd_graph_set_edge_color(g, &e, c);
+                        }
                     }
 
                     // false edge: fall-through
                     RDGraphNode dst = _rd_function_get_or_add_block(
-                        g, nextaddr, self->address, &w, chunks);
-                    RDGraphEdge e = rd_graph_add_edge(g, src, dst);
-                    const char* c = rd_get_theme_color(RD_THEME_FAIL);
-                    rd_graph_set_edge_color(g, &e, c);
+                        ctx, g, nextaddr, self->address, &w, chunks);
+
+                    if(dst) {
+                        RDGraphEdge e = rd_graph_add_edge(g, src, dst);
+                        const char* c = rd_get_theme_color(RD_THEME_FAIL);
+                        rd_graph_set_edge_color(g, &e, c);
+                    }
                 }
                 else { // unconditional: single jump edge per target
                     const RDXRef* r;
                     vect_each(r, &refs) {
                         RDGraphNode dst = _rd_function_get_or_add_block(
-                            g, r->address, self->address, &w, chunks);
-                        rd_graph_add_edge(g, src, dst);
+                            ctx, g, r->address, self->address, &w, chunks);
+
+                        if(dst) rd_graph_add_edge(g, src, dst);
                     }
                 }
 
@@ -192,8 +205,8 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             // someone references here: forced split, add flow edge
             if(rd_i_flags_has_xref_in(nextflags)) {
                 RDGraphNode dst = _rd_function_get_or_add_block(
-                    g, nextaddr, self->address, &w, chunks);
-                rd_graph_add_edge(g, src, dst);
+                    ctx, g, nextaddr, self->address, &w, chunks);
+                if(dst) rd_graph_add_edge(g, src, dst);
                 addr = nextaddr;
                 break;
             }
