@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef int (*VectKeyCompare)(const void*, const void*);
 typedef int (*VectCompare)(const void*, const void*);
 typedef bool (*VectPredicate)(const void*);
 
@@ -68,19 +69,19 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_bsearch(self, key, cb)                                            \
     _vect_bsearch((const void*)(key), (const void*)(self)->data,               \
-                  (self)->length, sizeof(*(self)->data), (VectCompare)(cb))
+                  (self)->length, sizeof(*(self)->data), (VectKeyCompare)(cb))
+
+#define vect_lower_bound(self, key, cb)                                        \
+    _vect_lower_bound((const void*)(key), (void*)(self)->data, (self)->length, \
+                      sizeof(*(self)->data), (VectKeyCompare)(cb))
+
+#define vect_upper_bound(self, key, cb)                                        \
+    _vect_upper_bound((const void*)(key), (void*)(self)->data, (self)->length, \
+                      sizeof(*(self)->data), (VectKeyCompare)(cb))
 
 #define vect_stable_part(self, pred)                                           \
     _vect_stable_part((void*)(self)->data, (self)->length,                     \
                       sizeof(*(self)->data), (VectPredicate)(pred));
-
-#define vect_lower_bound(self, key, cb)                                        \
-    _vect_lower_bound((const void*)(key), (void*)(self)->data, (self)->length, \
-                      sizeof(*(self)->data), (VectCompare)(cb))
-
-#define vect_upper_bound(self, key, cb)                                        \
-    _vect_upper_bound((const void*)(key), (void*)(self)->data, (self)->length, \
-                      sizeof(*(self)->data), (VectCompare)(cb))
 
 #define vect_first(self)                                                       \
     (assert((self)->length && "vect_first: container is empty"),               \
@@ -327,11 +328,11 @@ void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred);
 size_t _vect_lower_bound(const void* key, void* data, size_t len,
-                         size_t elem_size, VectCompare cb);
+                         size_t elem_size, VectKeyCompare cb);
 size_t _vect_upper_bound(const void* key, void* data, size_t len,
-                         size_t elem_size, VectCompare cb);
+                         size_t elem_size, VectKeyCompare cb);
 size_t _vect_bsearch(const void* key, const void* data, size_t length,
-                     size_t elem_size, VectCompare cb);
+                     size_t elem_size, VectKeyCompare cb);
 size_t _vect_idx(const void* p, const void* data, size_t length,
                  size_t elem_size);
 void _hmap_rehash(void** data, size_t* capacity, size_t newcapacity,

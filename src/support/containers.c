@@ -124,7 +124,7 @@ size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
 }
 
 size_t _vect_lower_bound(const void* key, void* data, size_t len,
-                         size_t elem_size, VectCompare cb) {
+                         size_t elem_size, VectKeyCompare cb) {
     size_t lo = 0, hi = len;
 
     while(lo < hi) {
@@ -140,7 +140,7 @@ size_t _vect_lower_bound(const void* key, void* data, size_t len,
 }
 
 size_t _vect_upper_bound(const void* key, void* data, size_t len,
-                         size_t elem_size, VectCompare cb) {
+                         size_t elem_size, VectKeyCompare cb) {
     size_t lo = 0, hi = len;
 
     while(lo < hi) {
@@ -156,7 +156,7 @@ size_t _vect_upper_bound(const void* key, void* data, size_t len,
 }
 
 size_t _vect_bsearch(const void* key, const void* data, size_t length,
-                     size_t elem_size, VectCompare cb) {
+                     size_t elem_size, VectKeyCompare cb) {
     if(!data) return length;
 
     const void* p = bsearch(key, data, length, elem_size, cb);
