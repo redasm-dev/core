@@ -2,7 +2,6 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
-#include "io/flagsbuffer.h"
 #include "listing/builder.h"
 #include "support/containers.h"
 #include "support/error.h"
@@ -34,8 +33,14 @@ static const char* const RD_STEP_NAMES[] = {
     "Merge Data #2",
     "Finalize", "Done",
 };
-
 // clang-format on
+
+typedef struct RDAddressQueue {
+    RDAddress* data;
+    usize length;
+    usize capacity;
+    usize head;
+} RDAddressQueue;
 
 static int _rd_worker_problem_cmp(const void* a, const void* b) {
     const RDProblem* pa = (const RDProblem*)a;
@@ -66,35 +71,69 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     }
 }
 
-static void _rd_worker_apply_noret(RDContext* ctx) {
-    RDXRefVect xrefs = {0};
+static void _rd_worker_propagate_noret(RDContext* ctx, RDAddress funcaddr,
+                                       RDXRefVect* xrefs_buf, RDAddressQueue* q,
+                                       bool* changed) {
+    const RDXRefVect* xrefs =
+        rd_i_get_xrefs_to_ex(ctx, funcaddr, RD_CR_CALL, xrefs_buf);
 
-    RDAddressVect norets;
-    vect_dup(&norets, &ctx->noret_seeds);
-    rd_i_db_begin(ctx);
+    const RDXRef* r;
+    vect_each(r, xrefs) {
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, r->address);
+        assert(seg);
 
-    RDAddress* address;
-    vect_each(address, &norets) {
-        rd_i_get_xrefs_to_ex(ctx, *address, RD_XR_NONE, &xrefs);
+        usize idx = rd_i_address2index(seg, r->address);
 
-        const RDXRef* r;
-        vect_each(r, &xrefs) {
-            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, r->address);
-            assert(seg);
+        // already catched if NORET was available from the beginning
+        // or other functions calls again this one
+        if(rd_flagsbuffer_has_noret(seg->flags, idx)) continue;
 
-            usize idx = rd_i_address2index(seg, r->address);
-            if(rd_flagsbuffer_has_cond(seg->flags, idx)) continue;
+        bool applied = rd_i_set_noret(ctx, seg, idx);
 
-            if(rd_flagsbuffer_has_jump(seg->flags, idx) ||
-               rd_flagsbuffer_has_call(seg->flags, idx)) {
-                rd_i_set_noret(ctx, seg, idx);
-            }
+        if(applied) { // ...try to find upper layers...
+            const RDFunction* f = rd_find_function(ctx, r->address);
+            if(f) queue_push(q, f->address);
         }
+
+        *changed |= applied;
+    }
+}
+
+static void _rd_worker_apply_noret(RDContext* ctx) {
+    RDXRefVect xrefs_buf = {0};
+    RDAddressQueue q = {0};
+    bool changed = false;
+
+    RDTypeDef** it;
+    vect_each(it, &ctx->types[RD_TKIND_FUNC]) {
+        const RDTypeDef* tdef = *it;
+        if(!tdef->func_.is_noret) continue;
+
+        RDAddress address;
+        if(!rd_get_address(ctx, tdef->name, &address)) continue;
+
+        _rd_worker_propagate_noret(ctx, address, &xrefs_buf, &q, &changed);
     }
 
-    rd_i_db_commit(ctx);
-    vect_destroy(&norets);
-    vect_destroy(&xrefs);
+    // look for who references them and propagate NORET
+    // (needed if KB is not available & processor plugins stamps NORET too)
+    RDFunction** f;
+    vect_each(f, &ctx->functions) {
+        if(!rd_i_function_has_noret(*f)) continue;
+        queue_push(&q, (*f)->address);
+    }
+
+    // queue propagates NORET to callers and callers of callers...
+    while(!queue_is_empty(&q)) {
+        RDAddress funcaddr;
+        queue_pop(&q, &funcaddr);
+        _rd_worker_propagate_noret(ctx, funcaddr, &xrefs_buf, &q, &changed);
+    }
+
+    if(changed) rd_i_rebuild_all_functions(ctx);
+
+    queue_destroy(&q);
+    vect_destroy(&xrefs_buf);
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
@@ -120,7 +159,7 @@ static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
 }
 
 static void _rd_worker_step_kb(RDContext* ctx) {
-    if(!vect_is_empty(&ctx->kb->noret_names)) _rd_worker_apply_noret(ctx);
+    // if(!vect_is_empty(&ctx->kb->noret_names)) _rd_worker_apply_noret(ctx);
 
     ctx->engine.step++;
 }
@@ -159,10 +198,12 @@ static void _rd_worker_step_mergedata(RDContext* ctx) {
 }
 
 static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
-    rd_i_listing_build(ctx);
+    rd_i_rebuild_all_functions(ctx);
     _rd_worker_follow_pointers(ctx);
-    rd_fire_hook(ctx, "redasm.finalize");
     rd_i_autorename(ctx);
+    _rd_worker_apply_noret(ctx);
+    rd_i_listing_build(ctx);
+    rd_fire_hook(ctx, "redasm.finalize");
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
 
     if(status) status->is_listing_changed = true;
@@ -172,8 +213,8 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
 
     // post-analysis summary
     LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
-             vect_length(&ctx->listing.functions),
-             vect_length(&ctx->listing.symbols), vect_length(&ctx->problems));
+             vect_length(&ctx->functions), vect_length(&ctx->listing.symbols),
+             vect_length(&ctx->problems));
 }
 
 bool rd_is_busy(const RDContext* self) {

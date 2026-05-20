@@ -87,6 +87,7 @@ typedef struct RDInstruction {
     u8 flow;
     u8 delay_slots;
     RDOperand operands[RD_MAX_OPERANDS];
+    bool no_ret;
 
     union {
         bool write_back;

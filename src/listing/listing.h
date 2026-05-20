@@ -83,13 +83,6 @@ typedef struct RDListing {
     RDSymbolVect symbols;
     RDAddressVect exported;
     RDAddressVect imported;
-    RDFunctionChunkVect chunks;
-
-    struct {
-        RDFunction** data;
-        usize length;
-        usize capacity;
-    } functions;
 } RDListing;
 
 void rd_i_listing_init(RDListing* self, RDListing* prev);

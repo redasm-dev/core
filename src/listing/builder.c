@@ -192,8 +192,8 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
     rd_i_listing_push_indent(&b->listing, 2);
 
     if(rd_flagsbuffer_has_func(b->flags, index)) {
-        RDFunction* f = rd_i_function_create(b->context, b->address);
-        vect_push(&b->listing.functions, f);
+        const RDFunction* f = rd_find_function(b->context, b->address);
+        panic_if(!f, "function not found @ %x", b->address);
 
         vect_push(&b->listing.symbols, (RDSymbol){
                                            .kind = RD_SYMBOL_FUNCTION,
@@ -267,13 +267,6 @@ void rd_i_listing_build(RDContext* ctx) {
             rd_i_listing_pop_indent(&b.listing, 2);
         }
     }
-
-    RDFunction** f;
-    vect_each(f, &b.listing.functions) {
-        rd_i_function_build_graph(*f, &b.listing.chunks);
-    }
-
-    rd_i_functionchunk_sort(&b.listing.chunks);
 
     mem_swap(RDListing, &ctx->listing, &b.listing);
     rd_i_listing_deinit(&b.listing);

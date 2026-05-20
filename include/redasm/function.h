@@ -14,6 +14,7 @@ typedef struct RDFunctionChunk {
     RDAddress func_address;
     RDAddress start;
     RDAddress end;
+    bool has_noret;
 } RDFunctionChunk;
 
 RD_API RDGraph* rd_function_get_graph(const RDFunction* self);

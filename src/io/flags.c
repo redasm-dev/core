@@ -125,9 +125,8 @@ void rd_i_flags_set_tail(RDFlags* self) {
 void rd_i_flags_set_flow(RDFlags* self) {
     assert(rd_i_flags_has_code(*self));
 
-    // silently ignore if function entry or noreturn:
-    // these break flow by definition
-    if(rd_i_flags_has_func(*self) || rd_i_flags_has_noret(*self)) return;
+    // FL_FUNC breaks flow by definition (function entries are not fallthrough)
+    if(rd_i_flags_has_func(*self)) return;
 
     *self |= FL_FLOW;
 }

@@ -4,6 +4,7 @@
 #include "io/flags.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
+#include "support/logging.h"
 #include <redasm/allocator.h>
 #include <redasm/function.h>
 
@@ -87,7 +88,8 @@ const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
     return ctx->tdef_buf.data;
 }
 
-void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
+void rd_i_function_rebuild_graph(RDFunction* self,
+                                 RDFunctionChunkVect* chunks) {
     RDContext* ctx = self->context;
     RDGraph* g = rd_graph_create();
     RDFunctionWorkVect w = {0};
@@ -107,6 +109,8 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
 
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, addr);
         if(!seg) continue;
+
+        bool has_noret = false;
 
         while(addr < seg->base.end_address) {
             usize idx = rd_i_address2index(seg, addr);
@@ -176,8 +180,10 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
             usize nextidx = rd_i_address2index(seg, nextaddr);
             RDFlags nextflags = rd_i_flagsbuffer_get(seg->flags, nextidx);
 
-            // ret, noret call, or end of reachable code
-            // no outgoing edge
+            // unreachable code
+            if(rd_i_flags_has_noret(nextflags)) has_noret = true;
+
+            // ret: no outgoing edge
             if(!rd_i_flags_has_flow(nextflags)) {
                 addr = nextaddr;
                 break;
@@ -198,11 +204,15 @@ void rd_i_function_build_graph(RDFunction* self, RDFunctionChunkVect* chunks) {
         // finalize block end address
         RDFunctionChunk* b = (RDFunctionChunk*)rd_graph_get_data(g, src);
         b->end = addr;
+        b->has_noret = has_noret;
     }
 
     vect_destroy(&refs);
     vect_destroy(&w);
+
+    RDGraph* oldgraph = self->graph;
     self->graph = g;
+    if(oldgraph) rd_graph_destroy(oldgraph);
 }
 
 void rd_i_functionchunk_sort(RDFunctionChunkVect* self) {
@@ -239,6 +249,18 @@ void rd_i_function_destroy(RDFunction* self) {
     rd_free(self);
 }
 
+bool rd_i_function_has_noret(const RDFunction* self) {
+    const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);
+
+    RDGraphNode* n;
+    vect_each(n, nodes) {
+        const RDFunctionChunk* chunk = rd_i_function_get_chunk(self, *n);
+        if(chunk->has_noret) return true;
+    }
+
+    return false;
+}
+
 RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }
 
 RDAddress rd_function_get_address(const RDFunction* self) {
@@ -272,6 +294,45 @@ bool rd_function_contains_address(const RDFunction* self, RDAddress address) {
     }
 
     return false;
+}
+
+void rd_i_rebuild_all_functions(RDContext* ctx) {
+    LOG_INFO("generating functions...");
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+
+    RDFunctionVect functions = {0};
+    vect_reserve(&functions, vect_capacity(&ctx->functions));
+    vect_reserve(&functions.chunks, vect_capacity(&ctx->functions.chunks));
+
+    RDSegmentFull** it;
+    vect_each(it, segments) {
+        const RDSegmentFull* s = *it;
+        if(!(s->base.perm & RD_SP_X)) continue;
+
+        RDAddress address = s->base.start_address;
+
+        for(usize i = 0; i < rd_flagsbuffer_get_length(s->flags);
+            i++, address++) {
+            if(!rd_flagsbuffer_has_func(s->flags, i)) continue;
+
+            RDFunction* f = rd_i_function_create(ctx, address);
+            rd_i_function_rebuild_graph(f, &functions.chunks);
+            vect_push(&functions, f);
+        }
+    }
+
+    rd_i_functionchunk_sort(&functions.chunks);
+    mem_swap(RDFunctionVect, &functions, &ctx->functions);
+    rd_i_functionvect_destroy(&functions);
+    rd_fire_hook(ctx, "redasm.functions_created");
+}
+
+void rd_i_functionvect_destroy(RDFunctionVect* self) {
+    rd_i_functionchunk_destroy(&self->chunks);
+
+    RDFunction** f;
+    vect_each(f, self) { rd_i_function_destroy(*f); }
+    vect_destroy(self);
 }
 
 int rd_i_function_find_chunk_pred(const void* key, const void* item) {

@@ -26,17 +26,9 @@ void rd_i_listing_init(RDListing* self, RDListing* prev) {
     vect_reserve(&self->symbols, vect_capacity(&prev->symbols));
     vect_reserve(&self->exported, vect_capacity(&prev->exported));
     vect_reserve(&self->imported, vect_capacity(&prev->imported));
-    vect_reserve(&self->functions, vect_capacity(&prev->functions));
-    vect_reserve(&self->chunks, vect_capacity(&prev->chunks));
 }
 
 void rd_i_listing_deinit(RDListing* self) {
-    rd_i_functionchunk_destroy(&self->chunks);
-
-    RDFunction** f;
-    vect_each(f, &self->functions) { rd_i_function_destroy(*f); }
-    vect_destroy(&self->functions);
-
     vect_destroy(&self->symbols);
     vect_destroy(&self->exported);
     vect_destroy(&self->imported);

@@ -157,13 +157,20 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
     // may be already code (backward jump / loop). Promote FL_JMPDST if so.
     // tail and non-executable cases are already handled inside accept_address.
     const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg) return false;
 
-    if(seg && (seg->base.perm & RD_SP_X)) {
-        usize idx = rd_i_address2index(seg, address);
+    usize dstidx = rd_i_address2index(seg, address);
+    if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
 
-        if(rd_flagsbuffer_has_code(seg->flags, idx) &&
-           !rd_flagsbuffer_has_tail(seg->flags, idx))
-            rd_i_flagsbuffer_set_jmpdst(seg->flags, idx);
+    if((seg->base.perm & RD_SP_X) &&
+       rd_flagsbuffer_has_code(seg->flags, dstidx)) {
+        rd_i_flagsbuffer_set_jmpdst(seg->flags, dstidx);
+    }
+
+    if(rd_flagsbuffer_has_noret(seg->flags, dstidx)) {
+        usize curridx = rd_i_address2index(ctx->engine.segment,
+                                           ctx->engine.current.address);
+        rd_i_set_noret(ctx, ctx->engine.segment, curridx);
     }
 
     return false;
@@ -186,15 +193,21 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
     }
 
     const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg) return false;
 
-    if(seg && (seg->base.perm & RD_SP_X)) {
-        usize idx = rd_i_address2index(seg, address);
+    usize dstidx = rd_i_address2index(seg, address);
+    if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
 
-        if(rd_flagsbuffer_has_code(seg->flags, idx) &&
-           !rd_flagsbuffer_has_tail(seg->flags, idx)) {
-            rd_i_flagsbuffer_set_func(seg->flags, idx);
-            if(name) rd_i_set_name(ctx, address, name, c);
-        }
+    if((seg->base.perm & RD_SP_X) &&
+       rd_flagsbuffer_has_code(seg->flags, dstidx)) {
+        rd_i_flagsbuffer_set_func(seg->flags, dstidx);
+        if(name) rd_i_set_name(ctx, address, name, c);
+    }
+
+    if(rd_flagsbuffer_has_noret(seg->flags, dstidx)) {
+        usize curridx = rd_i_address2index(ctx->engine.segment,
+                                           ctx->engine.current.address);
+        rd_i_set_noret(ctx, ctx->engine.segment, curridx);
     }
 
     return false;
@@ -318,6 +331,9 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
         if(rd_instr_is_delay_slot(&instr))
             rd_i_flagsbuffer_set_dslot(ctx->engine.segment->flags, idx);
+
+        if(instr.no_ret)
+            rd_i_flagsbuffer_set_noret(ctx->engine.segment->flags, idx);
 
         if(ctx->engine.current.kind == RD_EI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);

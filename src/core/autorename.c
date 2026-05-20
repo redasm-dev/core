@@ -63,7 +63,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
     RDIL* rdil = rd_il_create(ctx, NULL);
 
     RDFunction** it;
-    vect_each(it, &ctx->listing.functions) {
+    vect_each(it, &ctx->functions) {
         RDFunction* f = *it;
 
         RDName n;

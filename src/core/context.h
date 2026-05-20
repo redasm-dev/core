@@ -64,6 +64,7 @@ typedef struct RDContext {
     RDDB* db;
     RDKB* kb;
     RDListing listing;
+    RDFunctionVect functions;
     RDHooks* hooks;
 
     RDTypeDefVect types[RD_TKIND_COUNT];

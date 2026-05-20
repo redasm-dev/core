@@ -168,9 +168,6 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
         rd_i_db_set_name(self, address, finalname, c);
         rd_i_flagsbuffer_set_name(seg->flags, idx);
 
-        if(rd_i_kb_is_noret(self, rd_i_strip_prefix(finalname)))
-            rd_i_set_noret(self, seg, idx);
-
         return true;
     }
 
@@ -241,7 +238,7 @@ const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr) {
 }
 
 const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
-    const RDFunctionChunkVect* chunks = &self->listing.chunks;
+    const RDFunctionChunkVect* chunks = &self->functions.chunks;
     if(vect_is_empty(chunks)) return NULL;
 
     usize idx = vect_bsearch(chunks, &address, rd_i_function_find_chunk_pred);
@@ -249,11 +246,11 @@ const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
 
     const RDFunctionChunk* chunk = *vect_at(chunks, idx);
 
-    idx = vect_bsearch(&self->listing.functions, &chunk->func_address,
+    idx = vect_bsearch(&self->functions, &chunk->func_address,
                        rd_i_function_find_pred);
-    if(idx == vect_length(&self->listing.functions)) return NULL;
+    if(idx == vect_length(&self->functions)) return NULL;
 
-    return *vect_at(&self->listing.functions, idx);
+    return *vect_at(&self->functions, idx);
 }
 
 bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
@@ -550,6 +547,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->noret_seeds);
     hmap_destroy(&self->engine.current.registers);
+    rd_i_functionvect_destroy(&self->functions);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
@@ -838,8 +836,8 @@ RDInputMappingSlice rd_get_all_mappings(const RDContext* self) {
 
 RDFunctionSlice rd_get_all_functions(const RDContext* self) {
     return (RDFunctionSlice){
-        .data = (const RDFunction**)self->listing.functions.data,
-        .length = self->listing.functions.length,
+        .data = (const RDFunction**)self->functions.data,
+        .length = self->functions.length,
     };
 }
 
@@ -974,7 +972,12 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
         return false;
     }
 
-    if(name) rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
+    if(name) {
+        rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
+
+        if(rd_i_kb_is_noret(self, rd_i_strip_prefix(name)))
+            rd_i_set_noret(self, seg, idx);
+    }
 
     const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
     const char* ptrtype = rd_integral_from_size(PTR_SIZE);
@@ -1168,6 +1171,9 @@ bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
 }
 
 bool rd_i_set_noret(RDContext* self, const RDSegmentFull* seg, usize idx) {
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
+    if(rd_flagsbuffer_has_noret(seg->flags, idx)) return true;
+
     RDAddress address = rd_i_index2address(seg, idx);
     usize i = vect_lower_bound(&self->noret_seeds, &address, rd_i_address_pred);
 
