@@ -258,7 +258,7 @@ void rd_i_kb_add_noret(RDContext* ctx, const char* name) {
     assert(name);
 
     usize idx =
-        vect_lower_bound(&ctx->kb->noret_names, name, rd_i_strcmp_intern_pred);
+        vect_lower_bound(&ctx->kb->noret_names, name, rd_i_strcmp_key_pred);
 
     if(idx == vect_length(&ctx->kb->noret_names) ||
        name != *vect_at(&ctx->kb->noret_names, idx)) {
