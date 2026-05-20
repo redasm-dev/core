@@ -353,10 +353,12 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
     }
 
     // Sign
-    if(is_neg)
-        out[--c] = '-';
-    else if(p->with_sign)
-        out[--c] = '+';
+    if(p->with_sign) {
+        if(is_neg)
+            out[--c] = '-';
+        else if(p->with_sign)
+            out[--c] = '+';
+    }
 
     return &out[c];
 }

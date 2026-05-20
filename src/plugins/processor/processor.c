@@ -45,8 +45,10 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
                 }
             }
 
-            if(op->displ.offset > 0) rd_renderer_norm(r, "+");
-            if(op->displ.offset < 0) rd_renderer_norm(r, "-");
+            if(op->displ.offset > 0)
+                rd_renderer_norm(r, "+");
+            else if(op->displ.offset < 0)
+                rd_renderer_norm(r, "-");
 
             if(op->displ.offset != 0)
                 rd_renderer_num(r, op->displ.offset, 16, 0, RD_NUM_DEFAULT);
