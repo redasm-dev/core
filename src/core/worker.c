@@ -12,11 +12,11 @@ typedef enum {
     RD_WS_INIT = 0,
 
     // 1st pass
-    RD_WS_EMULATE1, RD_WS_KB1, RD_WS_ANALYZE1, 
+    RD_WS_EMULATE1, RD_WS_ANALYZE1, 
     RD_WS_MERGEDATA1, 
 
     // 2nd pass
-    RD_WS_EMULATE2, RD_WS_KB2, RD_WS_ANALYZE2, 
+    RD_WS_EMULATE2, RD_WS_ANALYZE2, 
     RD_WS_MERGEDATA2, 
 
     // Finalize pass
@@ -27,9 +27,9 @@ typedef enum {
 
 static const char* const RD_STEP_NAMES[] = {
     "Init",
-    "Emulate #1", "Knowledge Base #1", "Analyze #1", 
+    "Emulate #1", "Analyze #1", 
     "Merge Data #1",
-    "Emulate #2", "Knowledge Base #2", "Analyze #2", 
+    "Emulate #2","Analyze #2", 
     "Merge Data #2",
     "Finalize", "Done",
 };
@@ -158,12 +158,6 @@ static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
     }
 }
 
-static void _rd_worker_step_kb(RDContext* ctx) {
-    // if(!vect_is_empty(&ctx->kb->noret_names)) _rd_worker_apply_noret(ctx);
-
-    ctx->engine.step++;
-}
-
 static void _rd_worker_step_analyze(RDContext* ctx) {
     RDAnalyzerItem** it;
     vect_each(it, &ctx->analyzerplugins) {
@@ -241,9 +235,6 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 
             case RD_WS_EMULATE1:
             case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
-
-            case RD_WS_KB1:
-            case RD_WS_KB2: _rd_worker_step_kb(self); break;
 
             case RD_WS_ANALYZE1:
             case RD_WS_ANALYZE2: _rd_worker_step_analyze(self); break;
