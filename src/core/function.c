@@ -81,6 +81,8 @@ const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
 
     str_push(&ctx->tdef_buf, ')');
 
+    if(f_type->is_noret) str_append(&ctx->tdef_buf, " noreturn");
+
     assert(!vect_is_empty(&ctx->tdef_buf));
     return ctx->tdef_buf.data;
 }
