@@ -324,11 +324,6 @@ bool rd_i_db_del_type(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_del_type(ctx, address);
 }
 
-void rd_i_db_del_type_range(RDContext* ctx, RDAddress startaddr,
-                            RDAddress endaddr) {
-    _rd_i_db_query_del_type_range(ctx, startaddr, endaddr);
-}
-
 const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_get_comment(ctx, address);
 }
@@ -454,7 +449,7 @@ RDOvrOperandVect* rd_i_db_get_all_ovr_operand(RDContext* ctx,
     return _rd_i_db_query_get_all_ovr_operand(ctx, address);
 }
 
-RDConfidence rd_i_db_get_max_confidence(RDContext* ctx, RDAddress start,
-                                        RDAddress end) {
-    return _rd_i_db_query_get_max_confidence(ctx, start, end);
+RDConfidence rd_i_db_get_undefine_confidence(RDContext* ctx, RDAddress start,
+                                             RDAddress end) {
+    return _rd_i_db_query_get_undefine_confidence(ctx, start, end);
 }

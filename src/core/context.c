@@ -487,7 +487,8 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
     RDAddress startaddr = rd_i_index2address(seg, startidx);
     RDAddress endaddr = startaddr + (endidx - startidx);
 
-    RDConfidence maxc = rd_i_db_get_max_confidence(self, startaddr, endaddr);
+    RDConfidence maxc =
+        rd_i_db_get_undefine_confidence(self, startaddr, endaddr);
     if(maxc > c) return false;
 
     RDAddress curr = startaddr;
@@ -498,11 +499,7 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
             // FL_TYPE cleared by rd_i_flagsbuffer_undefine below
         }
 
-        if(rd_flagsbuffer_has_name(seg->flags, i)) {
-            rd_i_db_del_name(self, curr);
-            rd_i_flagsbuffer_undefine_name(seg->flags, i);
-        }
-
+        // remove references outgoing from this location
         if(rd_i_flagsbuffer_has_xref_out(seg->flags, i)) {
             const RDXRefVect* refs = rd_i_get_xrefs_from_ex(
                 self, curr, RD_XR_NONE, &self->und_xrefs);
@@ -510,19 +507,8 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
             const RDXRef* r;
             vect_each(r, refs) rd_i_del_xref(self, curr, r->address, c);
         }
-
-        // collect sources before deleting so we can fix remote FL_XREFOUT
-        if(rd_i_flagsbuffer_has_xref_in(seg->flags, i)) {
-            const RDXRefVect* refs =
-                rd_i_get_xrefs_to_ex(self, curr, RD_XR_NONE, &self->und_xrefs);
-
-            const RDXRef* r;
-            vect_each(r, refs) rd_i_del_xref(self, r->address, curr, c);
-        }
     }
 
-    // clears FL_CODE/FL_DATA/FL_TAIL
-    // preserves FL_NAME/FL_XREFIN/FL_XREFOUT (handled explicitly above)
     rd_i_flagsbuffer_undefine(seg->flags, startidx, endidx - startidx);
     return true;
 }

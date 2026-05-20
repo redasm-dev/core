@@ -3,7 +3,6 @@
 #include "io/flagsbuffer.h"
 #include "support/error.h"
 #include "types/def.h"
-#include <string.h>
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeModifier mod) {
@@ -74,54 +73,14 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
     if(!newsz) return false;
 
     usize idx = rd_i_address2index(seg, address);
-    usize startidx_exp = idx;
-    usize endidx_exp = startidx_exp + newsz;
+    usize startidx_exp = idx, endidx_exp = startidx_exp + newsz;
     rd_i_flagsbuffer_expand_range(seg->flags, &startidx_exp, &endidx_exp);
 
     if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
                                    endidx_exp - startidx_exp))
         return false;
 
-    // Walk all type HEADs in the expanded range.
-    // Confidence of the range is the max confidence of any member, not just
-    // the head.
-    // Any single item outranking c blocks the whole operation.
-    usize i = startidx_exp;
-    while(i < endidx_exp) {
-        if(rd_i_flagsbuffer_has_type(seg->flags, i)) {
-            RDAddress a = rd_i_index2address(seg, i);
-            RDTypeFull oldt;
-            bool ok = rd_i_db_get_type(ctx, a, &oldt);
-            assert(ok && "type flag set but not in DB");
-
-            if(oldt.confidence > c) return false; // confidence wins over size
-
-            if(oldt.confidence == c && i == idx) {
-                usize oldsz = rd_i_size_of(ctx, oldt.base.name, oldt.base.count,
-                                           oldt.base.mod);
-
-                if(newsz <= oldsz && !strcmp(name, oldt.base.name))
-                    return false;
-
-                // different type name or larger: allow replacement
-            }
-
-            i += rd_i_flagsbuffer_get_range_length(seg->flags, i);
-        }
-        else
-            i++;
-    }
-
-    // startidx_exp is always a valid HEAD index, safe to convert.
-    // endidx_exp is an exclusive upper bound, may equal flags->base.length,
-    // which equals end_address.
-    // Compute arithmetically to avoid the assertion.
-    RDAddress startaddr_exp = rd_i_index2address(seg, startidx_exp);
-    RDAddress endaddr_exp = startaddr_exp + (endidx_exp - startidx_exp);
-    rd_i_db_del_type_range(ctx, startaddr_exp, endaddr_exp);
-
-    rd_i_flagsbuffer_undefine(seg->flags, startidx_exp,
-                              endidx_exp - startidx_exp);
+    if(!rd_i_undefine_n(ctx, address, newsz, c)) return false;
 
     rd_i_flagsbuffer_set_type(seg->flags, idx, newsz);
     rd_i_db_set_type(ctx, address, name, n, flags, c);

@@ -519,18 +519,6 @@ bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address) {
     return sqlite3_changes(ctx->db->handle) > 0;
 }
 
-void _rd_i_db_query_del_type_range(RDContext* ctx, RDAddress startaddr,
-                                   RDAddress endaddr) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_TYPE_RANGE, "\
-        DELETE FROM Types \
-            WHERE address >= :start AND address < :end \
-    ");
-
-    _rd_db_bind_param_int(ctx, stmt, ":start", startaddr);
-    _rd_db_bind_param_int(ctx, stmt, ":end", endaddr);
-    _rd_db_step(ctx, stmt);
-}
-
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     if(tdef->kind == RD_TKIND_PRIM) return;
 
@@ -777,22 +765,17 @@ RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
     return &ctx->ovr_ops_buf;
 }
 
-RDConfidence _rd_i_db_query_get_max_confidence(RDContext* ctx, RDAddress start,
-                                               RDAddress end) {
+RDConfidence _rd_i_db_query_get_undefine_confidence(RDContext* ctx,
+                                                    RDAddress start,
+                                                    RDAddress end) {
     sqlite3_stmt* stmt =
-        _rd_db_prepare_query(ctx, RD_QUERY_GET_MAX_CONFIDENCE, "\
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_UNDEFINE_CONFIDENCE, "\
             SELECT MAX(confidence) FROM ( \
                 SELECT confidence FROM Types \
                 WHERE address >= :start AND address < :end \
                 UNION ALL \
-                SELECT confidence FROM Names \
-                WHERE address >= :start AND address < :end \
-                UNION ALL \
                 SELECT confidence FROM XRefs \
                 WHERE from_address >= :start AND from_address < :end \
-                UNION ALL \
-                SELECT confidence FROM XRefs \
-                WHERE to_address >= :start AND to_address < :end \
             )\
         ");
 

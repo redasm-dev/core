@@ -41,7 +41,6 @@ enum {
     RD_QUERY_SET_TYPE,
     RD_QUERY_GET_TYPE,
     RD_QUERY_DEL_TYPE,
-    RD_QUERY_DEL_TYPE_RANGE, // ?!?
 
     RD_QUERY_ADD_SEGMENT,
     RD_QUERY_ADD_MAPPING,
@@ -62,7 +61,7 @@ enum {
     RD_QUERY_SET_USERDATA,
     RD_QUERY_GET_USERDATA,
 
-    RD_QUERY_GET_MAX_CONFIDENCE,
+    RD_QUERY_GET_UNDEFINE_CONFIDENCE,
 
     RD_QUERY_COUNT,
 };
@@ -112,8 +111,6 @@ void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address,
                              RDConfidence c);
 bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
-void _rd_i_db_query_del_type_range(RDContext* ctx, RDAddress startaddr,
-                                   RDAddress endaddr);
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address);
@@ -136,5 +133,6 @@ bool _rd_i_db_query_has_ovr_operand(RDContext* ctx, RDAddress address);
 RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
                                                      RDAddress address);
 
-RDConfidence _rd_i_db_query_get_max_confidence(RDContext* ctx, RDAddress start,
-                                               RDAddress end);
+RDConfidence _rd_i_db_query_get_undefine_confidence(RDContext* ctx,
+                                                    RDAddress start,
+                                                    RDAddress end);
