@@ -95,7 +95,7 @@ bool rd_surfacegraph_jump_to_ep(RDSurfaceGraph* self) {
 
 bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     RDContext* ctx = self->renderer->context;
-    const RDFunction* f = rd_find_function(ctx, address);
+    const RDFunction* f = rd_i_find_function(ctx, address);
     if(!f) return false;
 
     if(f != self->function) {
@@ -147,7 +147,7 @@ bool rd_surfacegraph_go_back(RDSurfaceGraph* self) {
     // start is the listing index of function
     if(self->state.start < vect_length(listing)) {
         RDAddress addr = vect_at(listing, self->state.start)->address;
-        self->function = rd_find_function(ctx, addr);
+        self->function = rd_i_find_function(ctx, addr);
     }
 
     rd_surfacegraph_render(self);
@@ -164,7 +164,7 @@ bool rd_surfacegraph_go_forward(RDSurfaceGraph* self) {
     // start is the listing index of function
     if(self->state.start < vect_length(listing)) {
         RDAddress addr = vect_at(listing, self->state.start)->address;
-        self->function = rd_find_function(ctx, addr);
+        self->function = rd_i_find_function(ctx, addr);
     }
 
     rd_surfacegraph_render(self);

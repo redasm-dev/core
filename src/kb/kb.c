@@ -138,12 +138,7 @@ static void _rd_kb_apply_noret(RDContext* ctx) {
     vect_each(it, &ctx->kb->noret_names) {
         RDAddress address;
         if(!rd_get_address(ctx, *it, &address)) continue;
-
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-        assert(seg);
-
-        usize idx = rd_i_address2index(seg, address);
-        rd_i_set_noret(ctx, seg, idx);
+        rd_i_set_noret(ctx, address);
     }
 }
 

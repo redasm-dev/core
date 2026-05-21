@@ -89,6 +89,23 @@ void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
     }
 }
 
+void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
+                  VectDelIf cb) {
+    char* p = (char*)data;
+    size_t write = 0;
+
+    for(size_t i = 0; i < *len; i++) {
+        char* elem = p + (i * elem_size);
+
+        if(!cb(key, elem)) { // no compact, preserve
+            if(write != i) memcpy(p + (write * elem_size), elem, elem_size);
+            write++;
+        }
+    }
+
+    *len = write;
+}
+
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred) {
     if(!len) return 0;

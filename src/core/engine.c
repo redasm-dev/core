@@ -167,11 +167,8 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
         rd_i_flagsbuffer_set_jmpdst(seg->flags, dstidx);
     }
 
-    if(rd_flagsbuffer_has_noret(seg->flags, dstidx)) {
-        usize curridx = rd_i_address2index(ctx->engine.segment,
-                                           ctx->engine.current.address);
-        rd_i_set_noret(ctx, ctx->engine.segment, curridx);
-    }
+    if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
+        rd_i_set_noret(ctx, ctx->engine.current.address);
 
     return false;
 }
@@ -204,11 +201,8 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
         if(name) rd_i_set_name(ctx, address, name, c);
     }
 
-    if(rd_flagsbuffer_has_noret(seg->flags, dstidx)) {
-        usize curridx = rd_i_address2index(ctx->engine.segment,
-                                           ctx->engine.current.address);
-        rd_i_set_noret(ctx, ctx->engine.segment, curridx);
-    }
+    if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
+        rd_i_set_noret(ctx, ctx->engine.current.address);
 
     return false;
 }

@@ -8,6 +8,7 @@
 
 typedef int (*VectKeyCompare)(const void*, const void*);
 typedef int (*VectCompare)(const void*, const void*);
+typedef bool (*VectDelIf)(const void*, void*);
 typedef bool (*VectPredicate)(const void*);
 
 #define vect_length(self) ((self)->length)
@@ -66,6 +67,10 @@ typedef bool (*VectPredicate)(const void*);
                   (VectCompare)(cb));                                          \
         }                                                                      \
     } while(0)
+
+#define vect_del_if(self, key, cb)                                             \
+    _vect_del_if((const void*)(key), (void*)(self)->data, &(self)->length,     \
+                 sizeof(*(self)->data), (VectDelIf)(cb))
 
 #define vect_bsearch(self, key, cb)                                            \
     _vect_bsearch((const void*)(key), (const void*)(self)->data,               \
@@ -325,6 +330,8 @@ void _str_append(char** data, size_t* cap, size_t* len, const char* cstr);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
 void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
                size_t elem_size);
+void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
+                  VectDelIf cb);
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred);
 size_t _vect_lower_bound(const void* key, void* data, size_t len,

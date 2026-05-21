@@ -192,7 +192,7 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
     rd_i_listing_push_indent(&b->listing, 2);
 
     if(rd_flagsbuffer_has_func(b->flags, index)) {
-        const RDFunction* f = rd_find_function(b->context, b->address);
+        const RDFunction* f = rd_i_find_function(b->context, b->address);
         panic_if(!f, "function not found @ %x", b->address);
 
         vect_push(&b->listing.symbols, (RDSymbol){

@@ -50,6 +50,7 @@ typedef struct RDContext {
     RDCharVect problem_buf;
     RDCharVect tdef_buf;
     RDCharVect type_buf;
+    RDFunctionChunkVect chunk_buf;
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
 
@@ -68,7 +69,6 @@ typedef struct RDContext {
     RDHooks* hooks;
 
     RDTypeDefVect types[RD_TKIND_COUNT];
-    RDAddressVect noret_seeds;
 
     struct {
         RDAddress value;
@@ -127,7 +127,9 @@ const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
 const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefType type, RDXRefVect* r);
 
-bool rd_i_set_noret(RDContext* self, const RDSegmentFull* seg, usize idx);
+RDFunction* rd_i_find_function(const RDContext* self, RDAddress address);
+
+bool rd_i_set_noret(RDContext* self, RDAddress address);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
                       const char* fmt, ...);

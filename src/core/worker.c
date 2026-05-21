@@ -35,6 +35,8 @@ static const char* const RD_STEP_NAMES[] = {
 };
 // clang-format on
 
+static_assert(rd_count_of(RD_STEP_NAMES) == RD_WS_COUNT, "step names mismatch");
+
 typedef struct RDAddressQueue {
     RDAddress* data;
     usize length;
@@ -71,39 +73,17 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     }
 }
 
-static void _rd_worker_propagate_noret(RDContext* ctx, RDAddress funcaddr,
-                                       RDXRefVect* xrefs_buf, RDAddressQueue* q,
-                                       bool* changed) {
-    const RDXRefVect* xrefs =
-        rd_i_get_xrefs_to_ex(ctx, funcaddr, RD_CR_CALL, xrefs_buf);
-
-    const RDXRef* r;
-    vect_each(r, xrefs) {
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, r->address);
-        assert(seg);
-
-        usize idx = rd_i_address2index(seg, r->address);
-
-        // already catched if NORET was available from the beginning
-        // or other functions calls again this one
-        if(rd_flagsbuffer_has_noret(seg->flags, idx)) continue;
-
-        bool applied = rd_i_set_noret(ctx, seg, idx);
-
-        if(applied) { // ...try to find upper layers...
-            const RDFunction* f = rd_find_function(ctx, r->address);
-            if(f) queue_push(q, f->address);
-        }
-
-        *changed |= applied;
-    }
-}
-
 static void _rd_worker_apply_noret(RDContext* ctx) {
-    RDXRefVect xrefs_buf = {0};
-    RDAddressQueue q = {0};
-    bool changed = false;
+    RDXRefVect xrefs = {0};
+    RDAddressVect v = {0};
 
+    RDFunction** f;
+    vect_each(f, &ctx->functions) {
+        if(!rd_i_function_is_noret(*f)) continue;
+        vect_push(&v, (*f)->address);
+    }
+
+    // integrate with KB, if available
     RDTypeDef** it;
     vect_each(it, &ctx->types[RD_TKIND_FUNC]) {
         const RDTypeDef* tdef = *it;
@@ -112,28 +92,34 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
 
-        _rd_worker_propagate_noret(ctx, address, &xrefs_buf, &q, &changed);
+        usize idx = vect_lower_bound(&v, &address, rd_i_address_kcmp_pred);
+        if(idx < vect_length(&v) && *vect_at(&v, idx) == address) continue;
+
+        vect_ins(&v, idx, address);
     }
 
-    // look for who references them and propagate NORET
-    // (needed if KB is not available & processor plugins stamps NORET too)
-    RDFunction** f;
-    vect_each(f, &ctx->functions) {
-        if(!rd_i_function_has_noret(*f)) continue;
-        queue_push(&q, (*f)->address);
+    while(!vect_is_empty(&v)) {
+        RDAddress address = vect_pop_last(&v);
+        rd_i_get_xrefs_to_ex(ctx, address, RD_CR_CALL, &xrefs);
+
+        const RDXRef* r;
+        vect_each(r, &xrefs) {
+            // stamp FL_NORET on the call site
+            if(!rd_i_set_noret(ctx, r->address)) continue;
+
+            // find containing function, rebuild its graph
+            RDFunction* f = rd_i_find_function(ctx, r->address);
+            if(!f) continue;
+
+            rd_i_rebuild_function(f);
+
+            // if all exit blocks are now NORET, propagate further
+            if(rd_i_function_is_noret(f)) vect_push(&v, f->address);
+        }
     }
 
-    // queue propagates NORET to callers and callers of callers...
-    while(!queue_is_empty(&q)) {
-        RDAddress funcaddr;
-        queue_pop(&q, &funcaddr);
-        _rd_worker_propagate_noret(ctx, funcaddr, &xrefs_buf, &q, &changed);
-    }
-
-    if(changed) rd_i_rebuild_all_functions(ctx);
-
-    queue_destroy(&q);
-    vect_destroy(&xrefs_buf);
+    vect_destroy(&v);
+    vect_destroy(&xrefs);
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
@@ -197,7 +183,7 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_autorename(ctx);
     _rd_worker_apply_noret(ctx);
     rd_i_listing_build(ctx);
-    rd_fire_hook(ctx, "redasm.finalize");
+    rd_fire_hook(ctx, "redasm.finalized");
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
 
     if(status) status->is_listing_changed = true;

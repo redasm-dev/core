@@ -237,26 +237,30 @@ const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr) {
     return (const RDSegment*)rd_i_db_find_segment(self, addr);
 }
 
-const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
+RDFunction* rd_i_find_function(const RDContext* self, RDAddress address) {
     const RDFunctionChunkVect* chunks = &self->functions.chunks;
     if(vect_is_empty(chunks)) return NULL;
 
-    usize idx = vect_bsearch(chunks, &address, rd_i_function_find_chunk_pred);
+    usize idx = vect_bsearch(chunks, &address, rd_i_functionchunk_kcmp_pred);
     if(idx == vect_length(chunks)) return NULL;
 
     const RDFunctionChunk* chunk = *vect_at(chunks, idx);
 
     idx = vect_bsearch(&self->functions, &chunk->func_address,
-                       rd_i_function_find_pred);
+                       rd_i_function_kcmp_pred);
     if(idx == vect_length(&self->functions)) return NULL;
 
     return *vect_at(&self->functions, idx);
 }
 
+const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
+    return rd_i_find_function(self, address);
+}
+
 bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
     const RDMappingVect* mappings = rd_i_db_get_mappings(self);
 
-    usize idx = vect_bsearch(mappings, &address, rd_i_mapping_find_pred);
+    usize idx = vect_bsearch(mappings, &address, rd_i_mapping_kcmp_pred);
     if(idx == vect_length(mappings)) return NULL;
 
     RDInputMapping* m = vect_at(mappings, idx);
@@ -545,7 +549,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->und_xrefs);
     vect_destroy(&self->xrefs_from);
     vect_destroy(&self->lift_buf);
-    vect_destroy(&self->noret_seeds);
+    vect_destroy(&self->chunk_buf);
     hmap_destroy(&self->engine.current.registers);
     rd_i_functionvect_destroy(&self->functions);
     rd_i_listing_deinit(&self->listing);
@@ -976,7 +980,7 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
         rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
 
         if(rd_i_kb_is_noret(self, rd_i_strip_prefix(name)))
-            rd_i_set_noret(self, seg, idx);
+            rd_i_set_noret(self, address);
     }
 
     const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
@@ -1170,18 +1174,14 @@ bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
     return rd_i_db_get_imported(ctx, address, imp);
 }
 
-bool rd_i_set_noret(RDContext* self, const RDSegmentFull* seg, usize idx) {
+bool rd_i_set_noret(RDContext* self, RDAddress address) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
-    if(rd_flagsbuffer_has_noret(seg->flags, idx)) return true;
+    if(rd_flagsbuffer_has_noret(seg->flags, idx)) return false;
 
-    RDAddress address = rd_i_index2address(seg, idx);
-    usize i = vect_lower_bound(&self->noret_seeds, &address, rd_i_address_pred);
-
-    if(i < vect_length(&self->noret_seeds) &&
-       *vect_at(&self->noret_seeds, i) == address)
-        return false;
-
-    vect_ins(&self->noret_seeds, i, address);
     rd_i_flagsbuffer_set_noret(seg->flags, idx);
 
     usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);

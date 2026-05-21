@@ -31,7 +31,8 @@ typedef struct RDBaseParams {
     bool with_sign;
 } RDBaseParams;
 
-int rd_i_address_pred(const void* a, const void* b);
+int rd_i_address_cmp_pred(const void* a, const void* b);
+int rd_i_address_kcmp_pred(const void* key, const void* item);
 int rd_i_strcmp_pred(const void* a, const void* b);
 int rd_i_strcmp_intern_pred(const void* a, const void* b);
 int rd_i_strcmp_key_pred(const void* key, const void* s);
