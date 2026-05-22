@@ -1,5 +1,7 @@
 #include "segment.h"
+#include "io/buffer.h"
 #include <assert.h>
+#include <redasm/allocator.h>
 #include <redasm/segment.h>
 
 usize rd_i_address2index(const RDSegmentFull* self, RDAddress addr) {
@@ -17,4 +19,9 @@ RDAddress rd_i_index2address(const RDSegmentFull* self, usize idx) {
 
 const RDFlagsBuffer* rd_segment_get_flags(const RDSegment* self) {
     return ((const RDSegmentFull*)self)->flags;
+}
+
+void rd_i_segment_destroy(RDSegmentFull* self) {
+    rd_i_buffer_destroy((RDBuffer*)self->flags);
+    rd_free(self);
 }

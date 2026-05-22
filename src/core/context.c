@@ -204,7 +204,7 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                  endaddr);
     }
     else
-        rd_free(s);
+        rd_i_segment_destroy(s);
 
     return true;
 }

@@ -90,12 +90,9 @@ void rd_i_db_destroy(RDDB* self) {
     vect_destroy(&self->segment_regs);
 
     RDSegmentFull** s;
-    vect_each(s, &self->segments) {
-        rd_i_buffer_destroy((RDBuffer*)(*s)->flags);
-        rd_free(*s);
-    }
-
+    vect_each(s, &self->segments) { rd_i_segment_destroy(*s); }
     vect_destroy(&self->segments);
+
     vect_destroy(&self->mappings);
 
     for(int i = 0; i < RD_QUERY_COUNT; i++) {
