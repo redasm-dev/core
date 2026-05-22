@@ -241,6 +241,8 @@ void rd_disassemble(RDContext* ctx) {
         ;
 }
 
+void rd_set_scan_char16(RDContext* ctx, bool b) { ctx->scan_char16 = b; }
+
 const char* rd_str_intern(RDContext* self, const char* s) {
     return rd_i_strpool_intern(&self->strings, s);
 }

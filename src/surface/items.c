@@ -98,9 +98,13 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     if(!strcmp(t->name, "char16") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
         for(usize i = 0; i < t->count; i++) {
+            bool ok = false;
             u16 v;
-            bool ok = is_be ? rd_i_buffer_read_be16(flags, idx, &v)
-                            : rd_i_buffer_read_le16(flags, idx, &v);
+
+            if(is_be)
+                ok = rd_i_buffer_read_be16(flags, idx + (i * sizeof(i16)), &v);
+            else
+                ok = rd_i_buffer_read_le16(flags, idx + (i * sizeof(i16)), &v);
 
             if(!ok) {
                 rd_renderer_muted(r, "?");
@@ -194,7 +198,10 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
         }
 
         // render strings only
-        if(strcmp(t.base.name, "char") != 0 || !t.base.count) continue;
+        if((strcmp(t.base.name, "char") != 0 &&
+            strcmp(t.base.name, "char16") != 0) ||
+           !t.base.count)
+            continue;
 
         rd_renderer_ws(r, RD_SURFACE_WS_REFS);
         if(is_ptr) rd_renderer_norm(r, " => ");

@@ -911,18 +911,15 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
             bool ok = rd_i_get_type(ctx, self->address, &t);
             assert(ok && "cannot convert symbol to string, type not found");
 
-            // clang-format off
-            // reserve at least these bytes, +2 for quoting, +1 null terminator
-            usize sz = rd_i_size_of(ctx, t.base.name, t.base.count,
-                                          t.base.mod) + 3;
-            // clang-format on
-
+            usize char_sz = rd_i_size_of(ctx, t.base.name, 0, RD_TYPE_NONE);
+            usize n = char_sz * t.base.count;
             usize idx = rd_i_address2index(seg, self->address);
-            vect_reserve(&ctx->sym_buf, sz);
+            // reserve at least these bytes, +2 for quoting, +1 null terminator
+            vect_reserve(&ctx->sym_buf, t.base.count + 3);
             vect_clear(&ctx->sym_buf);
             vect_push(&ctx->sym_buf, '\"');
 
-            for(usize i = 0; i < t.base.count; i++) {
+            for(usize i = 0; i < n; i += char_sz) {
                 u8 v;
                 ok = rd_flagsbuffer_get_value(seg->flags, idx + i, &v);
                 assert(ok &&

@@ -22,8 +22,8 @@ static RDTypeDef t_prim_i8 = RD_PRIMITIVE("i8", sizeof(i8));
 static RDTypeDef t_prim_i16 = RD_PRIMITIVE("i16", sizeof(i16));
 static RDTypeDef t_prim_i32 = RD_PRIMITIVE("i32", sizeof(i32));
 static RDTypeDef t_prim_i64 = RD_PRIMITIVE("i64", sizeof(i64));
-static RDTypeDef t_prim_char = RD_PRIMITIVE("char", sizeof(char));
-static RDTypeDef t_prim_char16 = RD_PRIMITIVE("char16", sizeof(u16));
+static RDTypeDef t_prim_char = RD_PRIMITIVE("char", sizeof(i8));
+static RDTypeDef t_prim_char16 = RD_PRIMITIVE("char16", sizeof(i16));
 
 static bool _rd_typedef_enum_in_range(const char* type, i64 val) {
     if(!strcmp(type, "u8")) return val >= 0 && val <= UINT8_MAX;

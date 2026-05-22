@@ -45,25 +45,31 @@ static bool _rd_strings_check_format(const char* s, int len) {
 }
 
 static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
-                                     usize idx, const RDCharVect* str) {
+                                     usize idx, const char* type,
+                                     const RDCharVect* str,
+                                     RDCharVect* fmt_buf) {
     usize len = vect_length(str) - 1;
 
-    bool valid =
-        (*str->data == '%' && _rd_strings_check_format(str->data, len)) ||
-        len >= ctx->min_string;
+    if(!strcmp(type, "char")) { // C-style strings valid only for ASCII
+        bool valid =
+            (*str->data == '%' && _rd_strings_check_format(str->data, len)) ||
+            len >= ctx->min_string;
 
-    if(!valid) return;
+        if(!valid) return;
+    }
+    else if(len < ctx->min_string)
+        return;
 
-    RDAddress addr = rd_i_index2address(seg, idx);
-    if(rd_auto_type(ctx, addr, "char", vect_length(str), RD_TYPE_NONE))
-        rd_fire_address_hook(ctx, "redasm.string_found", addr);
+    RDAddress address = rd_i_index2address(seg, idx);
+
+    if(rd_auto_type(ctx, address, type, vect_length(str), RD_TYPE_NONE)) {
+        const char* hook = rd_i_format(fmt_buf, "redasm.%s_string_found", type);
+        rd_fire_address_hook(ctx, hook, address);
+    }
 }
 
-void rd_i_find_strings(RDContext* ctx) {
-    _rd_i_strings_init();
-    RDCharVect str = {0};
-    vect_reserve(&str, RD_STRING_BASE_CAPACITY);
-
+static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
+                                  RDCharVect* fmt_buf) {
     const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
     RDSegmentFull** it;
@@ -71,7 +77,7 @@ void rd_i_find_strings(RDContext* ctx) {
         RDSegmentFull* seg = *it;
         RDFlagsBuffer* flags = seg->flags;
         usize startidx = 0;
-        vect_clear(&str);
+        vect_clear(str);
 
         for(usize idx = 0; idx < flags->base.length; idx++) {
             u8 v;
@@ -80,26 +86,93 @@ void rd_i_find_strings(RDContext* ctx) {
                         !rd_flagsbuffer_get_value(flags, idx, &v);
 
             if(skip) {
-                vect_clear(&str);
+                vect_clear(str);
                 continue;
             }
 
             if(v == 0) {
-                vect_push(&str, 0);
-                _rd_strings_try_classify(ctx, seg, startidx, &str);
-                vect_clear(&str);
+                vect_push(str, 0);
+                _rd_strings_try_classify(ctx, seg, startidx, "char", str,
+                                         fmt_buf);
+                vect_clear(str);
                 continue;
             }
 
             if(!rd_is_char_valid[(int)v]) {
-                vect_clear(&str);
+                vect_clear(str);
                 continue;
             }
 
-            if(vect_is_empty(&str)) startidx = idx;
-            vect_push(&str, (char)v);
+            if(vect_is_empty(str)) startidx = idx;
+            vect_push(str, (char)v);
         }
     }
+}
 
+static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
+                                    RDCharVect* fmt_buf) {
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+
+    RDSegmentFull** it;
+    vect_each(it, segments) {
+        RDSegmentFull* seg = *it;
+        RDFlagsBuffer* flags = seg->flags;
+        usize startidx = 0;
+        vect_clear(str);
+
+        if(flags->base.length < sizeof(i16))
+            continue; // segment too small for any wide string
+
+        for(usize idx = 0; idx < flags->base.length - 1; idx++) {
+            if(idx % 2 != 0) { // alignment gate
+                vect_clear(str);
+                continue;
+            }
+
+            u8 lo, hi;
+
+            bool skip = rd_flagsbuffer_has_code(flags, idx) ||
+                        rd_flagsbuffer_has_tail(flags, idx) ||
+                        !rd_flagsbuffer_get_value(flags, idx, &lo) ||
+                        rd_flagsbuffer_has_code(flags, idx + 1) ||
+                        rd_flagsbuffer_has_tail(flags, idx + 1) ||
+                        !rd_flagsbuffer_get_value(flags, idx + 1, &hi);
+
+            if(skip) {
+                vect_clear(str);
+                continue;
+            }
+
+            if(lo == 0x00 && hi == 0x00) {
+                vect_push(str, 0);
+                _rd_strings_try_classify(ctx, seg, startidx, "char16", str,
+                                         fmt_buf);
+                vect_clear(str);
+                continue;
+            }
+
+            if(hi != 0x00 || !rd_is_char_valid[(int)lo]) {
+                vect_clear(str);
+                continue;
+            }
+
+            if(vect_is_empty(str)) startidx = idx;
+            vect_push(str, (char)lo);
+            idx++; // consume hi-byte
+        }
+    }
+}
+
+void rd_i_find_strings(RDContext* ctx) {
+    _rd_i_strings_init();
+
+    RDCharVect str = {0};
+    RDCharVect fmt_buf = {0};
+    vect_reserve(&str, RD_STRING_BASE_CAPACITY);
+
+    _rd_find_char_strings(ctx, &str, &fmt_buf);
+    if(ctx->scan_char16) _rd_find_char16_strings(ctx, &str, &fmt_buf);
+
+    vect_destroy(&fmt_buf);
     vect_destroy(&str);
 }
