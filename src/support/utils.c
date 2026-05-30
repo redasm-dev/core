@@ -101,9 +101,43 @@ bool rd_i_file_exists(const char* filepath) {
 const char* rd_i_strip_prefix(const char* s) {
     if(!s) return s;
 
-    if(strstr(s, "__imp_") == s) s += sizeof("__imp_") - 1;
+    const char* res = NULL;
 
-    return s;
+    if(strstr(s, "__imp_") == s)
+        res = s + sizeof("__imp_") - 1;
+    else if(strstr(s, "loc_") == s)
+        res = s + sizeof("loc_") - 1;
+    else if(strstr(s, "sub_") == s)
+        res = s + sizeof("sub_") - 1;
+
+    if(res) {
+        if(*(res + 1) != 0) return res;
+        return s;
+    }
+
+    const char* split = strchr(s, '_');
+    const char* r_split = strrchr(s, '_');
+
+    if(!split) { // no underscores found
+        assert(!r_split);
+        return s;
+    }
+
+    // multiple underscores found
+    if(split != r_split) return s;
+
+    const char* p = s;
+
+    // left part: only lower case characters allowed
+    while(p < split) {
+        if(*p < 'a' || *p > 'z') return s;
+        p++;
+    }
+
+    p = split + 1;
+    if(*p == 0) return s; // prefix only string
+
+    return p;
 }
 
 const char* rd_i_tolower(char* s) {
@@ -111,6 +145,11 @@ const char* rd_i_tolower(char* s) {
         *p = tolower((unsigned char)*p);
 
     return s;
+}
+
+u64 rd_align_up(u64 val, u64 align) {
+    u64 diff = val % align;
+    return diff ? (val + (align - diff)) : val;
 }
 
 char* rd_strdup(const char* s) {

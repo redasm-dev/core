@@ -3,6 +3,7 @@
 #include <redasm/config.h>
 
 RD_API const char* rd_format(const char* fmt, ...);
+RD_API u64 rd_align_up(u64 val, u64 align);
 RD_API char* rd_strdup(const char* s);
 RD_API char* rd_stristr(const char* haystack, const char* needle);
 RD_API int rd_stricmp(const char* a, const char* b);

@@ -218,3 +218,9 @@ RD_API bool rd_write_be32(RDContext* self, RDAddress address, u32 v);
 RD_API bool rd_write_be64(RDContext* self, RDAddress address, u64 v);
 RD_API usize rd_write(RDContext* self, RDAddress address, const void* data,
                       usize n);
+
+RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
+
+RD_API const char* rd_get_imported_hint(RDContext* ctx, const char* name);
+RD_API const char* rd_get_imported_ord_hint(RDContext* ctx, const char* module,
+                                            u32 ordinal);
