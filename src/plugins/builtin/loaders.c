@@ -2,10 +2,8 @@
 #include "plugins/builtin/builtin.h"
 #include <redasm/redasm.h>
 
-static const char* _builtin_binary_get_name(const RDLoader* ldr,
-                                            const RDLoaderPlugin* plugin) {
+static const char* _builtin_binary_get_name(const RDLoader* ldr) {
     RD_UNUSED(ldr);
-    RD_UNUSED(plugin);
     return "Binary";
 }
 

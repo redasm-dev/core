@@ -81,7 +81,7 @@ RDContextSlice rd_test(const char* filepath) {
                     rd_i_context_create(plugin, ldr, filepath, input);
 
                 if(plugin->get_processor) {
-                    const char* procid = plugin->get_processor(ldr, ctx);
+                    const char* procid = plugin->get_processor(ldr);
                     if(procid) ctx->processorplugin = rd_processor_find(procid);
                 }
 
@@ -93,7 +93,7 @@ RDContextSlice rd_test(const char* filepath) {
                 assert(plugin->get_name);
                 assert(ctx->processorplugin);
 
-                ctx->loader_name = rd_strdup(plugin->get_name(ldr, plugin));
+                ctx->loader_name = rd_strdup(plugin->get_name(ldr));
                 if(!ctx->loader_name) ctx->loader_name = rd_strdup(plugin->id);
                 assert(ctx->loader_name);
 

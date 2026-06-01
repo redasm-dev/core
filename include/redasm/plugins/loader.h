@@ -26,8 +26,8 @@ typedef struct RDLoaderPlugin {
 
     bool (*parse)(RDLoader*, const RDLoaderRequest*);
     bool (*load)(RDLoader*, RDContext*);
-    const char* (*get_name)(const RDLoader*, const RDLoaderPlugin*);
-    const char* (*get_processor)(RDLoader*, const RDContext*);
+    const char* (*get_name)(const RDLoader*);
+    const char* (*get_processor)(const RDLoader*);
 } RDLoaderPlugin;
 
 RD_API bool rd_register_loader(const RDLoaderPlugin* l);
