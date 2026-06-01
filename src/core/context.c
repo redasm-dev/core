@@ -192,6 +192,11 @@ RDLoader* rd_get_loader(const RDContext* self) { return self->loader; }
 
 bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                     RDAddress endaddr, u32 perm) {
+    if(!name) { // autogenerate name
+        name = rd_i_format(&self->seg_buf, "seg%03d",
+                           (int)vect_length(&self->db->segments));
+    }
+
     RDSegmentFull* s = rd_alloc0(1, sizeof(*s));
     s->base.name = rd_i_strpool_intern(&self->strings, name);
     s->base.start_address = addr;
@@ -536,6 +541,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->problem_buf);
     vect_destroy(&self->sym_buf);
     vect_destroy(&self->str_buf);
+    vect_destroy(&self->seg_buf);
     vect_destroy(&self->imp_buf);
     vect_destroy(&self->name_buf);
     vect_destroy(&self->ovr_ops_buf);

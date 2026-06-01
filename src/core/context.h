@@ -51,6 +51,7 @@ typedef struct RDContext {
     RDCharVect tdef_buf;
     RDCharVect type_buf;
     RDCharVect imp_hint_buf;
+    RDCharVect seg_buf;
     RDFunctionChunkVect chunk_buf;
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
