@@ -578,6 +578,7 @@ void rd_destroy(RDContext* self) {
     rd_i_reader_destroy(self->reader);
     rd_i_buffer_destroy((RDBuffer*)self->input);
     rd_i_strpool_destroy(&self->strings);
+    rd_free(self->loader_name);
     rd_free(self->filepath);
     rd_free(self);
 }

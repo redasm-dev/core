@@ -2,6 +2,13 @@
 #include "plugins/builtin/builtin.h"
 #include <redasm/redasm.h>
 
+static const char* _builtin_binary_get_name(const RDLoader* ldr,
+                                            const RDLoaderPlugin* plugin) {
+    RD_UNUSED(ldr);
+    RD_UNUSED(plugin);
+    return "Binary";
+}
+
 static bool _builtin_binary_parse(RDLoader* ldr, const RDLoaderRequest* req) {
     RD_UNUSED(ldr);
     RD_UNUSED(req);
@@ -24,8 +31,8 @@ static bool _builtin_binary_load(RDLoader* ldr, RDContext* ctx) {
 static const RDLoaderPlugin BUILTIN_BINARY = {
     .level = RD_API_LEVEL,
     .id = RD_BINARY_LOADER_ID,
-    .name = "Binary",
     .flags = RD_LF_MANUAL | RD_PF_LAST,
+    .get_name = _builtin_binary_get_name,
     .parse = _builtin_binary_parse,
     .load = _builtin_binary_load,
 };

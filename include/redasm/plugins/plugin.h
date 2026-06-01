@@ -5,8 +5,8 @@
 #define RD_PLUGIN_HEADER                                                       \
     u32 level;                                                                 \
     u32 flags;                                                                 \
-    const char* id;                                                            \
-    const char* name
+    void* userdata;                                                            \
+    const char* id
 
 #define RD_PF_LAST (1u << 31)
 

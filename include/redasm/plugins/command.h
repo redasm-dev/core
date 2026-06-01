@@ -33,6 +33,7 @@ typedef struct RDCommandParam {
 
 typedef struct RDCommandPlugin {
     RD_PLUGIN_HEADER;
+    const char* name;
     const RDCommandParam* params;
     RDCommandValue (*execute)(RDContext* ctx, const RDCommandValue* args);
 } RDCommandPlugin;

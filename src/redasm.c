@@ -26,8 +26,7 @@ static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
     return 0;
 }
 
-static bool _rd_validate_plugin(int level, const char* id, const char* name,
-                                const char* kind) {
+static bool _rd_validate_plugin(int level, const char* id, const char* kind) {
     if(!id || !(*id)) {
         LOG_FAIL("invalid %s-plugin id", kind);
         return false;
@@ -38,6 +37,13 @@ static bool _rd_validate_plugin(int level, const char* id, const char* name,
                  id, RD_API_LEVEL, level);
         return false;
     }
+
+    return true;
+}
+
+static bool _rd_validate_plugin_with_name(int level, const char* id,
+                                          const char* name, const char* kind) {
+    if(!_rd_validate_plugin(level, id, kind)) return false;
 
     if(!name || !(*name)) {
         LOG_FAIL("invalid name for plugin '%s'");
@@ -59,7 +65,7 @@ RDContextSlice rd_test(const char* filepath) {
         RDPlugin** it;
         vect_each(it, &rd_i_state.loaders) {
             const RDLoaderPlugin* plugin = (*it)->loader;
-            LOG_DEBUG("testing '%s' ...", plugin->name);
+            LOG_DEBUG("testing '%s' ...", plugin->id);
 
             RDLoader* ldr = plugin->create ? plugin->create(plugin) : NULL;
 
@@ -73,6 +79,7 @@ RDContextSlice rd_test(const char* filepath) {
             if(plugin->parse(ldr, &req)) {
                 RDContext* ctx =
                     rd_i_context_create(plugin, ldr, filepath, input);
+
                 if(plugin->get_processor) {
                     const char* procid = plugin->get_processor(ldr, ctx);
                     if(procid) ctx->processorplugin = rd_processor_find(procid);
@@ -83,7 +90,12 @@ RDContextSlice rd_test(const char* filepath) {
                         rd_processor_find(RD_NULL_PROCESSOR_ID);
                 }
 
-                assert(ctx->processorplugin && "invalid processor plugin");
+                assert(plugin->get_name);
+                assert(ctx->processorplugin);
+
+                ctx->loader_name = rd_strdup(plugin->get_name(ldr, plugin));
+                if(!ctx->loader_name) ctx->loader_name = rd_strdup(plugin->id);
+                assert(ctx->loader_name);
 
                 vect_push(&rd_i_state.tests, ctx);
             }
@@ -180,10 +192,15 @@ void rd_reject(void) {
 }
 
 bool rd_register_loader(const RDLoaderPlugin* l) {
-    if(!_rd_validate_plugin(l->level, l->id, l->name, "loader")) return false;
+    if(!_rd_validate_plugin(l->level, l->id, "loader")) return false;
+
+    if(!l->get_name) {
+        LOG_FAIL("loader '%s' requires a name", l->id);
+        return false;
+    }
 
     if(!l->parse) {
-        LOG_FAIL("loader '%s' does not have a parser", l->id);
+        LOG_FAIL("loader '%s' requires a parser", l->id);
         return false;
     }
 
@@ -192,7 +209,7 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
         return false;
     }
 
-    LOG_DEBUG("registering loader '%s' [%s]", l->id, l->name);
+    LOG_DEBUG("registering loader '%s'", l->id);
     RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->loader = l;
     vect_push(&rd_i_state.loaders, plugin);
@@ -200,16 +217,16 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
 }
 
 bool rd_register_processor(const RDProcessorPlugin* p) {
-    if(!_rd_validate_plugin(p->level, p->id, p->name, "processor"))
+    if(!_rd_validate_plugin_with_name(p->level, p->id, p->name, "processor"))
         return false;
 
     if(!p->decode) {
-        LOG_FAIL("processor '%s' does not have a decoder", p->id);
+        LOG_FAIL("processor '%s' requires a decoder", p->id);
         return false;
     }
 
     if(!p->emulate) {
-        LOG_FAIL("processor '%s' does not have an emulator", p->id);
+        LOG_FAIL("processor '%s' requires an emulator", p->id);
         return false;
     }
 
@@ -236,10 +253,11 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
 }
 
 bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
-    if(!_rd_validate_plugin(a->level, a->id, a->name, "analyzer")) return false;
+    if(!_rd_validate_plugin_with_name(a->level, a->id, a->name, "analyzer"))
+        return false;
 
     if(!a->execute) {
-        LOG_FAIL("analyzer '%s' does not have an execution", a->id);
+        LOG_FAIL("analyzer '%s' requires an executor", a->id);
         return false;
     }
 
@@ -257,10 +275,11 @@ bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
 }
 
 bool rd_register_command(const RDCommandPlugin* c) {
-    if(!_rd_validate_plugin(c->level, c->id, c->name, "command")) return false;
+    if(!_rd_validate_plugin_with_name(c->level, c->id, c->name, "command"))
+        return false;
 
     if(!c->execute) {
-        LOG_FAIL("command '%s' does not have an execution", c->id);
+        LOG_FAIL("command '%s' requires an executor", c->id);
         return false;
     }
 

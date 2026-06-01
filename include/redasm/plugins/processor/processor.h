@@ -18,7 +18,7 @@ typedef enum {
 // clang-format off
 typedef struct RDProcessorPlugin {
     RD_PLUGIN_HEADER;
-    void* userdata;
+    const char* name;
     const char* operand_sep;
     unsigned int code_ptr_size;
     unsigned int ptr_size;

@@ -55,6 +55,7 @@ typedef struct RDContext {
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
 
+    char* loader_name;
     char* filepath;
     RDByteBuffer* input;
     RDReader* input_reader;

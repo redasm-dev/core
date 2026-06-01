@@ -20,13 +20,13 @@ typedef enum {
 
 typedef struct RDLoaderPlugin {
     RD_PLUGIN_HEADER;
-    void* userdata;
 
     RDLoader* (*create)(const struct RDLoaderPlugin*);
     void (*destroy)(RDLoader*);
 
     bool (*parse)(RDLoader*, const RDLoaderRequest*);
     bool (*load)(RDLoader*, RDContext*);
+    const char* (*get_name)(const RDLoader*, const RDLoaderPlugin*);
     const char* (*get_processor)(RDLoader*, const RDContext*);
 } RDLoaderPlugin;
 
