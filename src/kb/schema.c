@@ -60,24 +60,6 @@ static const RDKBFieldSchema RD_KB_SCHEMA_PARAM[] = {
     },
 };
 
-static const char* _rd_kb_kind_str(RDKBObjectKind kind) {
-    switch(kind) {
-        case RD_KB_STR: return "STR";
-        case RD_KB_INT: return "INT";
-        case RD_KB_FLOAT: return "FLOAT";
-        case RD_KB_BOOL: return "BOOL";
-        case RD_KB_DATE: return "DATE";
-        case RD_KB_TIME: return "TIME";
-        case RD_KB_DATETIME: return "DATETIME";
-        case RD_KB_ARRAY: return "ARRAY";
-        case RD_KB_TABLE: return "TABLE";
-
-        default: break;
-    }
-
-    return "UNKNOWN";
-}
-
 static const char* _rd_kb_get_str_values(const RDKBFieldSchema* s) {
     RDCharVect* schema_buf = &rd_i_state.kb_schema_buf;
     const char* const* str_v = s->str_values;
@@ -98,8 +80,8 @@ static bool _rd_kb_validate_kind(const RDKBObject* o,
     RDKBObjectKind t = rd_kbobject_get_kind(o);
     if(t == s->kind) return true;
 
-    const char* got_kind = _rd_kb_kind_str(t);
-    const char* expected_kind = _rd_kb_kind_str(s->kind);
+    const char* got_kind = rd_i_kb_schema_kind_str(t);
+    const char* expected_kind = rd_i_kb_schema_kind_str(s->kind);
 
     LOG_FAIL("expected kind '%s', got '%s' for key '%s'", expected_kind,
              got_kind, s->key);
@@ -138,7 +120,7 @@ static bool _rd_kb_validate_schema(const RDKBObject* obj,
 
     if(k != RD_KB_TABLE) {
         LOG_FAIL("cannot validate object of type '%s', only table allowed",
-                 _rd_kb_kind_str(k));
+                 rd_i_kb_schema_kind_str(k));
         return false;
     }
 
@@ -164,6 +146,24 @@ static bool _rd_kb_validate_schema(const RDKBObject* obj,
     }
 
     return true;
+}
+
+const char* rd_i_kb_schema_kind_str(RDKBObjectKind kind) {
+    switch(kind) {
+        case RD_KB_STR: return "STR";
+        case RD_KB_INT: return "INT";
+        case RD_KB_FLOAT: return "FLOAT";
+        case RD_KB_BOOL: return "BOOL";
+        case RD_KB_DATE: return "DATE";
+        case RD_KB_TIME: return "TIME";
+        case RD_KB_DATETIME: return "DATETIME";
+        case RD_KB_ARRAY: return "ARRAY";
+        case RD_KB_TABLE: return "TABLE";
+
+        default: break;
+    }
+
+    return "UNKNOWN";
 }
 
 bool rd_i_kb_validate_function(const RDKBObject* obj) {

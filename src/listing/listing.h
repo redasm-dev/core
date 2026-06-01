@@ -81,8 +81,6 @@ typedef struct RDListing {
     int indent;
 
     RDSymbolVect symbols;
-    RDAddressVect exported;
-    RDAddressVect imported;
 } RDListing;
 
 void rd_i_listing_init(RDListing* self, RDListing* prev);

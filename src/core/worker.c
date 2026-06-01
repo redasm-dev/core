@@ -122,6 +122,18 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
     vect_destroy(&xrefs);
 }
 
+static void _rd_worker_resolve_ordinals(RDContext* ctx) {
+    const RDAddress* it;
+    vect_each(it, &ctx->imported) {
+        RDImported imp;
+        if(!rd_get_imported(ctx, *it, &imp) || !imp.ordinal.has_value) continue;
+
+        const char* name =
+            rd_i_kb_find_ordinal_name(ctx, imp.module, imp.ordinal.value);
+        if(name) rd_set_imported(ctx, *it, imp.module, name);
+    }
+}
+
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_listing_build(ctx); // Show pre-analysis listing
     if(status) status->is_listing_changed = true;
@@ -180,6 +192,7 @@ static void _rd_worker_step_mergedata(RDContext* ctx) {
 static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_rebuild_all_functions(ctx);
     _rd_worker_follow_pointers(ctx);
+    _rd_worker_resolve_ordinals(ctx);
     rd_i_autorename(ctx);
     _rd_worker_apply_noret(ctx);
     rd_i_listing_build(ctx);

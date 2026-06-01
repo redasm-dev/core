@@ -6,9 +6,24 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"
+#include <errno.h>
 #include <redasm/allocator.h>
 
 #define RD_KB_EXT ".toml"
+
+static int _rd_kb_ordinal_modules_cmp_pred(const void* key, const void* v) {
+    const char* modname = *(const char**)key;
+    const RDKBOrdinalModule* m = (const RDKBOrdinalModule*)v;
+    return rd_stricmp(modname, m->module);
+}
+
+static int _rd_kb_ordinal_cmp_pred(const void* key, const void* v) {
+    u32 ordinal = *(u32*)key;
+    const RDKBOrdinal* ord = (const RDKBOrdinal*)v;
+    if(ordinal < ord->ordinal) return -1;
+    if(ordinal > ord->ordinal) return 1;
+    return 0;
+}
 
 static RDKBFile* _rd_kbfile_create(void) {
     return rd_alloc0(1, sizeof(RDKBFile));
@@ -20,7 +35,7 @@ static void _rd_kbfile_destroy(RDKBFile* self) {
     rd_free(self);
 }
 
-static RDKBFile* _rd_kb_find(const RDContext* ctx, const char* name) {
+static RDKBFile* _rd_kb_find_file(const RDContext* ctx, const char* name) {
     if(!name) return NULL;
 
     RDKBFile** it;
@@ -45,6 +60,39 @@ static const char* _rd_kb_find_path(const char* name) {
     }
 
     return NULL;
+}
+
+static RDKBOrdinalModule* _rd_kb_find_ordinal_module(const RDContext* ctx,
+                                                     const char* module,
+                                                     usize* out_idx) {
+    if(!module) return NULL;
+
+    usize idx = vect_lower_bound(&ctx->kb->ordinal_modules, &module,
+                                 _rd_kb_ordinal_modules_cmp_pred);
+
+    if(out_idx) *out_idx = idx;
+
+    if(idx < vect_length(&ctx->kb->ordinal_modules) &&
+       !rd_stricmp(module, vect_at(&ctx->kb->ordinal_modules, idx)->module))
+        return vect_at(&ctx->kb->ordinal_modules, idx);
+
+    return NULL;
+}
+
+static RDKBOrdinalModule* _rd_kb_check_ordinal_module(RDContext* ctx,
+                                                      const char* module) {
+    if(!module) return NULL;
+
+    usize idx;
+    RDKBOrdinalModule* mod = _rd_kb_find_ordinal_module(ctx, module, &idx);
+    if(mod) return mod;
+
+    vect_ins(&ctx->kb->ordinal_modules, idx,
+             (RDKBOrdinalModule){
+                 .module = rd_i_strpool_intern(&ctx->strings, module),
+             });
+
+    return vect_at(&ctx->kb->ordinal_modules, idx);
 }
 
 static const char* _rd_kb_get_param_impl(const RDKBObject* obj, RDType* t,
@@ -222,6 +270,60 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
     return true;
 }
 
+static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* ordinals = rd_kbobject_get_table(root, "ordinals");
+    if(!ordinals) return false;
+
+    const char* modname;
+    const RDKBObject* ord_list;
+    rd_kbobject_each_pair(modname, ord_list, ordinals) {
+        RDKBOrdinalModule* mod = _rd_kb_check_ordinal_module(ctx, modname);
+
+        const char* ord_str;
+        const RDKBObject* ord;
+        rd_kbobject_each_pair(ord_str, ord, ord_list) {
+            errno = 0;
+            u32 ord_val = strtoul(ord_str, NULL, 10);
+
+            if(errno != 0) {
+                LOG_WARN("invalid ordinal '%s' for module '%s', skipping...",
+                         ord_str, modname);
+                continue;
+            }
+
+            const char* func_name = rd_kbobject_to_str(ord);
+
+            if(!func_name) {
+                LOG_WARN("ordinal-name must be '%s', got '%s' for module '%s', "
+                         "skipping...",
+                         rd_i_kb_schema_kind_str(RD_KB_STR),
+                         rd_i_kb_schema_kind_str(rd_kbobject_get_kind(ord)),
+                         modname);
+                continue;
+            }
+
+            usize idx = vect_lower_bound(&mod->ordinals, &ord_val,
+                                         _rd_kb_ordinal_cmp_pred);
+
+            if(idx < vect_length(&mod->ordinals) &&
+               vect_at(&mod->ordinals, idx)->ordinal == ord_val) {
+                LOG_WARN(
+                    "duplicate ordinal '%s', ' for module '%s', skipping...",
+                    ord_str, modname);
+                continue;
+            }
+
+            vect_ins(&mod->ordinals, idx,
+                     (RDKBOrdinal){
+                         .ordinal = ord_val,
+                         .name = rd_i_strpool_intern(&ctx->strings, func_name),
+                     });
+        }
+    }
+
+    return true;
+}
+
 void rd_i_kb_paths_init(const char** kb_paths) {
     if(!kb_paths) return;
 
@@ -238,12 +340,22 @@ void rd_i_kb_paths_deinit(RDPathVect* self) {
     vect_destroy(self);
 }
 
-RDKB* rd_i_kb_create(void) { return rd_alloc0(1, sizeof(RDKB)); }
+RDKB* rd_i_kb_create(void) {
+    RDKB* self = rd_alloc0(1, sizeof(RDKB));
+
+    return self;
+}
 
 void rd_i_kb_destroy(RDKB* self) {
     RDKBFile** f;
     vect_each(f, &self->files) { _rd_kbfile_destroy(*f); }
 
+    RDKBOrdinalModule* ord_modules;
+    vect_each(ord_modules, &self->ordinal_modules) {
+        vect_destroy(&ord_modules->ordinals);
+    }
+
+    vect_destroy(&self->ordinal_modules);
     vect_destroy(&self->noret_names);
     vect_destroy(&self->files);
     rd_free(self);
@@ -261,18 +373,31 @@ void rd_i_kb_add_noret(RDContext* ctx, const char* name) {
     }
 }
 
-bool rd_i_kb_is_noret(const RDContext* self, const char* name) {
+bool rd_i_kb_is_noret(const RDContext* ctx, const char* name) {
     assert(name);
 
-    usize idx =
-        vect_bsearch(&self->kb->noret_names, name, rd_i_strcmp_key_pred);
-    return idx < vect_length(&self->kb->noret_names);
+    usize idx = vect_bsearch(&ctx->kb->noret_names, name, rd_i_strcmp_key_pred);
+    return idx < vect_length(&ctx->kb->noret_names);
+}
+
+const char* rd_i_kb_find_ordinal_name(RDContext* ctx, const char* module,
+                                      u32 ordinal) {
+    const RDKBOrdinalModule* mod =
+        _rd_kb_find_ordinal_module(ctx, module, NULL);
+    if(!mod) return NULL;
+
+    usize idx = vect_bsearch(&mod->ordinals, &ordinal, _rd_kb_ordinal_cmp_pred);
+
+    if(idx < vect_length(&mod->ordinals))
+        return vect_at(&mod->ordinals, idx)->name;
+
+    return NULL;
 }
 
 const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     if(!kb) return NULL;
 
-    RDKBFile* kbfile = _rd_kb_find(ctx, kb);
+    RDKBFile* kbfile = _rd_kb_find_file(ctx, kb);
     if(kbfile) return kbfile->root;
 
     const char* kb_path = _rd_kb_find_path(kb);
@@ -300,6 +425,7 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     LOG_INFO("loading KB '%s'", kb);
     _rd_kb_load_types(kbfile->root, ctx);
     _rd_kb_load_functions(kbfile->root, ctx);
+    _rd_kb_load_ordinals(kbfile->root, ctx);
 
     return kbfile->root;
 }

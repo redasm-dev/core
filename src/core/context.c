@@ -549,6 +549,8 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->chunk_buf);
     vect_destroy(&self->imp_hint_buf);
     hmap_destroy(&self->engine.current.registers);
+    vect_destroy(&self->exported);
+    vect_destroy(&self->imported);
     rd_i_functionvect_destroy(&self->functions);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
@@ -866,11 +868,11 @@ RDFunctionSlice rd_get_all_functions(const RDContext* self) {
 }
 
 RDAddressSlice rd_get_all_exported(const RDContext* self) {
-    return vect_to_slice(RDAddressSlice, &self->listing.exported);
+    return vect_to_slice(RDAddressSlice, &self->exported);
 }
 
 RDAddressSlice rd_get_all_imported(const RDContext* self) {
-    return vect_to_slice(RDAddressSlice, &self->listing.imported);
+    return vect_to_slice(RDAddressSlice, &self->imported);
 }
 
 RDSymbolSlice rd_get_all_symbols(const RDContext* self) {
@@ -998,8 +1000,17 @@ bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
     const char* ptrtype = rd_integral_from_size(PTR_SIZE);
     rd_i_set_type(self, address, ptrtype, 0, RD_TYPE_PTR, RD_CONFIDENCE_AUTO);
 
-    rd_i_flagsbuffer_set_imported(seg->flags, idx);
+    if(!rd_i_flagsbuffer_set_imported(seg->flags, idx)) return false;
+
     rd_i_db_set_imported(self, address, imp);
+
+    usize imp_idx =
+        vect_lower_bound(&self->imported, &address, rd_i_address_kcmp_pred);
+
+    if(imp_idx == vect_length(&self->imported) ||
+       *vect_at(&self->imported, imp_idx) != address)
+        vect_ins(&self->imported, imp_idx, address);
+
     return true;
 }
 
@@ -1135,11 +1146,11 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     return false;
 }
 
-bool rd_set_exported(RDContext* ctx, RDAddress address, const char* name) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+bool rd_set_exported(RDContext* self, RDAddress address, const char* name) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
 
     if(!seg) {
-        rd_i_add_problem(ctx, address, address,
+        rd_i_add_problem(self, address, address,
                          "skipping export '%s' to unmapped address",
                          name ? name : "<unnamed>");
 
@@ -1149,40 +1160,49 @@ bool rd_set_exported(RDContext* ctx, RDAddress address, const char* name) {
     usize idx = rd_i_address2index(seg, address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(ctx, address, address,
+        rd_i_add_problem(self, address, address,
                          "cannot set exported on tail byte");
         return false;
     }
 
-    if(name) rd_i_set_name(ctx, address, name, RD_CONFIDENCE_LIBRARY);
-    return rd_i_flagsbuffer_set_exported(seg->flags, idx);
+    if(name) rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
+    if(!rd_i_flagsbuffer_set_exported(seg->flags, idx)) return false;
+
+    usize exp_idx =
+        vect_lower_bound(&self->exported, &address, rd_i_address_kcmp_pred);
+
+    if(exp_idx == vect_length(&self->exported) ||
+       *vect_at(&self->exported, exp_idx) != address)
+        vect_ins(&self->exported, exp_idx, address);
+
+    return true;
 }
 
-bool rd_set_imported(RDContext* ctx, RDAddress address, const char* module,
+bool rd_set_imported(RDContext* self, RDAddress address, const char* module,
                      const char* name) {
-    return rd_i_set_imported(ctx, address, name,
+    return rd_i_set_imported(self, address, name,
                              &(RDImported){
                                  .module = module,
                                  .ordinal = {.has_value = false},
                              });
 }
 
-bool rd_set_imported_ord(RDContext* ctx, RDAddress address, const char* module,
+bool rd_set_imported_ord(RDContext* self, RDAddress address, const char* module,
                          u32 ord) {
-    return rd_i_set_imported(ctx, address, NULL,
+    return rd_i_set_imported(self, address, NULL,
                              &(RDImported){
                                  .module = module,
                                  .ordinal = {.value = ord, .has_value = true},
                              });
 }
 
-bool rd_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+bool rd_get_imported(RDContext* self, RDAddress address, RDImported* imp) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
     if(!rd_flagsbuffer_has_imported(seg->flags, idx)) return false;
-    return rd_i_db_get_imported(ctx, address, imp);
+    return rd_i_db_get_imported(self, address, imp);
 }
 
 bool rd_i_set_noret(RDContext* self, RDAddress address) {
@@ -1216,7 +1236,8 @@ const char* rd_i_get_imported_hint(RDContext* ctx, const char* name,
 
 const char* rd_i_get_imported_ord_hint(RDContext* ctx, const char* module,
                                        u32 ordinal, RDCharVect* v) {
-    RD_UNUSED(ctx); // TODO: ordinal resolver
+    const char* name = rd_i_kb_find_ordinal_name(ctx, module, ordinal);
+    if(name) return rd_i_get_imported_hint(ctx, name, v);
 
     if(module) return rd_i_format(v, "__imp_%s_%" PRIu32, module, ordinal);
     return rd_i_format(v, "__imp_%" PRIu32, ordinal);

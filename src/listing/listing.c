@@ -24,14 +24,10 @@ void rd_i_listing_init(RDListing* self, RDListing* prev) {
 
     vect_reserve(self, vect_capacity(prev));
     vect_reserve(&self->symbols, vect_capacity(&prev->symbols));
-    vect_reserve(&self->exported, vect_capacity(&prev->exported));
-    vect_reserve(&self->imported, vect_capacity(&prev->imported));
 }
 
 void rd_i_listing_deinit(RDListing* self) {
     vect_destroy(&self->symbols);
-    vect_destroy(&self->exported);
-    vect_destroy(&self->imported);
     vect_destroy(self);
 }
 

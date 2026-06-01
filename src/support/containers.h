@@ -24,6 +24,8 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_ins(self, idx, ...)                                               \
     do {                                                                       \
+        assert((usize)(idx) <= (self)->length &&                               \
+               "vect_ins: index out of bounds");                               \
         _vect_ins((void**)(&(self)->data), &(self)->capacity, (self)->length,  \
                   (idx), sizeof(*(self)->data));                               \
         (self)->data[(idx)] = __VA_ARGS__;                                     \

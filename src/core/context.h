@@ -68,6 +68,8 @@ typedef struct RDContext {
     RDKB* kb;
     RDListing listing;
     RDFunctionVect functions;
+    RDAddressVect exported;
+    RDAddressVect imported;
     RDHooks* hooks;
 
     RDTypeDefVect types[RD_TKIND_COUNT];

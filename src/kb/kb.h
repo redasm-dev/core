@@ -16,8 +16,29 @@ typedef struct RDKBFileVect {
     usize capacity;
 } RDKBFileVect;
 
+typedef struct RDKBOrdinal {
+    u32 ordinal;
+    const char* name;
+} RDKBOrdinal;
+
+typedef struct RDKBOrdinalModule {
+    const char* module;
+
+    struct {
+        RDKBOrdinal* data;
+        usize length;
+        usize capacity;
+    } ordinals;
+} RDKBOrdinalModule;
+
 typedef struct RDKB {
     RDKBFileVect files;
+
+    struct {
+        RDKBOrdinalModule* data;
+        usize length;
+        usize capacity;
+    } ordinal_modules;
 
     struct {
         const char** data;
@@ -32,4 +53,6 @@ void rd_i_kb_paths_deinit(RDPathVect* self);
 RDKB* rd_i_kb_create(void);
 void rd_i_kb_destroy(RDKB* self);
 void rd_i_kb_add_noret(RDContext* ctx, const char* name);
-bool rd_i_kb_is_noret(const RDContext* self, const char* name);
+bool rd_i_kb_is_noret(const RDContext* ctx, const char* name);
+const char* rd_i_kb_find_ordinal_name(RDContext* ctx, const char* module,
+                                      u32 ordinal);

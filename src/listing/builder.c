@@ -36,7 +36,6 @@ static usize _rd_listing_count_fill(RDListingBuilder* b, usize startidx,
 static RDListingModifier _rd_listing_check_modifiers(RDListingBuilder* b,
                                                      usize index) {
     if(rd_flagsbuffer_has_exported(b->flags, index)) {
-        vect_push(&b->listing.exported, b->address);
         vect_push(&b->listing.symbols, (RDSymbol){
                                            .kind = RD_SYMBOL_EXPORTED,
                                            .address = b->address,
@@ -45,7 +44,6 @@ static RDListingModifier _rd_listing_check_modifiers(RDListingBuilder* b,
     }
 
     if(rd_flagsbuffer_has_imported(b->flags, index)) {
-        vect_push(&b->listing.imported, b->address);
         vect_push(&b->listing.symbols, (RDSymbol){
                                            .kind = RD_SYMBOL_IMPORTED,
                                            .address = b->address,
