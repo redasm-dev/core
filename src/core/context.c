@@ -599,7 +599,7 @@ bool rd_read_u8(const RDContext* self, RDAddress address, u8* v) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
-    return rd_i_buffer_read_u8((const RDBuffer*)s->flags, idx, v);
+    return rd_i_buffer_read_byte((const RDBuffer*)s->flags, idx, v);
 }
 
 bool rd_read_le16(const RDContext* self, RDAddress address, u16* v) {

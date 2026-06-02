@@ -70,11 +70,11 @@ void rd_i_reader_destroy(RDReader* self) {
     rd_free(self);
 }
 
-void rd_reader_begin(RDReader* self) {
+void rd_reader_save(RDReader* self) {
     vect_push(&self->stack, rd_reader_tell(self));
 }
 
-u64 rd_reader_end(RDReader* self) {
+u64 rd_reader_restore(RDReader* self) {
     panic_if(vect_is_empty(&self->stack), "reader begin/end mismatch");
     rd_reader_seek(self, vect_pop_last(&self->stack));
     return rd_reader_tell(self);
@@ -101,10 +101,10 @@ bool rd_reader_read(RDReader* self, void* v, usize n) {
     return false;
 }
 
-bool rd_reader_read_u8(RDReader* self, u8* v) {
+bool rd_reader_read_byte(RDReader* self, u8* v) {
     if(self->error || self->position >= self->buffer->length) return false;
 
-    self->error = !rd_i_buffer_read_u8(self->buffer, self->position, v);
+    self->error = !rd_i_buffer_read_byte(self->buffer, self->position, v);
     if(!self->error) self->position += sizeof(u8);
     return !self->error;
 }
@@ -173,9 +173,9 @@ const char* rd_reader_read_str(RDReader* self, usize* len) {
     return s;
 }
 
-bool rd_reader_peek_u8(const RDReader* self, u8* v) {
+bool rd_reader_peek_byte(const RDReader* self, u8* v) {
     return !self->error && self->position < self->buffer->length &&
-           rd_i_buffer_read_u8(self->buffer, self->position, v);
+           rd_i_buffer_read_byte(self->buffer, self->position, v);
 }
 
 bool rd_reader_peek_le16(const RDReader* self, u16* v) {
@@ -213,9 +213,9 @@ const char* rd_reader_peek_str(RDReader* self, usize* len) {
     return rd_i_buffer_read_str(self->buffer, self->position, len);
 }
 
-bool rd_reader_expect_u8(RDReader* self, u8 v) {
+bool rd_reader_expect_byte(RDReader* self, u8 v) {
     u8 r;
-    return rd_reader_read_u8(self, &r) && r == v;
+    return rd_reader_read_byte(self, &r) && r == v;
 }
 
 bool rd_reader_expect_le16(RDReader* self, u16 v) {

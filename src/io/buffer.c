@@ -90,7 +90,7 @@ usize rd_i_buffer_read(const RDBuffer* self, usize idx, void* ptr, usize n) {
     return i;
 }
 
-bool rd_i_buffer_read_u8(const RDBuffer* self, usize idx, u8* v) {
+bool rd_i_buffer_read_byte(const RDBuffer* self, usize idx, u8* v) {
     return self->get_byte(self, idx, v);
 }
 
@@ -158,7 +158,7 @@ bool rd_i_buffer_read_be64(const RDBuffer* self, usize idx, u64* v) {
 
 bool rd_i_buffer_expect_u8(const RDBuffer* self, usize idx, u8 v) {
     u8 r;
-    return rd_i_buffer_read_u8(self, idx, &r) && r == v;
+    return rd_i_buffer_read_byte(self, idx, &r) && r == v;
 }
 
 bool rd_i_buffer_expect_le16(const RDBuffer* self, usize idx, u16 v) {
@@ -195,7 +195,7 @@ bool rd_i_buffer_read_primitive(const RDBuffer* self, usize idx,
                                 const char* name, bool big, u64* v) {
     if(!strcmp(name, "u8") || !strcmp(name, "i8") || !strcmp(name, "char")) {
         u8 val;
-        if(!rd_i_buffer_read_u8(self, idx, &val)) return false;
+        if(!rd_i_buffer_read_byte(self, idx, &val)) return false;
         if(v) *v = val;
         return true;
     }

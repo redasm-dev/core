@@ -20,7 +20,7 @@ RDByteBuffer* rd_i_buffer_create(usize n);
 void rd_i_buffer_destroy(RDBuffer* self);
 bool rd_i_buffer_is_empty(const RDBuffer* self);
 usize rd_i_buffer_get_length(const RDBuffer* self);
-bool rd_i_buffer_read_u8(const RDBuffer* self, usize idx, u8* v);
+bool rd_i_buffer_read_byte(const RDBuffer* self, usize idx, u8* v);
 bool rd_i_buffer_read_le16(const RDBuffer* self, usize idx, u16* v);
 bool rd_i_buffer_read_le32(const RDBuffer* self, usize idx, u32* v);
 bool rd_i_buffer_read_le64(const RDBuffer* self, usize idx, u64* v);

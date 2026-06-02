@@ -64,7 +64,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         for(; i < t->count - 1; i++) {
             u8 v;
 
-            if(!rd_i_buffer_read_u8(flags, idx + i, &v)) {
+            if(!rd_i_buffer_read_byte(flags, idx + i, &v)) {
                 rd_renderer_muted(r, "?");
                 continue;
             }
@@ -80,7 +80,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             rd_renderer_norm(r, ",");
             u8 v;
 
-            if(rd_i_buffer_read_u8(flags, idx + i, &v)) {
+            if(rd_i_buffer_read_byte(flags, idx + i, &v)) {
                 if(v) {
                     rd_renderer_text(r, rd_i_escape_char(v, true),
                                      RD_THEME_MUTED, RD_THEME_BACKGROUND);
@@ -128,7 +128,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     if(!strcmp(t->name, "char")) {
         u8 v;
         rd_renderer_norm(r, "'");
-        if(rd_i_buffer_read_u8(flags, idx, &v))
+        if(rd_i_buffer_read_byte(flags, idx, &v))
             rd_renderer_text(r, rd_i_escape_char(v, false), RD_THEME_STRING,
                              RD_THEME_BACKGROUND);
         else
