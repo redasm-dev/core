@@ -23,7 +23,7 @@ typedef struct RDRow {
 
     LIndex index;
     RDAddress address;
-    usize content_length; // length before padding (number of valid cells)
+    int content_length; // length before padding (number of valid cells)
 
     RDCellData curr_meta;
 } RDRow;
@@ -43,14 +43,14 @@ static inline RDCellData rd_i_default_cell_data(void) {
 void rd_i_rowvect_destroy(RDRowVect* self);
 void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address);
 
-void rd_i_row_reserve(RDRow* self, usize n);
+void rd_i_row_reserve(RDRow* self, int n);
 void rd_i_row_push(RDRow* self, char ch, RDThemeKind fg, RDThemeKind bg);
 
-static inline RDCell* rd_i_row_cell_at(RDRow* self, usize idx) {
+static inline RDCell* rd_i_row_cell_at(RDRow* self, int idx) {
     return vect_at(&self->cells, idx);
 }
 
-static inline RDCellData* rd_i_row_meta_at(RDRow* self, usize idx) {
+static inline RDCellData* rd_i_row_meta_at(RDRow* self, int idx) {
     return vect_at(&self->data, idx);
 }
 
@@ -59,7 +59,7 @@ static inline usize rd_i_row_is_empty(const RDRow* self) {
     return vect_is_empty(&self->cells);
 }
 
-static inline usize rd_i_row_length(const RDRow* self) {
+static inline int rd_i_row_length(const RDRow* self) {
     assert(vect_length(&self->cells) == (vect_length(&self->data)));
-    return vect_length(&self->cells);
+    return (int)vect_length(&self->cells);
 }

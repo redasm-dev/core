@@ -11,6 +11,6 @@ typedef struct RDInstructionVect {
 } RDInstructionVect;
 
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
-                                   usize idx, RDProcessor* p);
+                                   int idx, RDProcessor* p);
 void rd_i_processor_render_instruction(RDRenderer* r,
                                        const RDInstruction* instr);

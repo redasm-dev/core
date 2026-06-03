@@ -24,11 +24,11 @@ static u32 _murmur3_fmix32(u32 h) {
 static u32 _murmur3_rotl32(u32 x, u8 r) { return (x << r) | (x >> (32U - r)); }
 // clang-format on
 
-u32 rd_i_murmur3(const char* s, usize len) {
+u32 rd_i_murmur3(const char* s, u32 len) {
     const usize N_BLOCKS = len / 4;
     u32 h1 = MURMUR3_SEED;
 
-    for(usize i = 0; i < N_BLOCKS; i++) {
+    for(unsigned i = 0; i < N_BLOCKS; i++) {
         u32 k1 = _murmur3_get_block(s, i);
 
         k1 *= MURMUR3_C1;
@@ -40,15 +40,16 @@ u32 rd_i_murmur3(const char* s, usize len) {
         h1 = (h1 * 5) + 0xe6546b64;
     }
 
-    const usize TAIL = len - (len % 4);
+    const u8* p = (const u8*)s;
+    const u32 TAIL = len - (len % 4);
     u32 k1 = 0;
 
     switch(len & 3) {
-        case 3: k1 ^= s[TAIL + 2] << 16; // fall through
-        case 2: k1 ^= s[TAIL + 1] << 8;  // fall through
+        case 3: k1 ^= (u32)p[TAIL + 2] << 16; // fall through
+        case 2: k1 ^= (u32)p[TAIL + 1] << 8;  // fall through
 
         case 1:
-            k1 ^= s[TAIL + 0];
+            k1 ^= (u32)p[TAIL + 0];
             k1 *= MURMUR3_C1;
             k1 = _murmur3_rotl32(k1, 15);
             k1 *= MURMUR3_C2;

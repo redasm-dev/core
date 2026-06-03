@@ -32,7 +32,7 @@ static void _rd_surfacegraph_render_finalize(RDSurfaceGraph* self) {
     rd_i_renderer_swap(self->renderer);
 }
 
-RDSurfaceGraph* rd_surfacegraph_create(RDContext* ctx, usize flags) {
+RDSurfaceGraph* rd_surfacegraph_create(RDContext* ctx, RDRenderFlags flags) {
     RDSurfaceGraph* self = rd_alloc(sizeof(*self));
     *self = (RDSurfaceGraph){.renderer = rd_i_renderer_create(ctx, flags)};
     return self;

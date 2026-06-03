@@ -123,7 +123,7 @@ static RDILValue _rd_il_eval_op(RDIL* self, const RDInstruction* il,
                 addr += index_val * (op->displ.scale ? op->displ.scale : 1);
             }
 
-            addr += op->displ.offset;
+            addr += (RDAddress)op->displ.offset;
             return (RDILValue){.value = addr, .known = known};
         }
 
@@ -500,7 +500,7 @@ static bool _rd_il_invalid_operand(const RDInstruction* instr,
 }
 
 static bool _rd_il_validate(RDAddress address, const RDInstructionVect* v) {
-    for(usize i = 0; i < vect_length(v); i++) {
+    for(int i = 0; i < (int)vect_length(v); i++) {
         const RDInstruction* instr = vect_at(v, i);
 
         switch(instr->id) {

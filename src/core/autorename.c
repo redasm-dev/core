@@ -94,7 +94,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
 
         if(i < RD_AUTORENAME_DEPTH && is_nullsub) {
             const char* new_name = rd_i_format(&name_buf, "nullsub_%s",
-                                               rd_i_to_hex(f->address, 0));
+                                               rd_i_to_hex((i64)f->address, 0));
             rd_auto_name(ctx, f->address, new_name);
         }
     }

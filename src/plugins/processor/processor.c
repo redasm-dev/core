@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
-                                   usize idx, RDProcessor* p) {
+                                   int idx, RDProcessor* p) {
     RD_UNUSED(p);
     const RDProcessorPlugin* plugin = r->context->processorplugin;
     const RDOperand* op = &instr->operands[idx];
@@ -12,13 +12,13 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
 
     switch(op->kind) {
         case RD_OP_CNST:
-            rd_renderer_num(r, op->imm, 16, 0, RD_NUM_NOADDR);
+            rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_NOADDR);
             break;
 
         case RD_OP_REG: rd_renderer_reg(r, op->reg); break;
 
         case RD_OP_IMM:
-            rd_renderer_num(r, op->imm, 16, 0, RD_NUM_DEFAULT);
+            rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_DEFAULT);
             break;
 
         case RD_OP_ADDR:

@@ -63,7 +63,7 @@ typedef struct RDContext {
     RDReader* reader;
 
     bool scan_char16;
-    unsigned int min_string;
+    int min_string;
     RDLoadAddressing addressing;
 
     RDDB* db;

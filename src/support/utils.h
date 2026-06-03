@@ -60,7 +60,7 @@ static inline const char* rd_i_to_dec(i64 v) {
                            });
 }
 
-static inline const char* rd_i_to_hex(i64 v, int size) {
+static inline const char* rd_i_to_hex(i64 v, unsigned int size) {
     return rd_i_to_base(v, &(RDBaseParams){
                                .base = 16,
                                .fill = size * 2,
@@ -70,3 +70,4 @@ static inline const char* rd_i_to_hex(i64 v, int size) {
 
 static inline usize rd_i_min(usize a, usize b) { return a < b ? a : b; }
 static inline usize rd_i_max(usize a, usize b) { return a > b ? a : b; }
+static inline int rd_i_max_i(int a, int b) { return a > b ? a : b; }

@@ -174,7 +174,7 @@ static inline RDOperand* rd_instr_set_op_mem(RDInstruction* instr, int idx,
 
 static inline RDOperand* rd_instr_set_op_displ(RDInstruction* instr, int idx,
                                                RDReg base, RDReg index,
-                                               int scale, i64 offset) {
+                                               u8 scale, i64 offset) {
     RDOperand* op = &instr->operands[idx];
     op->kind = RD_OP_DISPL;
     op->displ.base = base;

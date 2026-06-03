@@ -82,7 +82,7 @@ void rd_surface_set_cursor_visible(RDSurface* self, bool b) {
     rd_i_renderer_set_cursor_visible(self->renderer, b);
 }
 
-void rd_surface_set_columns(RDSurface* self, usize cols) {
+void rd_surface_set_columns(RDSurface* self, int cols) {
     self->renderer->columns = cols;
 }
 
@@ -235,14 +235,14 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
 
     if(!rd_i_renderer_is_index_visible(self->renderer, index)) {
         const usize DIFF = (vect_length(&self->renderer->rows_front) / 4);
-        usize rindex = index;
+        LIndex rindex = index;
         if(rindex > DIFF) rindex -= DIFF;
 
         self->state.start = rindex;
-        rd_surface_set_pos(self, index - rindex, -1);
+        rd_surface_set_pos(self, (int)(index - rindex), -1);
     }
     else
-        rd_surface_set_pos(self, index - self->state.start, -1);
+        rd_surface_set_pos(self, (int)(index - self->state.start), -1);
 
     return true;
 }

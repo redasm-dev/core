@@ -272,8 +272,8 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     }
 
     if(rd_flagsbuffer_has_code(ctx->engine.segment->flags, idx)) {
-        instr.length =
-            rd_i_flagsbuffer_get_range_length(ctx->engine.segment->flags, idx);
+        instr.length = (u16)rd_i_flagsbuffer_get_range_length(
+            ctx->engine.segment->flags, idx);
         goto done;
     }
 

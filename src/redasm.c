@@ -26,7 +26,7 @@ static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
     return 0;
 }
 
-static bool _rd_validate_plugin(int level, const char* id, const char* kind) {
+static bool _rd_validate_plugin(u32 level, const char* id, const char* kind) {
     if(!id || !(*id)) {
         LOG_FAIL("invalid %s-plugin id", kind);
         return false;
@@ -41,7 +41,7 @@ static bool _rd_validate_plugin(int level, const char* id, const char* kind) {
     return true;
 }
 
-static bool _rd_validate_plugin_with_name(int level, const char* id,
+static bool _rd_validate_plugin_with_name(u32 level, const char* id,
                                           const char* name, const char* kind) {
     if(!_rd_validate_plugin(level, id, kind)) return false;
 

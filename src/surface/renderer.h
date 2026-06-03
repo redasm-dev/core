@@ -13,7 +13,7 @@ typedef struct RDRenderer {
     RDContext* context;
     RDRenderFlags flags;
     RDRenderMode mode;
-    usize columns, auto_columns;
+    int columns, auto_columns;
     RDAddress curr_address;
     LIndex listing_idx;
     RDRowVect rows_front, rows_back;

@@ -9,8 +9,8 @@
 // ---------------------------------------------------------------------------
 
 #define RD_LLAYOUT_PADDING 16
-#define RD_LLAYOUT_PADDING_DIV2 (RD_LLAYOUT_PADDING / 2.0F)
-#define RD_LLAYOUT_PADDING_DIV4 (RD_LLAYOUT_PADDING_DIV2 / 2.0F)
+#define RD_LLAYOUT_PADDING_DIV2 ((int)(RD_LLAYOUT_PADDING / 2.0F))
+#define RD_LLAYOUT_PADDING_DIV4 ((int)(RD_LLAYOUT_PADDING_DIV2 / 2.0F))
 #define RD_LLAYOUT_NODE_PADDING (2 * RD_LLAYOUT_PADDING)
 
 // ---------------------------------------------------------------------------
@@ -741,15 +741,15 @@ static void _rd_ll_compute_node_positions(RDLayeredLayout* ll) {
     for(usize i = 0; i < vect_length(&ll->blocks); i++) {
         b = &ll->blocks.data[i];
 
-        float cx = (ll->col_x[b->col] + ll->col_width[b->col] +
+        float cx = ((float)(ll->col_x[b->col] + ll->col_width[b->col]) +
                     (RD_LLAYOUT_PADDING_DIV4 *
                      (float)ll->col_edge_count[b->col + 1])) -
                    ((float)(b->width) / 2.0F);
 
         float right_bound =
-            (ll->col_x[b->col] + ll->col_width[b->col] +
-             ll->col_width[b->col + 1] +
-             (RD_LLAYOUT_PADDING_DIV2 * ll->col_edge_count[b->col + 1]));
+            ((float)(ll->col_x[b->col] + ll->col_width[b->col] +
+                     ll->col_width[b->col + 1]) +
+             (RD_LLAYOUT_PADDING_DIV2 * (float)ll->col_edge_count[b->col + 1]));
 
         if((cx + (float)b->width) > right_bound)
             cx = right_bound - (float)b->width;

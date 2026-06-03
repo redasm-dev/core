@@ -408,7 +408,7 @@ void rd_graph_set_edge_arrow(RDGraph* self, const RDGraphEdge* e,
 
 u32 rd_graph_get_hash(const RDGraph* self) {
     rd_graph_generate_dot((RDGraph*)self);
-    return rd_i_murmur3(self->dot_buf.data, self->dot_buf.length);
+    return rd_i_murmur3(self->dot_buf.data, (u32)self->dot_buf.length);
 }
 
 const char* rd_graph_generate_dot(RDGraph* self) {
@@ -422,10 +422,10 @@ const char* rd_graph_generate_dot(RDGraph* self) {
         const RDGraphEdge* e;
         vect_each(e, edges) {
             str_append(&self->dot_buf, "\t\"#");
-            str_append(&self->dot_buf, rd_i_to_dec(e->src));
+            str_append(&self->dot_buf, rd_i_to_dec((i64)e->src));
 
             str_append(&self->dot_buf, " -> \"#");
-            str_append(&self->dot_buf, rd_i_to_dec(e->dst));
+            str_append(&self->dot_buf, rd_i_to_dec((i64)e->dst));
 
             str_append(&self->dot_buf, "\";\n");
         }

@@ -1288,13 +1288,8 @@ RDLoadAddressing rd_get_load_addressing(const RDContext* self) {
     return self->addressing;
 }
 
-unsigned int rd_get_min_string(const RDContext* self) {
-    return self->min_string;
-}
-
-void rd_set_min_string(RDContext* self, unsigned int l) {
-    self->min_string = l;
-}
+int rd_get_min_string(const RDContext* self) { return self->min_string; }
+void rd_set_min_string(RDContext* self, int l) { self->min_string = l; }
 
 bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
     if(index >= RD_MAX_OPERANDS) return false;

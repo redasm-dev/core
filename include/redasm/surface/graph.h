@@ -7,7 +7,7 @@
 typedef struct RDSurfaceGraph RDSurfaceGraph;
 
 // clang-format off
-RD_API RDSurfaceGraph* rd_surfacegraph_create(RDContext* ctx, usize flags);
+RD_API RDSurfaceGraph* rd_surfacegraph_create(RDContext* ctx, RDRenderFlags flags);
 RD_API void rd_surfacegraph_destroy(RDSurfaceGraph* self);
 RD_API void rd_surfacegraph_render(RDSurfaceGraph* self);
 RD_API void rd_surfacegraph_clear_history(RDSurfaceGraph* self);

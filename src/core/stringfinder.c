@@ -37,8 +37,9 @@ static void _rd_i_strings_init(void) {
 
 static bool _rd_strings_check_format(const char* s, int len) {
     for(unsigned int i = 0; i < RD_N_FORMATS; i++) {
-        int fmtlen = strlen(RD_C_FORMATS[i]);
-        if(fmtlen == len && !strncmp(s, RD_C_FORMATS[i], fmtlen)) return true;
+        int fmtlen = (int)strlen(RD_C_FORMATS[i]);
+        if(fmtlen == len && !strncmp(s, RD_C_FORMATS[i], (usize)fmtlen))
+            return true;
     }
 
     return false;
@@ -48,7 +49,7 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
                                      usize idx, const char* type,
                                      const RDCharVect* str,
                                      RDCharVect* fmt_buf) {
-    usize len = vect_length(str) - 1;
+    int len = (int)vect_length(str) - 1;
 
     if(!strcmp(type, "char")) { // C-style strings valid only for ASCII
         bool valid =

@@ -14,12 +14,12 @@ static char* _rd_db_get_dbpath(const RDContext* ctx) {
     if(!ctx->filepath) return NULL;
 
     char* filestem = rd_i_get_file_stem(ctx->filepath);
-    int filestem_len = strlen(filestem);
-    int id_len = strlen(ctx->loaderplugin->id);
+    int filestem_len = (int)strlen(filestem);
+    int id_len = (int)strlen(ctx->loaderplugin->id);
 
     int n = filestem_len + id_len + 5;
-    char* dbname = rd_alloc(n);
-    snprintf(dbname, n, "%s_%s.db", filestem, ctx->loaderplugin->id);
+    char* dbname = rd_alloc((usize)n);
+    snprintf(dbname, (usize)n, "%s_%s.db", filestem, ctx->loaderplugin->id);
 
     char* dbpath = rd_i_get_unique_temp_path(dbname);
     rd_free(dbname);

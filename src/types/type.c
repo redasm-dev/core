@@ -50,7 +50,7 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
 
     if(t->count > 0) {
         str_push(buf, '[');
-        str_append(buf, rd_i_to_dec(t->count));
+        str_append(buf, rd_i_to_dec((i64)t->count));
         str_push(buf, ']');
     }
 

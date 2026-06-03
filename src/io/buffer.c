@@ -98,7 +98,7 @@ bool rd_i_buffer_read_le16(const RDBuffer* self, usize idx, u16* v) {
     uint8_t b[2];
     if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
 
-    if(v) *v = ((u16)b[0] << 0) | ((u16)b[1] << 8);
+    if(v) *v = (u16)(((u16)b[0] << 0) | ((u16)b[1] << 8));
     return true;
 }
 
@@ -129,7 +129,7 @@ bool rd_i_buffer_read_be16(const RDBuffer* self, usize idx, u16* v) {
     uint8_t b[2];
     if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
 
-    if(v) *v = ((u16)b[0] << 8) | ((u16)b[1] << 0);
+    if(v) *v = (u16)(((u16)b[0] << 8) | ((u16)b[1] << 0));
     return true;
 }
 

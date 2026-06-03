@@ -65,7 +65,7 @@ int rd_i_strcmp_pred(const void* a, const void* b) {
 }
 
 int rd_i_strcmp_intern_pred(const void* a, const void* b) {
-    return (*(const char**)a) - (*(const char**)b);
+    return (int)((*(const char**)a) - (*(const char**)b));
 }
 
 int rd_i_strcmp_key_pred(const void* key, const void* s) {
@@ -142,7 +142,7 @@ const char* rd_i_strip_prefix(const char* s) {
 
 const char* rd_i_tolower(char* s) {
     for(char* p = s; *p; p++)
-        *p = tolower((unsigned char)*p);
+        *p = (char)tolower((int)*p);
 
     return s;
 }
@@ -238,8 +238,8 @@ char* rd_i_get_file_stem(const char* filepath) {
     if(filename == fileext) return rd_strdup(fileext);
 
     ptrdiff_t n = (fileext - filename - 1);
-    char* stem = rd_alloc(n + 1);
-    memcpy(stem, filename, n);
+    char* stem = rd_alloc((usize)n + 1);
+    memcpy(stem, filename, (usize)n);
     stem[n] = 0;
     return stem;
 }
@@ -285,7 +285,7 @@ char* rd_i_get_unique_temp_path(const char* suffix) {
     size_t baselen, extlen;
 
     if(ext) {
-        baselen = ext - tmppath - 1;
+        baselen = (usize)(ext - tmppath - 1);
         extlen = strlen(ext);
     }
     else {
@@ -360,14 +360,14 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
     uintmax_t u = is_neg ? -(uintmax_t)v : (uintmax_t)v;
 
     // Build digits right-to-left
-    unsigned int digit_start = c;
+    unsigned int digit_start = (unsigned int)c;
 
     do {
         out[--c] = DIGITS[u % p->base];
         u /= p->base;
     } while(u > 0);
 
-    unsigned int digit_count = digit_start - c;
+    unsigned int digit_count = digit_start - (unsigned int)c;
 
     // Zero-padding
     if(p->fill > 0) {
@@ -417,7 +417,7 @@ char* rd_i_vformat(RDCharVect* buf, const char* fmt, va_list args) {
     va_end(args_copy);
 
     if(len >= (int)vect_capacity(buf)) {
-        vect_reserve(buf, len + 1);
+        vect_reserve(buf, (usize)len + 1);
         va_copy(args_copy, args);
         len = vsnprintf(buf->data, vect_capacity(buf), fmt, args_copy);
         va_end(args_copy);

@@ -27,7 +27,7 @@ RD_API void rd_surface_clear_selection(RDSurface* self);
 RD_API void rd_surface_render(RDSurface* self, usize n);
 RD_API void rd_surface_set_mode(RDSurface* self, RDRenderMode m);
 RD_API void rd_surface_set_cursor_visible(RDSurface* self, bool b);
-RD_API void rd_surface_set_columns(RDSurface* self, usize cols);
+RD_API void rd_surface_set_columns(RDSurface* self, int cols);
 RD_API void rd_surface_seek(RDSurface* self, usize index);
 RD_API void rd_surface_set_highlight_word(RDSurface* self, const char* word);
 RD_API RDRenderMode rd_surface_get_mode(const RDSurface* self);

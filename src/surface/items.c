@@ -71,8 +71,8 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 
             if(!v) break;
 
-            rd_renderer_text(r, rd_i_escape_char(v, true), RD_THEME_STRING,
-                             RD_THEME_BACKGROUND);
+            rd_renderer_text(r, rd_i_escape_char((char)v, true),
+                             RD_THEME_STRING, RD_THEME_BACKGROUND);
         }
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
 
@@ -82,7 +82,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 
             if(rd_i_buffer_read_byte(flags, idx + i, &v)) {
                 if(v) {
-                    rd_renderer_text(r, rd_i_escape_char(v, true),
+                    rd_renderer_text(r, rd_i_escape_char((char)v, true),
                                      RD_THEME_MUTED, RD_THEME_BACKGROUND);
                 }
                 else
@@ -129,8 +129,8 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         u8 v;
         rd_renderer_norm(r, "'");
         if(rd_i_buffer_read_byte(flags, idx, &v))
-            rd_renderer_text(r, rd_i_escape_char(v, false), RD_THEME_STRING,
-                             RD_THEME_BACKGROUND);
+            rd_renderer_text(r, rd_i_escape_char((char)v, false),
+                             RD_THEME_STRING, RD_THEME_BACKGROUND);
         else
             rd_renderer_muted(r, "?");
         rd_renderer_norm(r, "'");
@@ -157,8 +157,9 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     // numeric primitive
     u64 v;
     if(rd_i_buffer_read_primitive(flags, idx, t->name, is_be, &v)) {
-        usize sz = rd_i_size_of(r->context, t->name, 0, t->mod);
-        rd_renderer_num(r, v, 16, sz * 2, RD_NUM_DEFAULT);
+        unsigned int sz =
+            (unsigned int)rd_i_size_of(r->context, t->name, 0, t->mod);
+        rd_renderer_num(r, (char)v, 16, sz * 2, RD_NUM_DEFAULT);
     }
     else
         rd_renderer_muted(r, "?");
@@ -295,7 +296,7 @@ static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
 
     rd_i_renderer_new_row(r, item);
     rd_renderer_text(r, ".fill ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    rd_renderer_num(r, count, 16, 0, RD_NUM_DEFAULT);
+    rd_renderer_num(r, (i64)count, 16, 0, RD_NUM_DEFAULT);
     rd_renderer_norm(r, ",");
 
     if(item->fill.has_value)
@@ -323,9 +324,9 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
         rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT,
                          RD_THEME_BACKGROUND);
         rd_renderer_text(r, " (start: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, seg->base.start_address, 16, F, RD_NUM_NOADDR);
+        rd_renderer_num(r, (i64)seg->base.start_address, 16, F, RD_NUM_NOADDR);
         rd_renderer_text(r, ", end: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, seg->base.end_address, 16, F, RD_NUM_NOADDR);
+        rd_renderer_num(r, (i64)seg->base.end_address, 16, F, RD_NUM_NOADDR);
         rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
     }
 }
@@ -430,15 +431,15 @@ static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
 
     if(item->array_index != RD_LISTING_NO_INDEX) {
         rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec(item->array_index), RD_THEME_NUMBER,
-                         RD_THEME_BACKGROUND);
+        rd_renderer_text(r, rd_i_to_dec((i64)item->array_index),
+                         RD_THEME_NUMBER, RD_THEME_BACKGROUND);
         rd_renderer_norm(r, "]");
     }
 
     // 5. array size
     if(item->type.count > 0) {
         rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec(item->type.count), RD_THEME_NUMBER,
+        rd_renderer_text(r, rd_i_to_dec((i64)item->type.count), RD_THEME_NUMBER,
                          RD_THEME_BACKGROUND);
         rd_renderer_norm(r, "]");
     }

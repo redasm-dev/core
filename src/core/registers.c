@@ -5,7 +5,7 @@
 
 static size_t _rd_register_hash(const void* e) {
     const RDRegister* r = (const RDRegister*)e;
-    return rd_i_murmur3(r->name, strlen(r->name));
+    return rd_i_murmur3(r->name, (u32)strlen(r->name));
 }
 
 static bool _rd_register_equal(const void* a, const void* b) {

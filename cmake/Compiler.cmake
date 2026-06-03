@@ -9,6 +9,8 @@ function(setup_compiler project_name)
         "-Wall"
         "-Wextra"
         "-Wpedantic"
+        "-Wconversion"
+        "-Wsign-conversion"
         "-Wno-missing-field-initializers"
         "-Wno-error=unused"
         "-Wno-error=unused-function"

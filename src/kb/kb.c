@@ -109,7 +109,7 @@ static const char* _rd_kb_get_param_impl(const RDKBObject* obj, RDType* t,
     bool is_type_ptr = !strcmp(t->name, "ptr");
 
     rd_kbobject_get_int(obj, "count", &count);
-    t->count = count;
+    t->count = (usize)count;
 
     const char* mod_str = rd_kbobject_get_str(obj, "mod");
     bool is_mod_str_cptr = mod_str && !strcmp(mod_str, "cptr");
@@ -283,7 +283,7 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
         const RDKBObject* ord;
         rd_kbobject_each_pair(ord_str, ord, ord_list) {
             errno = 0;
-            u32 ord_val = strtoul(ord_str, NULL, 10);
+            u32 ord_val = (u32)strtoul(ord_str, NULL, 10);
 
             if(errno != 0) {
                 LOG_WARN("invalid ordinal '%s' for module '%s', skipping...",

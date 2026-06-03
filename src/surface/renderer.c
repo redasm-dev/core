@@ -21,7 +21,7 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
     if(row >= (int)vect_length(rows)) return NULL;
 
     RDRow* r = vect_at(rows, row);
-    if(col >= (int)rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
+    if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
     if(_rd_is_char_skippable(rd_i_row_cell_at(r, col)->ch)) return NULL;
 
     vect_clear(&self->word_buf);
@@ -31,7 +31,7 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
         col--;
     }
 
-    for(int i = col; i < (int)rd_i_row_length(r); i++) {
+    for(int i = col; i < rd_i_row_length(r); i++) {
         if(_rd_is_char_skippable(rd_i_row_cell_at(r, i)->ch)) break;
         vect_push(&self->word_buf, rd_i_row_cell_at(r, i)->ch);
     }
@@ -43,8 +43,8 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
 static void _rd_renderer_calc_auto_column(RDRenderer* self) {
     if(self->columns || vect_is_empty(&self->rows_back)) return;
 
-    usize lastlen = rd_i_row_length(vect_last(&self->rows_back));
-    self->auto_columns = rd_i_max(self->auto_columns, lastlen);
+    int lastlen = rd_i_row_length(vect_last(&self->rows_back));
+    self->auto_columns = rd_i_max_i(self->auto_columns, lastlen);
 }
 
 static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
@@ -104,14 +104,14 @@ void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m) {
 
 void rd_i_renderer_set_cursor_visible(RDRenderer* self, bool b) {
     if(b)
-        self->flags &= ~RD_RF_NO_CURSOR;
+        self->flags &= (RDRenderFlags)(~RD_RF_NO_CURSOR);
     else
         self->flags |= RD_RF_NO_CURSOR;
 }
 
 void rd_i_renderer_fill_columns(RDRenderer* self) {
     _rd_renderer_calc_auto_column(self);
-    usize ncols = self->columns > 0 ? self->columns : self->auto_columns;
+    int ncols = self->columns > 0 ? self->columns : self->auto_columns;
 
     RDRow* row;
     vect_each(row, &self->rows_back) {
@@ -147,7 +147,7 @@ void rd_i_renderer_highlight_cursor(RDRenderer* self, int row, int col) {
     if(rd_i_row_is_empty(vect_at(&self->rows_back, row))) return;
 
     RDRow* r = vect_at(&self->rows_back, row);
-    if(col >= (int)rd_i_row_length(r)) col = (int)rd_i_row_length(r) - 1;
+    if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
 
     rd_i_row_cell_at(r, col)->fg = RD_THEME_CURSOR_FG;
     rd_i_row_cell_at(r, col)->bg = RD_THEME_CURSOR_BG;
@@ -162,8 +162,8 @@ void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col) {
 
     RDRow* r;
     vect_each(r, &self->rows_back) {
-        for(usize i = 0; i < rd_i_row_length(r); i++) {
-            usize endidx = i;
+        for(int i = 0; i < rd_i_row_length(r); i++) {
+            int endidx = i;
             bool found = true;
 
             for(const char* w = word; *w; w++) {
@@ -178,7 +178,7 @@ void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col) {
                 break;
             }
 
-            for(usize j = i; found && j < endidx; j++) {
+            for(int j = i; found && j < endidx; j++) {
                 rd_i_row_cell_at(r, j)->fg = RD_THEME_HIGHLIGHT_FG;
                 rd_i_row_cell_at(r, j)->bg = RD_THEME_HIGHLIGHT_BG;
             }
@@ -199,7 +199,7 @@ void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
         if(row == startrow) sc = startcol;
         if(row == endrow) ec = endcol;
 
-        for(int col = sc; col < (int)rd_i_row_length(r) && col < ec; col++) {
+        for(int col = sc; col < rd_i_row_length(r) && col < ec; col++) {
             rd_i_row_cell_at(r, col)->fg = RD_THEME_SELECTION_FG;
             rd_i_row_cell_at(r, col)->bg = RD_THEME_SELECTION_BG;
         }
@@ -222,7 +222,7 @@ void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
         const unsigned int SIZE =
             item->segment->base.unit ? item->segment->base.unit : INT_SIZE;
 
-        const char* address = rd_i_to_hex(item->address, SIZE);
+        const char* address = rd_i_to_hex((i64)item->address, SIZE);
 
         rd_renderer_norm(self, address);
         rd_renderer_ws(self, 2);
@@ -411,7 +411,7 @@ void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
     }
 }
 
-void rd_renderer_reg(RDRenderer* self, int reg) {
+void rd_renderer_reg(RDRenderer* self, RDReg reg) {
     const RDProcessorPlugin* p = self->context->processorplugin;
     const char* regname = NULL;
 
@@ -480,13 +480,13 @@ const char* rd_i_renderer_get_text(RDRenderer* self, RDSurfacePos startpos,
         if(!vect_is_empty(&self->text_buf)) vect_push(&self->text_buf, '\n');
 
         RDRow* r = vect_at(&self->rows_front, i);
-        usize s = 0, e = 0;
+        int s = 0, e = 0;
 
         if(!rd_i_row_is_empty(r)) e = rd_i_row_length(r) - 1;
         if(i == startpos.row) s = startpos.col;
         if(i == endpos.row) e = endpos.col;
 
-        for(usize j = s; j <= e; j++)
+        for(int j = s; j <= e; j++)
             vect_push(&self->text_buf, rd_i_row_cell_at(r, j)->ch);
     }
 
@@ -534,7 +534,7 @@ void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col) {
     else if(*row < 0)
         *row = 0;
 
-    int ncols = (int)rd_i_row_length(vect_at(&self->rows_front, *row));
+    int ncols = rd_i_row_length(vect_at(&self->rows_front, *row));
     if(!ncols || *col < 0)
         *col = 0;
     else if(*col >= ncols)
@@ -555,7 +555,7 @@ bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,
     if(pos->row >= (int)vect_length(&self->rows_front)) return false;
 
     RDRow* r = vect_at(&self->rows_front, pos->row);
-    if(pos->col >= (int)rd_i_row_length(r)) return false;
+    if(pos->col >= rd_i_row_length(r)) return false;
 
     if(cd) *cd = *rd_i_row_meta_at(r, pos->col);
     return true;
@@ -614,11 +614,11 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
     if(row >= (int)vect_length(&self->rows_front)) return false;
 
     RDRow* r = vect_at(&self->rows_front, row);
-    if(col >= (int)rd_i_row_length(r)) col = (int)rd_i_row_length(r) - 1;
+    if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
 
     if(_rd_is_char_skippable(rd_i_row_cell_at(r, col)->ch)) return false;
 
-    usize startcol = 0, endcol = 0;
+    int startcol = 0, endcol = 0;
 
     for(int i = col; i-- > 0;) {
         const RDCell* cell = rd_i_row_cell_at(r, i);
@@ -628,7 +628,7 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
         }
     }
 
-    for(int i = col; i < (int)rd_i_row_length(r); i++) {
+    for(int i = col; i < rd_i_row_length(r); i++) {
         const RDCell* cell = rd_i_row_cell_at(r, i);
         if(_rd_is_char_skippable(cell->ch)) {
             endcol = i - 1;
@@ -644,11 +644,12 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
 }
 
 void rd_i_renderer_write_text(RDRenderer* self, RDCharVect* v) {
-    usize cols = self->columns;
+    int cols = self->columns;
     vect_clear(v);
 
-    if(cols && vect_capacity(v) < cols)
-        vect_reserve(v, (cols * vect_length(&self->rows_front)) + 1);
+    if(cols && (int)vect_capacity(v) < cols)
+        vect_reserve(v,
+                     (usize)(cols * (int)vect_length(&self->rows_front)) + 1);
 
     const RDRow* r;
     vect_each(r, &self->rows_front) {

@@ -8,7 +8,7 @@ static int _rd_command_count_params(const RDCommandPlugin* plugin) {
     while(p->name && p->kind)
         p++;
 
-    return p - plugin->params;
+    return (int)(p - plugin->params);
 }
 
 static int _rd_command_count_args(const RDCommandValue* args) {
@@ -17,7 +17,7 @@ static int _rd_command_count_args(const RDCommandValue* args) {
     while(a->kind != RD_CMDARG_VOID)
         a++;
 
-    return a - args;
+    return (int)(a - args);
 }
 
 static const char* _rd_command_type_name(RDCommandValueKind kind) {

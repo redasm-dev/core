@@ -10,7 +10,7 @@
 
 static size_t _rd_strpool_hash(const void* e) {
     const RDStringPoolEntry* entry = (const RDStringPoolEntry*)e;
-    return rd_i_murmur3(entry->value, strlen(entry->value));
+    return rd_i_murmur3(entry->value, (u32)strlen(entry->value));
 }
 
 static bool _rd_strpool_equal(const void* a, const void* b) {

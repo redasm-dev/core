@@ -16,9 +16,9 @@ void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address) {
                     });
 }
 
-void rd_i_row_reserve(RDRow* self, usize n) {
-    vect_reserve(&self->cells, n);
-    vect_reserve(&self->data, n);
+void rd_i_row_reserve(RDRow* self, int n) {
+    vect_reserve(&self->cells, (usize)n);
+    vect_reserve(&self->data, (usize)n);
 }
 
 void rd_i_row_push(RDRow* self, char ch, RDThemeKind fg, RDThemeKind bg) {
