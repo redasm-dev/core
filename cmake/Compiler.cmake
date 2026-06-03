@@ -37,7 +37,11 @@ function(setup_compiler project_name)
         "-fno-omit-frame-pointer"
     )
 
-    set(MSVC_COMPILE_OPTIONS "/W4")
+    set(MSVC_COMPILE_OPTIONS
+        "/W4"
+        "/FS"
+        "/D_CRT_SECURE_NO_WARNINGS"
+    )
 
     set(MSVC_COMPILE_OPTIONS_DEBUG
         "/WX"
