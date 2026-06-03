@@ -81,7 +81,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
         vect_clear(str);
 
         for(usize idx = 0; idx < flags->base.length; idx++) {
-            u8 v;
+            u8 v = 0;
             bool skip = rd_flagsbuffer_has_code(flags, idx) ||
                         rd_flagsbuffer_has_tail(flags, idx) ||
                         !rd_flagsbuffer_get_value(flags, idx, &v);
@@ -130,7 +130,7 @@ static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
                 continue;
             }
 
-            u8 lo, hi;
+            u8 lo = 0, hi = 0;
 
             bool skip = rd_flagsbuffer_has_code(flags, idx) ||
                         rd_flagsbuffer_has_tail(flags, idx) ||

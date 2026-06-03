@@ -34,7 +34,7 @@ static void _rd_module_errmsg(void) {
     LPTSTR buffer = NULL;
     FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
                   NULL, error, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
-                  &buffer, 0, NULL);
+                  (LPTSTR)(LPVOID)&buffer, 0, NULL);
 
     LOG_FAIL("%s", buffer);
     LocalFree(buffer);

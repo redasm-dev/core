@@ -41,12 +41,15 @@ function(setup_compiler project_name)
         "/W4"
         "/FS"
         "/D_CRT_SECURE_NO_WARNINGS"
+        "/wd4100"  # unreferenced formal parameter
+        "/wd4702"  # unreachable code
     )
 
     set(MSVC_COMPILE_OPTIONS_DEBUG
         "/WX"
         "/Od"
         "/fsanitize=address"
+        "/INCREMENTAL:NO"
     )
 
     target_compile_options(${project_name}

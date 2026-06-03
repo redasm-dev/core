@@ -1,11 +1,14 @@
 #pragma once
 
+// clang-format off
 #if defined(_WIN32)
-#include <winbase.h>
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winbase.h>
 #else
 #include <dlfcn.h>
 #endif
+// clang-format on
 
 #if defined(_WIN32)
 typedef HMODULE RDModuleHandle;

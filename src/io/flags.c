@@ -17,8 +17,8 @@ static const RDFlags FL_EXPORTED = 1U << 14;
 static const RDFlags FL_IMPORTED = 1U << 15;
 
 // covers bits 0-13 (NOTE: always add the last flag above)
-static const RDFlags FL_PRESERVE_MASK = (FL_IMPORTED << 1) - 1;
-static const RDFlags FL_HAS_INFO = FL_PRESERVE_MASK & ~(FL_VALUE | 0xFF);
+#define FL_PRESERVE_MASK ((RDFlags)((FL_IMPORTED << 1) - 1))
+#define FL_HAS_INFO ((RDFlags)(FL_PRESERVE_MASK & ~(FL_VALUE | 0xFF)))
 
 static const RDFlags FL_CODE = 1U << 16;
 static const RDFlags FL_DATA = 1U << 17;
@@ -103,7 +103,7 @@ bool rd_i_flags_get_value(RDFlags self, u8* b) {
 }
 
 void rd_i_flags_set_value(RDFlags* self, u8 b) {
-    *self &= (u8)~0xFF;
+    *self &= ~(RDFlags)0xFF;
     *self |= (FL_VALUE | b);
 }
 

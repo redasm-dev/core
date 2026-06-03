@@ -213,6 +213,10 @@ bool rd_i_engine_has_pending_code(const RDContext* ctx) {
 }
 
 u16 rd_i_engine_tick(RDContext* ctx) {
+    RDInstruction instr = {
+        .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
+    };
+
     if(ctx->engine.flow.has_value) {
         ctx->engine.current.address = optional_take(&ctx->engine.flow);
         ctx->engine.current.kind = RD_EI_FLOW;
@@ -252,10 +256,6 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
     usize idx =
         rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
-
-    RDInstruction instr = {
-        .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
-    };
 
     rd_i_flagsbuffer_undefine_queued(ctx->engine.segment->flags, idx);
 

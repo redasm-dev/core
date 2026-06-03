@@ -195,25 +195,25 @@ const char* rd_kbobject_to_str(const RDKBObject* self) {
 }
 
 bool rd_kbobject_to_bool(const RDKBObject* self, bool* val) {
-    if(!self || rd_kbobject_get_kind(self) != RD_KB_BOOL) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_BOOL) return false;
     if(val) *val = rd_i_kb_to_datum(self)->u.boolean;
     return true;
 }
 
 bool rd_kbobject_to_int(const RDKBObject* self, i64* val) {
-    if(!self || rd_kbobject_get_kind(self) != RD_KB_INT) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_INT) return false;
     if(val) *val = rd_i_kb_to_datum(self)->u.int64;
     return true;
 }
 
 bool rd_kbobject_to_float(const RDKBObject* self, double* val) {
-    if(!self || rd_kbobject_get_kind(self) != RD_KB_FLOAT) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_FLOAT) return false;
     if(val) *val = rd_i_kb_to_datum(self)->u.fp64;
     return true;
 }
 
 bool rd_kbobject_to_time(const RDKBObject* self, RDKBTime* val) {
-    if(!self || rd_kbobject_get_kind(self) != RD_KB_TIME) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_TIME) return false;
 
     if(val) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);
@@ -230,7 +230,7 @@ bool rd_kbobject_to_time(const RDKBObject* self, RDKBTime* val) {
 }
 
 bool rd_kbobject_to_date(const RDKBObject* self, RDKBDate* val) {
-    if(!self || rd_kbobject_get_kind(self) != RD_KB_DATE) return NULL;
+    if(!self || rd_kbobject_get_kind(self) != RD_KB_DATE) return false;
 
     if(val) {
         const toml_datum_t* datum = rd_i_kb_to_datum(self);

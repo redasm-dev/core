@@ -357,7 +357,7 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
 
     // Work with unsigned magnitude to handle INTMAX_MIN safely
     bool is_neg = v < 0;
-    uintmax_t u = is_neg ? -(uintmax_t)v : (uintmax_t)v;
+    uintmax_t u = is_neg ? ~(uintmax_t)v + 1 : (uintmax_t)v;
 
     // Build digits right-to-left
     unsigned int digit_start = (unsigned int)c;
