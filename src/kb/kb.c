@@ -168,14 +168,14 @@ static bool _rd_kb_load_struct(const char* name, const RDKBObject* def,
     const RDKBObject* m;
     rd_kbobject_each(m, members) {
         RDType t;
-        const char* name = _rd_kb_get_param(m, &t, ctx);
+        const char* param_name = _rd_kb_get_param(m, &t, ctx);
 
-        if(!name) {
+        if(!param_name) {
             rd_typedef_destroy(tdef);
             return false;
         }
 
-        rd_typedef_add_member(tdef, t.name, name, t.count, t.mod, ctx);
+        rd_typedef_add_member(tdef, t.name, param_name, t.count, t.mod, ctx);
     }
 
     return rd_typedef_register(tdef, ctx);

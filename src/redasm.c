@@ -119,9 +119,9 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
 
     bool accepted = false;
 
-    RDContext** it;
-    vect_each(it, &rd_i_state.tests) {
-        RDContext* ctx = *it;
+    RDContext** ctx_it;
+    vect_each(ctx_it, &rd_i_state.tests) {
+        RDContext* ctx = *ctx_it;
 
         if(ctx != self) {
             ctx->input = NULL; // disown input
@@ -151,17 +151,17 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
             LOG_INFO("selected loader '%s' and processor '%s'",
                      ctx->loaderplugin->id, ctx->processorplugin->id);
 
-            RDPlugin** it;
-            vect_each(it, &rd_i_state.analyzers) {
-                const RDAnalyzerPlugin* p = (*it)->analyzer;
+            RDPlugin** plugin_it;
+            vect_each(plugin_it, &rd_i_state.analyzers) {
+                const RDAnalyzerPlugin* ap = (*plugin_it)->analyzer;
 
                 // Assume true if 'is_enabled' is not implemented
-                if(!p->is_enabled || p->is_enabled(ctx, p)) {
+                if(!ap->is_enabled || ap->is_enabled(ctx, ap)) {
                     RDAnalyzerItem* ai = rd_alloc(sizeof(*ai));
 
                     *ai = (RDAnalyzerItem){
-                        .plugin = p,
-                        .is_selected = p->flags & RD_AF_SELECTED,
+                        .plugin = ap,
+                        .is_selected = ap->flags & RD_AF_SELECTED,
                     };
 
                     vect_push(&ctx->analyzerplugins, ai);

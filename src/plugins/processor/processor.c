@@ -88,7 +88,7 @@ void rd_i_processor_render_instruction(RDRenderer* r,
         data->operand.index = i;
         data->operand.value = *op;
 
-        bool done = false;
+        done = false;
 
         if(p->render_operand)
             done = p->render_operand(r, instr, i, ctx->processor);

@@ -77,10 +77,10 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
     RDXRefVect xrefs = {0};
     RDAddressVect v = {0};
 
-    RDFunction** f;
-    vect_each(f, &ctx->functions) {
-        if(!rd_i_function_is_noret(*f)) continue;
-        vect_push(&v, (*f)->address);
+    RDFunction** func_it;
+    vect_each(func_it, &ctx->functions) {
+        if(!rd_i_function_is_noret(*func_it)) continue;
+        vect_push(&v, (*func_it)->address);
     }
 
     // integrate with KB, if available
