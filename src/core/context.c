@@ -266,7 +266,7 @@ bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset) {
     const RDMappingVect* mappings = rd_i_db_get_mappings(self);
 
     usize idx = vect_bsearch(mappings, &address, rd_i_mapping_kcmp_pred);
-    if(idx == vect_length(mappings)) return NULL;
+    if(idx == vect_length(mappings)) return false;
 
     RDInputMapping* m = vect_at(mappings, idx);
     if(offset) *offset = (address - m->start_address) + m->offset;
