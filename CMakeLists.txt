@@ -68,6 +68,7 @@ target_sources(${PROJECT_NAME}
         src/hooks.c
         src/redasm.c
         src/theme.c
+        src/version.c
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -84,6 +85,9 @@ target_link_libraries(${PROJECT_NAME}
         sqlite3
         tomlc17
 )
+
+include(cmake/Version.cmake)
+redasm_setup_version(redasm)
 
 include(GNUInstallDirs)
 
