@@ -67,7 +67,7 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier flags, RDConfidence c) {
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-    if(!seg) return false;
+    if(!seg || !rd_i_typedef_find(ctx, name)) return false;
 
     usize newsz = rd_i_size_of(ctx, name, n, flags);
     if(!newsz) return false;
