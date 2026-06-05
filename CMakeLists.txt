@@ -89,8 +89,6 @@ target_link_libraries(${PROJECT_NAME}
 include(cmake/Version.cmake)
 redasm_setup_version(redasm)
 
-include(GNUInstallDirs)
-
 install(
     TARGETS ${PROJECT_NAME}
     EXPORT ${PROJECT_NAME}Targets
