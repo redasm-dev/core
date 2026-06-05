@@ -1,0 +1,24 @@
+name: Notify Workspace
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.RD_WORKSPACE_CI_TOKEN }}
+          script: |
+            await github.rest.repos.createDispatchEvent({
+              owner: 'redasm-dev',
+              repo: 'workspace',
+              event_type: 'repo_updated',
+              client_payload: {
+                repo: context.repo.repo,
+                sha: context.sha
+              }
+            })
