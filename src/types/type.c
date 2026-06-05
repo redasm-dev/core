@@ -2,13 +2,18 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/error.h"
+#include "support/logging.h"
 #include "types/def.h"
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeModifier mod) {
     const RDProcessorPlugin* p = ctx->processorplugin;
     RDTypeDef* tdef = rd_i_typedef_find(ctx, name);
-    panic_if(!tdef, "cannot get the size of '%s', type not found", name);
+
+    if(!tdef) {
+        LOG_FAIL("cannot get the size of '%s', type not found", name);
+        return 0;
+    }
 
     usize sz;
 
@@ -67,22 +72,22 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier flags, RDConfidence c) {
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-    if(!seg || !rd_i_typedef_find(ctx, name)) return false;
+    if(!seg) return false;
 
-    usize newsz = rd_i_size_of(ctx, name, n, flags);
-    if(!newsz) return false;
+    usize sz = rd_i_size_of(ctx, name, n, flags);
+    if(!sz) return false;
 
     usize idx = rd_i_address2index(seg, address);
-    usize startidx_exp = idx, endidx_exp = startidx_exp + newsz;
+    usize startidx_exp = idx, endidx_exp = startidx_exp + sz;
     rd_i_flagsbuffer_expand_range(seg->flags, &startidx_exp, &endidx_exp);
 
     if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
                                    endidx_exp - startidx_exp))
         return false;
 
-    if(!rd_i_undefine_n(ctx, address, newsz, c)) return false;
+    if(!rd_i_undefine_n(ctx, address, sz, c)) return false;
 
-    rd_i_flagsbuffer_set_type(seg->flags, idx, newsz);
+    rd_i_flagsbuffer_set_type(seg->flags, idx, sz);
     rd_i_db_set_type(ctx, address, name, n, flags, c);
     return true;
 }

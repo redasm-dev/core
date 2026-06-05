@@ -327,7 +327,10 @@ void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
         }
     }
     else if(tdef->kind == RD_TKIND_ENUM) {
-        tdef->size = rd_i_size_of(ctx, tdef->enum_.base_type, 0, RD_TYPE_NONE);
+        usize sz = rd_i_size_of(ctx, tdef->enum_.base_type, 0, RD_TYPE_NONE);
+        panic_if(!sz, "enum '%s' base type '%s' has unresolved size",
+                 tdef->name, tdef->enum_.base_type);
+        tdef->size = sz;
     }
     else
         panic("unsupported type kind '%lld'", tdef->kind);

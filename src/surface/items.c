@@ -159,6 +159,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     if(rd_i_buffer_read_primitive(flags, idx, t->name, is_be, &v)) {
         unsigned int sz =
             (unsigned int)rd_i_size_of(r->context, t->name, 0, t->mod);
+        panic_if(!sz, "type '%s' has unresolved size", t->name);
         rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
     }
     else

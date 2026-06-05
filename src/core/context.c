@@ -941,6 +941,8 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
             assert(ok && "cannot convert symbol to string, type not found");
 
             usize char_sz = rd_i_size_of(ctx, t.base.name, 0, RD_TYPE_NONE);
+            panic_if(!char_sz, "type '%s' has unresolved size", t.base.name);
+
             usize n = char_sz * t.base.count;
             usize idx = rd_i_address2index(seg, self->address);
             // reserve at least these bytes, +2 for quoting, +1 null terminator

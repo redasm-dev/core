@@ -127,7 +127,10 @@ static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
                                                });
             }
 
-            b->address += rd_i_size_of(b->context, t->name, t->count, t->mod);
+            usize sz = rd_i_size_of(b->context, t->name, t->count, t->mod);
+            panic_if(!sz, "type '%s' has unresolved size", t->name);
+            b->address += sz;
+
             return idx;
         }
 
@@ -156,8 +159,11 @@ static LIndex _rd_listing_process_type(RDListingBuilder* b, const RDType* t,
 
         rd_i_listing_pop_indent(&b->listing, 1);
     }
-    else
-        b->address += rd_i_size_of(b->context, t->name, 0, t->mod);
+    else {
+        usize sz = rd_i_size_of(b->context, t->name, 0, t->mod);
+        panic_if(!sz, "type '%s' has unresolved size", t->name);
+        b->address += sz;
+    }
 
     if(isroot) {
         vect_push(&b->listing.symbols, (RDSymbol){
