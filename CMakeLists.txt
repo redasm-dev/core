@@ -43,6 +43,7 @@ target_sources(${PROJECT_NAME}
         src/plugins/builtin/processors.c
         src/plugins/processor/instruction.c
         src/plugins/processor/processor.c
+        src/plugins/analyzer.c
         src/plugins/command.c
         src/plugins/module.c
         src/rdil/opcodes.c

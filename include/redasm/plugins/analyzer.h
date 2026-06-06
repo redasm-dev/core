@@ -15,7 +15,6 @@ typedef struct RDAnalyzerPlugin {
     const char* name;
     u32 order;
 
-    bool (*is_enabled)(RDContext*, const struct RDAnalyzerPlugin*);
     void (*execute)(RDContext*);
 } RDAnalyzerPlugin;
 
@@ -27,6 +26,7 @@ typedef struct RDAnalyzerItemSlice {
 } RDAnalyzerItemSlice;
 
 RD_API bool rd_register_analyzer(const RDAnalyzerPlugin* a);
+RD_API bool rd_analyzer_enable(RDContext* ctx, const char* id);
 
 // clang-format off
 RD_API const RDAnalyzerPlugin* rd_analyzeritem_get_plugin(const RDAnalyzerItem* self);

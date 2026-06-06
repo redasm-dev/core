@@ -3,6 +3,7 @@
 #include "core/engine.h"
 #include "core/stringfinder.h"
 #include "listing/builder.h"
+#include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"

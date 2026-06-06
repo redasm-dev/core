@@ -15,12 +15,6 @@
 
 typedef struct RDHooks RDHooks;
 
-typedef struct RDAnalyzerItem {
-    const RDAnalyzerPlugin* plugin;
-    bool is_selected;
-    usize n_runs;
-} RDAnalyzerItem;
-
 typedef struct RDDelaySlotInfo {
     RDInstruction instr;
     u8 n;

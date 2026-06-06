@@ -150,24 +150,6 @@ bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
         if(load_ok) {
             LOG_INFO("selected loader '%s' and processor '%s'",
                      ctx->loaderplugin->id, ctx->processorplugin->id);
-
-            RDPlugin** plugin_it;
-            vect_each(plugin_it, &rd_i_state.analyzers) {
-                const RDAnalyzerPlugin* ap = (*plugin_it)->analyzer;
-
-                // Assume true if 'is_enabled' is not implemented
-                if(!ap->is_enabled || ap->is_enabled(ctx, ap)) {
-                    RDAnalyzerItem* ai = rd_alloc(sizeof(*ai));
-
-                    *ai = (RDAnalyzerItem){
-                        .plugin = ap,
-                        .is_selected = ap->flags & RD_AF_SELECTED,
-                    };
-
-                    vect_push(&ctx->analyzerplugins, ai);
-                }
-            }
-
             accepted = true;
         }
 
