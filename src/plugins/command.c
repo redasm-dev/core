@@ -1,4 +1,3 @@
-#include "support/error.h"
 #include "support/logging.h"
 #include <redasm/plugins/command.h>
 
@@ -20,22 +19,6 @@ static int _rd_command_count_args(const RDCommandValue* args) {
     return (int)(a - args);
 }
 
-static const char* _rd_command_type_name(RDCommandValueKind kind) {
-    switch(kind) {
-        case RD_CMDARG_VOID: return "VOID";
-        case RD_CMDARG_BOOL: return "BOOL";
-        case RD_CMDARG_INT: return "INT";
-        case RD_CMDARG_UINT: return "UINT";
-        case RD_CMDARG_STRING: return "STRING";
-        case RD_CMDARG_OFFSET: return "OFFSET";
-        case RD_CMDARG_ADDRESS: return "ADDRESS";
-        default: break;
-    }
-
-    unreachable();
-    return NULL;
-}
-
 static bool _rd_command_validate_args(const RDCommandPlugin* p,
                                       const RDCommandParam* params,
                                       const RDCommandValue* args) {
@@ -43,8 +26,8 @@ static bool _rd_command_validate_args(const RDCommandPlugin* p,
 
     while(args->kind != RD_CMDARG_VOID) {
         if(params->kind != args->kind) {
-            const char* paramtype = _rd_command_type_name(params->kind);
-            const char* argtype = _rd_command_type_name(args->kind);
+            const char* paramtype = rd_command_valuekind_str(params->kind);
+            const char* argtype = rd_command_valuekind_str(args->kind);
 
             LOG_FAIL("command '%s', argument #%d: expects '%s', got '%s'",
                      p->id, i, paramtype, argtype);
@@ -58,6 +41,21 @@ static bool _rd_command_validate_args(const RDCommandPlugin* p,
     }
 
     return true;
+}
+
+const char* rd_command_valuekind_str(RDCommandValueKind kind) {
+    switch(kind) {
+        case RD_CMDARG_VOID: return "VOID";
+        case RD_CMDARG_BOOL: return "BOOL";
+        case RD_CMDARG_INT: return "INT";
+        case RD_CMDARG_UINT: return "UINT";
+        case RD_CMDARG_STRING: return "STRING";
+        case RD_CMDARG_OFFSET: return "OFFSET";
+        case RD_CMDARG_ADDRESS: return "ADDRESS";
+        default: break;
+    }
+
+    return "???";
 }
 
 RDCommandValue rd_command_run(RDContext* ctx, const char* name,

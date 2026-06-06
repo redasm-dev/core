@@ -41,3 +41,4 @@ typedef struct RDCommandPlugin {
 RD_API bool rd_register_command(const RDCommandPlugin* c);
 RD_API RDCommandValue rd_command_run(RDContext* ctx, const char* name,
                                      const RDCommandValue* args);
+RD_API const char* rd_command_valuekind_str(RDCommandValueKind kind);
