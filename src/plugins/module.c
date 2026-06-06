@@ -1,12 +1,17 @@
 #include "plugins/module.h"
+#include "core/state.h"
 #include "support/logging.h"
+#include "support/stringpool.h"
 #include <assert.h>
 #include <redasm/allocator.h>
 #include <redasm/support/utils.h>
 #include <string.h>
 
+#define RD_MODULE_VERSION_NONE "unknown"
+
 #define RD_PLUGIN_CREATE "rd_plugin_create"
 #define RD_PLUGIN_DESTROY "rd_plugin_destroy"
+#define RD_PLUGIN_VERSION "rd_plugin_version"
 
 #if defined(_WIN32)
 typedef FARPROC RDModuleProc;
@@ -14,7 +19,8 @@ typedef FARPROC RDModuleProc;
 typedef void* RDModuleProc;
 #endif
 
-static void _rd_module_sym(const RDModule* self, const char* name, void* sym) {
+static void _rd_module_sym(const RDModuleFull* self, const char* name,
+                           void* sym) {
 #if defined(_WIN32)
     RDModuleProc proc = GetProcAddress(self->handle, name);
 #else
@@ -43,11 +49,11 @@ static void _rd_module_errmsg(void) {
 #endif
 }
 
-RDModule* rd_i_module_create(const char* filepath) {
+RDModuleFull* rd_i_module_create(const char* filepath) {
     if(!filepath) return NULL;
 
     LOG_INFO("Loading module '%s'", filepath);
-    RDModule* self = rd_alloc0(1, sizeof(*self));
+    RDModuleFull* self = rd_alloc0(1, sizeof(*self));
 
 #if defined(_WIN32)
     self->handle = LoadLibraryA(filepath);
@@ -55,7 +61,7 @@ RDModule* rd_i_module_create(const char* filepath) {
     self->handle = dlopen(filepath, RTLD_LAZY);
 #endif
 
-    self->path = rd_strdup(filepath);
+    self->base.path = rd_strdup(filepath);
 
     if(!self->handle) {
         LOG_FAIL("failed to load '%s'", filepath);
@@ -71,6 +77,16 @@ RDModule* rd_i_module_create(const char* filepath) {
     }
 
     _rd_module_sym(self, RD_PLUGIN_DESTROY, (void*)&self->destroy);
+
+    RDModuleVersion module_ver;
+    _rd_module_sym(self, RD_PLUGIN_VERSION, (void*)&module_ver);
+
+    if(module_ver)
+        self->base.version =
+            rd_i_strpool_intern(&rd_i_state.strings, module_ver());
+
+    if(!self->base.version) self->base.version = RD_MODULE_VERSION_NONE;
+
     return self;
 
 fail:
@@ -78,8 +94,8 @@ fail:
     return NULL;
 }
 
-void rd_i_module_destroy(RDModule* self) {
-    LOG_INFO("Unloading module '%s'", self->path);
+void rd_i_module_destroy(RDModuleFull* self) {
+    LOG_INFO("Unloading module '%s'", self->base.path);
 
     if(self->handle) {
 #if defined(_WIN32)
@@ -89,6 +105,6 @@ void rd_i_module_destroy(RDModule* self) {
 #endif
     }
 
-    rd_free(self->path);
+    rd_free((char*)self->base.path);
     rd_free(self);
 }

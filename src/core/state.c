@@ -15,20 +15,19 @@
 RDGlobalState rd_i_state = {0};
 
 static void _rd_i_state_unload_modules(void) {
-    RDModule* m = rd_i_state.modules;
-
-    while(m) {
-        RDModule* n = m->next;
-        if(m->destroy) m->destroy();
-        rd_i_module_destroy(m);
-        m = n;
+    RDModuleFull** m;
+    vect_each(m, &rd_i_state.modules) {
+        if((*m)->destroy) (*m)->destroy();
+        rd_i_module_destroy(*m);
     }
+
+    vect_destroy(&rd_i_state.modules);
 }
 
-static RDModule* _rd_module_find(const char* filepath) {
-    RDModule* m;
-    list_each(m, rd_i_state.modules) {
-        if(!strcmp(m->path, filepath)) return m;
+static RDModuleFull* _rd_module_find(const char* filepath) {
+    RDModuleFull** m;
+    vect_each(m, &rd_i_state.modules) {
+        if(!strcmp((*m)->base.path, filepath)) return *m;
     }
 
     return NULL;
@@ -40,6 +39,7 @@ void rd_i_state_init(const RDInitParams* params) {
     }
 
     rd_i_theme_init(&rd_i_state.theme);
+    rd_i_strpool_init(&rd_i_state.strings);
     rd_i_builtin_binary();
     rd_i_builtin_null();
 }
@@ -65,6 +65,7 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.mnem_buf);
     _rd_i_state_unload_modules();
     rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
+    rd_i_strpool_destroy(&rd_i_state.strings);
 }
 
 void rd_set_log_callback(RDLogCallback cb, void* userdata) {
@@ -117,7 +118,7 @@ const RDCommandPlugin* rd_command_find(const char* id) {
 }
 
 bool rd_module_load(const char* filepath) {
-    RDModule* m = _rd_module_find(filepath);
+    RDModuleFull* m = _rd_module_find(filepath);
 
     if(m) {
         LOG_WARN("module '%s' already loaded, skipping...", filepath);
@@ -127,12 +128,19 @@ bool rd_module_load(const char* filepath) {
     m = rd_i_module_create(filepath);
 
     if(m) {
-        list_push(rd_i_state.modules, m);
+        vect_push(&rd_i_state.modules, m);
         m->create();
         return true;
     }
 
     return false;
+}
+
+RDModuleSlice rd_get_all_modules(void) {
+    return (RDModuleSlice){
+        .data = (const RDModule**)rd_i_state.modules.data,
+        .length = rd_i_state.modules.length,
+    };
 }
 
 RDPluginSlice rd_get_all_loader_plugins(void) {

@@ -29,6 +29,17 @@ typedef struct RDPluginSlice {
     usize length;
 } RDPluginSlice;
 
+typedef struct RDModule {
+    const char* path;
+    const char* version;
+} RDModule;
+
+typedef struct RDModuleSlice {
+    const RDModule** data;
+    usize length;
+} RDModuleSlice;
+
+RD_API RDModuleSlice rd_get_all_modules(void);
 RD_API RDPluginSlice rd_get_all_loader_plugins(void);
 RD_API RDPluginSlice rd_get_all_processor_plugins(void);
 RD_API RDPluginSlice rd_get_all_analyzers_plugins(void);
@@ -41,3 +52,4 @@ RD_API const RDCommandPlugin* rd_command_find(const char* id);
 // Plugin entry points
 RD_API void rd_plugin_create(void);
 RD_API void rd_plugin_destroy(void);
+RD_API const char* rd_plugin_version(void);

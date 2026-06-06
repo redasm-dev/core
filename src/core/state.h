@@ -1,9 +1,11 @@
 #pragma once
 
-#include "plugins/module.h"
+#include "support/stringpool.h"
 #include "support/utils.h"
 #include "theme.h"
 #include <redasm/redasm.h>
+
+typedef struct RDModuleFull RDModuleFull;
 
 typedef struct RDPluginVect {
     RDPlugin** data;
@@ -12,12 +14,18 @@ typedef struct RDPluginVect {
 } RDPluginVect;
 
 typedef struct RDGlobalState {
-    RDModule* modules;
+    struct {
+        RDModuleFull** data;
+        usize length;
+        usize capacity;
+    } modules;
 
     RDPluginVect loaders;
     RDPluginVect processors;
     RDPluginVect analyzers;
     RDPluginVect commands;
+
+    RDStringPool strings;
 
     RDTheme theme;
 

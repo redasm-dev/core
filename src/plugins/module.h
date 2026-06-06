@@ -1,5 +1,7 @@
 #pragma once
 
+#include <redasm/plugins/plugin.h>
+
 // clang-format off
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -18,17 +20,15 @@ typedef void* RDModuleHandle;
 
 typedef void (*RDModuleCreate)(void);
 typedef void (*RDModuleDestroy)(void);
+typedef const char* (*RDModuleVersion)(void);
 
-typedef struct RDModule {
-    char* path;
+typedef struct RDModuleFull {
+    RDModule base;
 
     RDModuleHandle handle;
     RDModuleCreate create;
     RDModuleDestroy destroy;
+} RDModuleFull;
 
-    struct RDModule* prev;
-    struct RDModule* next;
-} RDModule;
-
-RDModule* rd_i_module_create(const char* filepath);
-void rd_i_module_destroy(RDModule* self);
+RDModuleFull* rd_i_module_create(const char* filepath);
+void rd_i_module_destroy(RDModuleFull* self);
