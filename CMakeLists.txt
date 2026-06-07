@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.25)
 
 project(redasm C)
 
+include(GNUInstallDirs)
+
 include(cmake/Dependencies.cmake)
 setup_dependencies()
 
