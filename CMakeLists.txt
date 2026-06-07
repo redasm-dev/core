@@ -112,6 +112,14 @@ configure_package_config_file(
 )
 
 install(
+    EXPORT ${PROJECT_NAME}Targets
+    FILE redasmTargets.cmake
+    NAMESPACE redasm::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
+)
+
+install(
     FILES "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
 )
+
