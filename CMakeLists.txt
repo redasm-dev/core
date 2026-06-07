@@ -83,7 +83,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        sqlite3
+        SQLite3::SQLite3
         tomlc17
 )
 
