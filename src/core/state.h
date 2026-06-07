@@ -1,6 +1,5 @@
 #pragma once
 
-#include "support/stringpool.h"
 #include "support/utils.h"
 #include "theme.h"
 #include <redasm/redasm.h>
@@ -24,8 +23,6 @@ typedef struct RDGlobalState {
     RDPluginVect processors;
     RDPluginVect analyzers;
     RDPluginVect commands;
-
-    RDStringPool strings;
 
     RDTheme theme;
 

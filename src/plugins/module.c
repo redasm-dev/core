@@ -81,11 +81,10 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
     RDModuleVersion module_ver;
     _rd_module_sym(self, RD_PLUGIN_VERSION, (void*)&module_ver);
 
-    if(module_ver)
-        self->base.version =
-            rd_i_strpool_intern(&rd_i_state.strings, module_ver());
+    if(module_ver) self->base.version = rd_strdup(module_ver());
 
-    if(!self->base.version) self->base.version = RD_MODULE_VERSION_NONE;
+    if(!self->base.version)
+        self->base.version = rd_strdup(RD_MODULE_VERSION_NONE);
 
     return self;
 
@@ -105,6 +104,7 @@ void rd_i_module_destroy(RDModuleFull* self) {
 #endif
     }
 
+    rd_free((char*)self->base.version);
     rd_free((char*)self->base.path);
     rd_free(self);
 }
