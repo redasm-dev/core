@@ -329,7 +329,7 @@ void rd_i_kb_paths_init(const char** kb_paths) {
 
     for(const char** p = kb_paths; *p; p++) {
         char* sp = rd_strdup(*p);
-        puts(sp);
+        assert(sp && "invalid searchpath");
         vect_push(&rd_i_state.kb_paths, sp);
     }
 }
