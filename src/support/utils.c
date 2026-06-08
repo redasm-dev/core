@@ -128,9 +128,9 @@ const char* rd_i_strip_prefix(const char* s) {
 
     const char* p = s;
 
-    // left part: only lower case characters allowed
+    // left part: only characters and numbers allowed
     while(p < split) {
-        if(*p < 'a' || *p > 'z') return s;
+        if(!islower((int)*p) && !isdigit((int)*p)) return s;
         p++;
     }
 
