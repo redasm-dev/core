@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/utils.h"
 #include <redasm/function.h>
 
 typedef struct RDFunction {
@@ -8,6 +9,7 @@ typedef struct RDFunction {
     usize n_instructions;
     usize n_norets;
     RDGraph* graph;
+    RDCharVect fmt_buf;
 } RDFunction;
 
 typedef struct RDFunctionChunkVect {

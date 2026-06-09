@@ -70,6 +70,12 @@ void rd_i_graph_remove_outgoing_edges(RDGraph* self, RDGraphNode n);
 void rd_i_graph_remove_incoming_edges(RDGraph* self, RDGraphNode n);
 void rd_i_graph_remove_edges(RDGraph* self, RDGraphNode n);
 RDNodeAttributes* rd_i_graph_get_node_attributes(RDGraph* self, RDGraphNode n);
-const RDEdgeVect* rd_i_graph_get_outgoing_edges(RDGraph* self, RDGraphNode n);
-const RDEdgeVect* rd_i_graph_get_incoming_edges(RDGraph* self, RDGraphNode n);
+const RDEdgeVect* rd_i_graph_get_outgoing_edges(const RDGraph* self,
+                                                RDGraphNode n);
+const RDEdgeVect* rd_i_graph_get_incoming_edges(const RDGraph* self,
+                                                RDGraphNode n);
 const RDNodeVect* rd_i_graph_get_nodes(const RDGraph* self);
+const char* rd_i_graph_generate_dot(RDGraph* self,
+                                    void (*props)(RDGraph*, RDGraphNode n,
+                                                  RDCharVect* buf,
+                                                  void* userdata));

@@ -5,6 +5,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/logging.h"
+#include <inttypes.h>
 #include <redasm/allocator.h>
 #include <redasm/function.h>
 
@@ -34,6 +35,16 @@ static bool _rd_functionchunks_del_if_pred(const void* key, const void* item) {
 
     rd_free(chunk);
     return true;
+}
+
+static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
+                                          void* userdata) {
+    RDFunction* self = (RDFunction*)userdata;
+    const RDFunctionChunk* c = (const RDFunctionChunk*)rd_graph_get_data(g, n);
+    assert(c);
+
+    return rd_i_format(&self->fmt_buf, "[label=\"0x%" PRIx64 " (%zu)\"]",
+                       c->start, c->n_instructions);
 }
 
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
@@ -84,6 +95,7 @@ static void _rd_function_rebuild_graph(RDFunction* self,
         RDFunctionWorkItem wi = vect_pop_last(&w);
         RDAddress addr = wi.address;
         RDGraphNode src = wi.node;
+        RDFunctionChunk* b = (RDFunctionChunk*)rd_graph_get_data(g, src);
 
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, addr);
         assert(seg);
@@ -100,7 +112,9 @@ static void _rd_function_rebuild_graph(RDFunction* self,
 
             usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
             if(!len) break;
+
             self->n_instructions++;
+            b->n_instructions++;
 
             RDAddress nextaddr = addr + len;
 
@@ -113,9 +127,13 @@ static void _rd_function_rebuild_graph(RDFunction* self,
                     RDFlags nextflags =
                         rd_i_flagsbuffer_get(seg->flags, nextidx);
                     if(!rd_i_flags_has_dslot(nextflags)) break;
+
                     usize slotlen =
                         rd_i_flagsbuffer_get_range_length(seg->flags, nextidx);
+
                     self->n_instructions++;
+                    b->n_instructions++;
+
                     nextaddr += slotlen;
                 }
 
@@ -190,7 +208,6 @@ static void _rd_function_rebuild_graph(RDFunction* self,
         }
 
         // finalize block end address
-        RDFunctionChunk* b = (RDFunctionChunk*)rd_graph_get_data(g, src);
         b->end = addr;
         b->has_noret = has_noret;
     }
@@ -269,6 +286,7 @@ RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
 void rd_i_function_destroy(RDFunction* self) {
     if(!self) return;
 
+    vect_destroy(&self->fmt_buf);
     rd_graph_destroy(self->graph);
     rd_free(self);
 }
@@ -328,6 +346,24 @@ bool rd_function_get_chunk(const RDFunction* self, RDGraphNode n,
     if(!c) return false;
     if(chunk) *chunk = *c;
     return true;
+}
+
+const char* rd_function_generate_dot(const RDFunction* self) {
+    if(self->graph) {
+        return rd_graph_generate_dot(self->graph, _rd_function_dot_props,
+                                     (RDFunction*)self);
+    }
+
+    return NULL;
+}
+
+u32 rd_function_get_hash(const RDFunction* self) {
+    if(self->graph) {
+        return rd_graph_get_hash(self->graph, _rd_function_dot_props,
+                                 (RDFunction*)self);
+    }
+
+    return 0;
 }
 
 bool rd_function_contains_address(const RDFunction* self, RDAddress address) {

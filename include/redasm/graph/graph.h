@@ -30,10 +30,16 @@ typedef struct RDGraphPointSlice {
     usize length;
 } RDGraphPointSlice;
 
+typedef const char* (*RDGraphPropCallback)(const RDGraph* self, RDGraphNode n,
+                                           void* userdata);
+
 RD_API RDGraph* rd_graph_create(void);
 RD_API void rd_graph_destroy(RDGraph* self);
-RD_API u32 rd_graph_get_hash(const RDGraph* self);
-RD_API const char* rd_graph_generate_dot(RDGraph* self);
+RD_API u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
+                             void* userdata);
+RD_API const char* rd_graph_generate_dot(const RDGraph* self,
+                                         RDGraphPropCallback cb,
+                                         void* userdata);
 RD_API RDGraphNode rd_graph_add_node(RDGraph* self);
 RD_API RDGraphEdge rd_graph_add_edge(RDGraph* self, RDGraphNode src,
                                      RDGraphNode dst);
@@ -44,8 +50,10 @@ RD_API bool rd_graph_set_root(RDGraph* self, RDGraphNode n);
 RD_API RDGraphNode rd_graph_get_root(const RDGraph* self);
 RD_API RDNodeSlice rd_graph_get_nodes(const RDGraph* self);
 RD_API RDEdgeSlice rd_graph_get_edges(const RDGraph* self);
-RD_API RDEdgeSlice rd_graph_get_outgoing_edges(RDGraph* self, RDGraphNode n);
-RD_API RDEdgeSlice rd_graph_get_incoming_edges(RDGraph* self, RDGraphNode n);
+RD_API RDEdgeSlice rd_graph_get_outgoing_edges(const RDGraph* self,
+                                               RDGraphNode n);
+RD_API RDEdgeSlice rd_graph_get_incoming_edges(const RDGraph* self,
+                                               RDGraphNode n);
 RD_API const RDGraphEdge* rd_graph_find_edge(const RDGraph* self,
                                              RDGraphNode src, RDGraphNode dst);
 

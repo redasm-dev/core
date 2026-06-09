@@ -53,29 +53,33 @@ RDNodeAttributes* rd_i_graph_get_node_attributes(RDGraph* self, RDGraphNode n) {
         return vect_at(&self->node_attributes, rd_i_node2index(n));
 
     LOG_WARN("node out of range");
-    return false;
+    return NULL;
 }
 
-const RDEdgeVect* rd_i_graph_get_outgoing_edges(RDGraph* self, RDGraphNode n) {
-    vect_clear(&self->outgoing_edges);
+const RDEdgeVect* rd_i_graph_get_outgoing_edges(const RDGraph* self,
+                                                RDGraphNode n) {
+    RDEdgeVect* outgoing_edges = (RDEdgeVect*)&self->outgoing_edges;
+    vect_clear(outgoing_edges);
 
     const RDGraphEdge* e;
     vect_each(e, &self->edges) {
-        if(e->src == n) vect_push(&self->outgoing_edges, *e);
+        if(e->src == n) vect_push(outgoing_edges, *e);
     }
 
-    return &self->outgoing_edges;
+    return outgoing_edges;
 }
 
-const RDEdgeVect* rd_i_graph_get_incoming_edges(RDGraph* self, RDGraphNode n) {
-    vect_clear(&self->incoming_edges);
+const RDEdgeVect* rd_i_graph_get_incoming_edges(const RDGraph* self,
+                                                RDGraphNode n) {
+    RDEdgeVect* incoming_edges = (RDEdgeVect*)&self->incoming_edges;
+    vect_clear(incoming_edges);
 
     const RDGraphEdge* e;
     vect_each(e, &self->edges) {
-        if(e->dst == n) vect_push(&self->incoming_edges, *e);
+        if(e->dst == n) vect_push(incoming_edges, *e);
     }
 
-    return &self->incoming_edges;
+    return incoming_edges;
 }
 
 const RDNodeVect* rd_i_graph_get_nodes(const RDGraph* self) {
@@ -238,11 +242,11 @@ RDEdgeSlice rd_graph_get_edges(const RDGraph* self) {
     return vect_to_slice(RDEdgeSlice, &self->edges);
 }
 
-RDEdgeSlice rd_graph_get_outgoing_edges(RDGraph* self, RDGraphNode n) {
+RDEdgeSlice rd_graph_get_outgoing_edges(const RDGraph* self, RDGraphNode n) {
     return vect_to_slice(RDEdgeSlice, rd_i_graph_get_outgoing_edges(self, n));
 }
 
-RDEdgeSlice rd_graph_get_incoming_edges(RDGraph* self, RDGraphNode n) {
+RDEdgeSlice rd_graph_get_incoming_edges(const RDGraph* self, RDGraphNode n) {
     return vect_to_slice(RDEdgeSlice, rd_i_graph_get_incoming_edges(self, n));
 }
 
@@ -406,31 +410,53 @@ void rd_graph_set_edge_arrow(RDGraph* self, const RDGraphEdge* e,
         vect_push(&ea->arrow, poly[i]);
 }
 
-u32 rd_graph_get_hash(const RDGraph* self) {
-    rd_graph_generate_dot((RDGraph*)self);
-    return rd_i_murmur3(self->dot_buf.data, (u32)self->dot_buf.length);
+u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
+                      void* userdata) {
+    rd_graph_generate_dot((RDGraph*)self, cb, userdata);
+    return rd_i_murmur3(self->dot_buf.data, (u32)vect_length(&self->dot_buf));
 }
 
-const char* rd_graph_generate_dot(RDGraph* self) {
-    str_clear(&self->dot_buf);
-    str_append(&self->dot_buf, "digraph G{\n");
+const char* rd_graph_generate_dot(const RDGraph* self, RDGraphPropCallback cb,
+                                  void* userdata) {
+    RDCharVect* buf = (RDCharVect*)&self->dot_buf;
+
+    str_clear(buf);
+    str_append(buf, "digraph G {\n");
 
     const RDGraphNode* n;
+    vect_each(n, &self->nodes) {
+        str_append(buf, "\t\"#");
+        str_append(buf, rd_i_to_dec((i64)*n));
+        str_append(buf, "\"");
+
+        if(cb) {
+            const char* prop = cb(self, *n, userdata);
+            if(prop) {
+                str_push(buf, ' ');
+                str_append(buf, prop);
+            }
+        }
+
+        str_append(buf, ";\n");
+    }
+
+    if(!vect_is_empty(&self->nodes)) str_push(buf, '\n');
+
     vect_each(n, &self->nodes) {
         const RDEdgeVect* edges = rd_i_graph_get_outgoing_edges(self, *n);
 
         const RDGraphEdge* e;
         vect_each(e, edges) {
-            str_append(&self->dot_buf, "\t\"#");
-            str_append(&self->dot_buf, rd_i_to_dec((i64)e->src));
+            str_append(buf, "\t\"#");
+            str_append(buf, rd_i_to_dec((i64)e->src));
 
-            str_append(&self->dot_buf, " -> \"#");
-            str_append(&self->dot_buf, rd_i_to_dec((i64)e->dst));
+            str_append(buf, "\" -> \"#");
+            str_append(buf, rd_i_to_dec((i64)e->dst));
 
-            str_append(&self->dot_buf, "\";\n");
+            str_append(buf, "\";\n");
         }
     }
 
-    str_push(&self->dot_buf, '}');
+    str_push(buf, '}');
     return self->dot_buf.data;
 }
