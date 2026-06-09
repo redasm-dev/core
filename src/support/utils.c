@@ -218,7 +218,7 @@ const char* rd_i_get_file_ext(const char* filepath) {
     const char* fname = rd_i_get_file_name(filepath);
     if(!fname) return NULL;
 
-    const char* ldot = strrchr(filepath, '.');
+    const char* ldot = strrchr(fname, '.'); // search filename only, not full path
 
     // Has extension if dot exists and isn't at the start (avoid
     // ".gitignore")
