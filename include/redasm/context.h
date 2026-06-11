@@ -190,7 +190,7 @@ RD_API bool rd_operand_as_immediate(RDContext* self, RDAddress address,
 
 RD_API RDReader* rd_get_reader(const RDContext* self);
 RD_API RDReader* rd_get_input_reader(const RDContext* self);
-RD_API bool rd_read_u8(const RDContext* self, RDAddress address, u8* v);
+RD_API bool rd_read_byte(const RDContext* self, RDAddress address, u8* v);
 RD_API bool rd_read_le16(const RDContext* self, RDAddress address, u16* v);
 RD_API bool rd_read_le32(const RDContext* self, RDAddress address, u32* v);
 RD_API bool rd_read_le64(const RDContext* self, RDAddress address, u64* v);
@@ -210,7 +210,7 @@ RD_API bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v);
 RD_API usize rd_read(const RDContext* self, RDAddress address, void* data,
                      usize n);
 
-RD_API bool rd_write_u8(RDContext* self, RDAddress address, u8 v);
+RD_API bool rd_write_byte(RDContext* self, RDAddress address, u8 v);
 RD_API bool rd_write_le16(RDContext* self, RDAddress address, u16 v);
 RD_API bool rd_write_le32(RDContext* self, RDAddress address, u32 v);
 RD_API bool rd_write_le64(RDContext* self, RDAddress address, u64 v);

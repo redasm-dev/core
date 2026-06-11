@@ -596,7 +596,7 @@ RDReader* rd_get_input_reader(const RDContext* self) {
     return self->input_reader;
 }
 
-bool rd_read_u8(const RDContext* self, RDAddress address, u8* v) {
+bool rd_read_byte(const RDContext* self, RDAddress address, u8* v) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return 0;
     usize idx = rd_i_address2index(s, address);
@@ -651,7 +651,7 @@ bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
     switch(ctx->processorplugin->ptr_size) {
         case sizeof(u8): {
             u8 ptr_v;
-            if(!rd_read_u8(ctx, address, &ptr_v)) return false;
+            if(!rd_read_byte(ctx, address, &ptr_v)) return false;
             *v = (RDAddress)ptr_v;
             return true;
         }
@@ -773,7 +773,7 @@ usize rd_read(const RDContext* self, RDAddress address, void* data, usize n) {
                             data, n);
 }
 
-bool rd_write_u8(RDContext* self, RDAddress address, u8 v) {
+bool rd_write_byte(RDContext* self, RDAddress address, u8 v) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
     usize idx = rd_i_address2index(s, address);
