@@ -578,8 +578,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         }
     }
     else if(tdef->kind == RD_TKIND_FUNC) {
-        if(!rd_i_type_is_void(
-               &tdef->func_.ret)) { // return type at member_idx=0
+        if(!rd_type_is_void(&tdef->func_.ret)) { // return type at member_idx=0
             stmt = _rd_db_prepare_set_typedef_params_query(ctx);
             _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
             _rd_db_bind_param_str(ctx, stmt, ":type", tdef->func_.ret.name);

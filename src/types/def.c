@@ -241,7 +241,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                 goto fail;
             }
 
-            if(rd_i_type_is_void(&arg1->type)) {
+            if(rd_type_is_void(&arg1->type)) {
                 LOG_FAIL("function '%s': argument %d '%s' cannot be void",
                          self->name, i + 1, arg1->name);
                 goto fail;

@@ -46,7 +46,7 @@ const char* rd_integral_from_size(unsigned int size) {
 }
 
 const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
-    if(rd_i_type_is_void(t)) return "void";
+    if(rd_type_is_void(t)) return "void";
 
     assert(t->name);
 
@@ -127,4 +127,11 @@ bool rd_library_type(RDContext* ctx, RDAddress address, const char* name,
 bool rd_user_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                   RDTypeModifier flags) {
     return rd_i_set_type(ctx, address, name, n, flags, RD_CONFIDENCE_USER);
+}
+
+bool rd_type_equals(const RDType* self, const RDType* t) {
+    if(!self || !t) return false;
+    if(self->count != t->count || self->mod != t->mod) return false;
+    if(self->name == t->name) return true;
+    return !strcmp(self->name, t->name);
 }
