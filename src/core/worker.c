@@ -80,7 +80,7 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
 
     RDFunction** func_it;
     vect_each(func_it, &ctx->functions) {
-        if(!rd_i_function_is_noret(*func_it)) continue;
+        if(!rd_function_is_noret(*func_it)) continue;
         vect_push(&v, (*func_it)->address);
     }
 
@@ -115,7 +115,7 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
             rd_i_rebuild_function(f);
 
             // if all exit blocks are now NORET, propagate further
-            if(rd_i_function_is_noret(f)) vect_push(&v, f->address);
+            if(rd_function_is_noret(f)) vect_push(&v, f->address);
         }
     }
 

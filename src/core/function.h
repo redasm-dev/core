@@ -28,7 +28,6 @@ typedef struct RDFunctionVect {
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_destroy(RDFunction* self);
-bool rd_i_function_is_noret(const RDFunction* self);
 usize rd_i_function_get_terminal_count(const RDFunction* self);
 const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx);
 RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);

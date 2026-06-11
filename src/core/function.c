@@ -250,7 +250,7 @@ const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
 
     str_push(&ctx->tdef_buf, ')');
 
-    if(rd_i_function_is_noret(self)) str_append(&ctx->tdef_buf, " noreturn");
+    if(rd_function_is_noret(self)) str_append(&ctx->tdef_buf, " noreturn");
 
     assert(!vect_is_empty(&ctx->tdef_buf));
     return ctx->tdef_buf.data;
@@ -291,7 +291,7 @@ void rd_i_function_destroy(RDFunction* self) {
     rd_free(self);
 }
 
-bool rd_i_function_is_noret(const RDFunction* self) {
+bool rd_function_is_noret(const RDFunction* self) {
     if(!self->n_norets) return false;
 
     const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);

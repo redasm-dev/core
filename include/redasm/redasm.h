@@ -41,6 +41,7 @@ typedef struct RDDecodedInstruction {
 
 RD_API void rd_init(const RDInitParams* params);
 RD_API void rd_deinit(void);
+RD_API RDContextSlice rd_test_data(const char* data, usize n);
 RD_API RDContextSlice rd_test(const char* filepath);
 RD_API bool rd_module_load(const char* filepath);
 RD_API bool rd_accept(const RDContext* ctx, const RDProcessorPlugin* p,

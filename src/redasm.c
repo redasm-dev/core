@@ -56,10 +56,11 @@ static bool _rd_validate_plugin_with_name(u32 level, const char* id,
 void rd_init(const RDInitParams* params) { rd_i_state_init(params); }
 void rd_deinit(void) { rd_i_state_deinit(); }
 
-RDContextSlice rd_test(const char* filepath) {
-    vect_destroy(&rd_i_state.tests);
+RDContextSlice rd_i_test(RDByteBuffer* input, const char* filepath) {
+    if(!input) return (RDContextSlice){0};
 
-    RDByteBuffer* input = rd_i_readfile(filepath);
+    assert(filepath);
+    vect_destroy(&rd_i_state.tests);
 
     if(!rd_i_buffer_is_empty((RDBuffer*)input)) {
         RDPlugin** it;
@@ -111,6 +112,20 @@ RDContextSlice rd_test(const char* filepath) {
     }
 
     return (RDContextSlice){0};
+}
+
+RDContextSlice rd_test_data(const char* data, usize n) {
+    if(!data || !n) return (RDContextSlice){0};
+
+    RDByteBuffer* input = rd_i_fromdata(data, n);
+    return rd_i_test(input, ":memory:");
+}
+
+RDContextSlice rd_test(const char* filepath) {
+    if(!filepath) return (RDContextSlice){0};
+
+    RDByteBuffer* input = rd_i_readfile(filepath);
+    return rd_i_test(input, filepath);
 }
 
 bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,

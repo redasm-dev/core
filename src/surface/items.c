@@ -359,7 +359,7 @@ static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
     rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
     rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
 
-    if(rd_i_function_is_noret(item->func)) {
+    if(rd_function_is_noret(item->func)) {
         rd_renderer_text(r, " noreturn", RD_THEME_FUNCTION,
                          RD_THEME_BACKGROUND);
     }
