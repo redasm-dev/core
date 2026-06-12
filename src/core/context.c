@@ -1146,14 +1146,11 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
 
     assert(n && "invalid entry point name");
 
-    if(rd_library_function(self, address, n) &&
-       rd_set_exported(self, address, NULL)) {
-        rd_i_db_set_entry_point(self, address);
-        optional_set(&self->entry_point, address);
-        return true;
-    }
-
-    return false;
+    rd_library_function(self, address, n);
+    rd_set_exported(self, address, NULL);
+    rd_i_db_set_entry_point(self, address);
+    optional_set(&self->entry_point, address);
+    return true;
 }
 
 bool rd_set_exported(RDContext* self, RDAddress address, const char* name) {
