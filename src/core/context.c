@@ -941,27 +941,45 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
             bool ok = rd_i_get_type(ctx, self->address, &t);
             assert(ok && "cannot convert symbol to string, type not found");
 
-            usize char_sz = rd_i_size_of(ctx, t.base.name, 0, RD_TYPE_NONE);
-            panic_if(!char_sz, "type '%s' has unresolved size", t.base.name);
-
-            usize n = char_sz * t.base.count;
             usize idx = rd_i_address2index(seg, self->address);
             // reserve at least these bytes, +2 for quoting, +1 null terminator
             vect_reserve(&ctx->sym_buf, t.base.count + 3);
             vect_clear(&ctx->sym_buf);
             vect_push(&ctx->sym_buf, '\"');
 
-            for(usize i = 0; i < n; i += char_sz) {
-                u8 v;
-                ok = rd_flagsbuffer_get_value(seg->flags, idx + i, &v);
-                assert(ok &&
-                       "cannot convert symbol to string, missing character");
-                if(!v) break; // null terminator
+            if(!strcmp(t.base.name, "char16")) {
+                for(usize i = 0; i < t.base.count; i++) {
+                    u8 lo = 0, hi = 0;
+                    ok = rd_flagsbuffer_get_value(seg->flags, idx + (i * 2),
+                                                  &lo) &&
+                         rd_flagsbuffer_get_value(seg->flags, idx + (i * 2) + 1,
+                                                  &hi);
+                    assert(
+                        ok &&
+                        "cannot convert symbol to string, missing character");
 
-                const char* s = rd_i_escape_char((char)v, true);
+                    u16 v = (u16)(lo | ((u16)hi << 8));
+                    if(!v) break;
 
-                while(*s)
-                    vect_push(&ctx->sym_buf, *s++);
+                    const char* s = rd_i_escape_char16(v, true);
+                    while(*s)
+                        vect_push(&ctx->sym_buf, *s++);
+                }
+            }
+            else {
+                for(usize i = 0; i < t.base.count; i++) {
+                    u8 v = 0;
+                    ok = rd_flagsbuffer_get_value(seg->flags, idx + i, &v);
+                    assert(
+                        ok &&
+                        "cannot convert symbol to string, missing character");
+
+                    if(!v) break;
+
+                    const char* s = rd_i_escape_char((char)v, true);
+                    while(*s)
+                        vect_push(&ctx->sym_buf, *s++);
+                }
             }
 
             vect_push(&ctx->sym_buf, '\"');

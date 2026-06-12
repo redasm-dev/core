@@ -327,9 +327,43 @@ const char* rd_i_escape_char(char c, bool isstr) {
 const char* rd_i_escape_char16(u16 c, bool isstr) {
     if(c < 128) return rd_i_escape_char((char)c, isstr);
 
+    // Latin-1 printable: convert to UTF-8 directly
+    if(c >= 0xA0 && c <= 0xFF) {
+        static char utf8_buf[3];
+        utf8_buf[0] = (char)(0xC0 | (c >> 6));   // 0xC2 or 0xC3
+        utf8_buf[1] = (char)(0x80 | (c & 0x3F)); // continuation byte
+        utf8_buf[2] = '\0';
+        return utf8_buf;
+    }
+
     static char buf[8]; // \uXXXX + null
     snprintf(buf, sizeof(buf), "\\u%04x", c);
     return buf;
+}
+
+int rd_i_utf8_decode(const char* s, u32* cp) {
+    u8 b = (u8)*s;
+
+    if(b < 0x80) { // ASCII: 0xxxxxxx
+        *cp = b;
+        return 1;
+    }
+
+    if(b < 0xE0) { // 2 bytes: 110xxxxx 10xxxxxx
+        *cp = (u32)((b & 0x1F) << 6) | (u32)((u8)s[1] & 0x3F);
+        return 2;
+    }
+
+    if(b < 0xF0) { // 3 bytes: 1110xxxx 10xxxxxx 10xxxxxx
+        *cp = (u32)((b & 0x0F) << 12) | (u32)(((u8)s[1] & 0x3F) << 6) |
+              (u32)((u8)s[2] & 0x3F);
+        return 3;
+    }
+
+    // 4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+    *cp = (u32)((b & 0x07) << 18) | (u32)(((u8)s[1] & 0x3F) << 12) |
+          (u32)(((u8)s[2] & 0x3F) << 6) | (u32)((u8)s[3] & 0x3F);
+    return 4;
 }
 
 const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
@@ -401,6 +435,32 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
     }
 
     return &out[c];
+}
+
+int rd_i_cp_push_utf8(RDCharVect* v, u32 cp) {
+    if(cp <= 0x7F) {
+        vect_push(v, (char)cp);
+        return 1;
+    }
+
+    if(cp <= 0x7FF) {
+        vect_push(v, (char)(0xC0 | (cp >> 6)));
+        vect_push(v, (char)(0x80 | (cp & 0x3F)));
+        return 2;
+    }
+
+    if(cp <= 0xFFFF) {
+        vect_push(v, (char)(0xE0 | (cp >> 12)));
+        vect_push(v, (char)(0x80 | ((cp >> 6) & 0x3F)));
+        vect_push(v, (char)(0x80 | (cp & 0x3F)));
+        return 3;
+    }
+
+    vect_push(v, (char)(0xF0 | (cp >> 18)));
+    vect_push(v, (char)(0x80 | ((cp >> 12) & 0x3F)));
+    vect_push(v, (char)(0x80 | ((cp >> 6) & 0x3F)));
+    vect_push(v, (char)(0x80 | (cp & 0x3F)));
+    return 4;
 }
 
 char* rd_i_vformat(RDCharVect* buf, const char* fmt, va_list args) {

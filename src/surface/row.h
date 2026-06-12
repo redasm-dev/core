@@ -44,7 +44,7 @@ void rd_i_rowvect_destroy(RDRowVect* self);
 void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address);
 
 void rd_i_row_reserve(RDRow* self, int n);
-void rd_i_row_push(RDRow* self, char ch, RDThemeKind fg, RDThemeKind bg);
+void rd_i_row_push(RDRow* self, u32 ch, RDThemeKind fg, RDThemeKind bg);
 
 static inline RDCell* rd_i_row_cell_at(RDRow* self, int idx) {
     return vect_at(&self->cells, idx);

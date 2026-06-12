@@ -7,16 +7,24 @@
 #define RD_STRING_BASE_CAPACITY 1024
 #define RD_MAX_CHARS 256
 
-static char const RD_VALID_CHARS[] = "\t\n\r !\"#$%&'()*+,-./"
-                                     "0123456789"
-                                     ":;<=>?@"
-                                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                     "[\\]^_"
-                                     "abcdefghijklmnopqrstuvwxyz"
-                                     "{|}";
+/* latin-1 set (char16)
+ * 0x00–0x1F  C0 controls (non-printable: NUL, TAB, LF, CR, etc.)
+ * 0x20–0x7E  ASCII printable (space, letters, digits, punctuation)
+ * 0x7F       DEL (non-printable)
+ * 0x80–0x9F  C1 controls (non-printable, mostly unused in practice)
+ * 0xA0–0xFF  Latin-1 Supplement (printable: accented letters, symbols)
+ */
 
-static bool rd_is_char_valid[RD_MAX_CHARS] = {0};
-static bool rd_is_strings_initialized = false;
+static char const RD_ASCII_VALID_CHARS[] = "\t\n\r !\"#$%&'()*+,-./"
+                                           "0123456789"
+                                           ":;<=>?@"
+                                           "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                           "[\\]^_"
+                                           "abcdefghijklmnopqrstuvwxyz"
+                                           "{|}";
+
+static bool rd_is_ascii_valid[RD_MAX_CHARS] = {0};
+static bool rd_is_ascii_initialized = false;
 
 static const char* const RD_C_FORMATS[] = {
     "%c", "%d",  "%e",  "%E",  "%f",  "%g",  "%G",   "%hi",  "%hu",
@@ -27,11 +35,11 @@ static const char* const RD_C_FORMATS[] = {
 #define RD_N_FORMATS (sizeof(RD_C_FORMATS) / sizeof(*RD_C_FORMATS))
 
 static void _rd_i_strings_init(void) {
-    if(!rd_is_strings_initialized) {
-        for(const char* c = RD_VALID_CHARS; *c; c++)
-            rd_is_char_valid[(int)*c] = true;
+    if(!rd_is_ascii_initialized) {
+        for(const char* c = RD_ASCII_VALID_CHARS; *c; c++)
+            rd_is_ascii_valid[(int)*c] = true;
 
-        rd_is_strings_initialized = true;
+        rd_is_ascii_initialized = true;
     }
 }
 
@@ -99,7 +107,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
                 continue;
             }
 
-            if(!rd_is_char_valid[(int)v]) {
+            if(!rd_is_ascii_valid[(int)v]) {
                 vect_clear(str);
                 continue;
             }
@@ -152,7 +160,7 @@ static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
                 continue;
             }
 
-            if(hi != 0x00 || !rd_is_char_valid[(int)lo]) {
+            if(hi != 0x00 || (lo < 0x20) || (lo > 0x7E && lo < 0xA0)) {
                 vect_clear(str);
                 continue;
             }

@@ -11,9 +11,10 @@
 
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
 
-static bool _rd_is_char_skippable(char ch) {
-    if(ch == '_' || ch == '@' || ch == '.') return false;
-    return isspace((int)ch) || ispunct((int)ch);
+static bool _rd_is_char_skippable(const RDCell* c) {
+    if(c->cp > 0x7f) return true; // non-ASCII, always skippable
+    if(c->cp == '_' || c->cp == '@' || c->cp == '.') return false;
+    return isspace((int)c->cp) || ispunct((int)c->cp);
 }
 
 static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
@@ -22,18 +23,18 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
 
     RDRow* r = vect_at(rows, row);
     if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
-    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col)->ch)) return NULL;
+    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col))) return NULL;
 
     vect_clear(&self->word_buf);
 
     for(int i = col; i-- > 0;) {
-        if(_rd_is_char_skippable(vect_at(&r->cells, i)->ch)) break;
+        if(_rd_is_char_skippable(vect_at(&r->cells, i))) break;
         col--;
     }
 
     for(int i = col; i < rd_i_row_length(r); i++) {
-        if(_rd_is_char_skippable(rd_i_row_cell_at(r, i)->ch)) break;
-        vect_push(&self->word_buf, rd_i_row_cell_at(r, i)->ch);
+        if(_rd_is_char_skippable(rd_i_row_cell_at(r, i))) break;
+        rd_i_cp_push_utf8(&self->word_buf, rd_i_row_cell_at(r, i)->cp);
     }
 
     vect_push(&self->word_buf, 0);
@@ -171,7 +172,7 @@ void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col) {
 
                 const RDCell* c = rd_i_row_cell_at(r, endidx);
                 endidx++;
-                if(c->ch == *w) continue;
+                if((char)c->cp == *w) continue;
 
                 found = false;
                 endidx = i;
@@ -238,10 +239,13 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
 
     RDRow* r = vect_last(&self->rows_back);
 
-    for(char ch = *s; ch; ch = *++s) {
+    while(*s) {
         if(self->columns && rd_i_row_length(r) >= self->columns) break;
 
-        switch(ch) {
+        u32 cp;
+        s += rd_i_utf8_decode(s, &cp);
+
+        switch(cp) {
             case '\t':
                 rd_i_row_push(r, '\\', fg, bg);
                 rd_i_row_push(r, 't', fg, bg);
@@ -262,7 +266,7 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                 rd_i_row_push(r, 'v', fg, bg);
                 break;
 
-            default: rd_i_row_push(r, ch, fg, bg); break;
+            default: rd_i_row_push(r, cp, fg, bg); break;
         }
     }
 }
@@ -487,7 +491,7 @@ const char* rd_i_renderer_get_text(RDRenderer* self, RDSurfacePos startpos,
         if(i == endpos.row) e = endpos.col;
 
         for(int j = s; j <= e; j++)
-            vect_push(&self->text_buf, rd_i_row_cell_at(r, j)->ch);
+            rd_i_cp_push_utf8(&self->text_buf, rd_i_row_cell_at(r, j)->cp);
     }
 
     vect_push(&self->text_buf, 0);
@@ -616,13 +620,13 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
     RDRow* r = vect_at(&self->rows_front, row);
     if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
 
-    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col)->ch)) return false;
+    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col))) return false;
 
     int startcol = 0, endcol = 0;
 
     for(int i = col; i-- > 0;) {
         const RDCell* cell = rd_i_row_cell_at(r, i);
-        if(_rd_is_char_skippable(cell->ch)) {
+        if(_rd_is_char_skippable(cell)) {
             startcol = i + 1;
             break;
         }
@@ -630,7 +634,7 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
 
     for(int i = col; i < rd_i_row_length(r); i++) {
         const RDCell* cell = rd_i_row_cell_at(r, i);
-        if(_rd_is_char_skippable(cell->ch)) {
+        if(_rd_is_char_skippable(cell)) {
             endcol = i - 1;
             break;
         }
@@ -656,7 +660,7 @@ void rd_i_renderer_write_text(RDRenderer* self, RDCharVect* v) {
         if(!vect_is_empty(v)) vect_push(v, '\n');
 
         const RDCell* c;
-        vect_each(c, &r->cells) vect_push(v, c->ch);
+        vect_each(c, &r->cells) rd_i_cp_push_utf8(v, c->cp);
     }
 
     vect_push(v, 0);

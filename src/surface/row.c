@@ -21,11 +21,11 @@ void rd_i_row_reserve(RDRow* self, int n) {
     vect_reserve(&self->data, (usize)n);
 }
 
-void rd_i_row_push(RDRow* self, char ch, RDThemeKind fg, RDThemeKind bg) {
+void rd_i_row_push(RDRow* self, u32 cp, RDThemeKind fg, RDThemeKind bg) {
     assert(vect_length(&self->cells) == (vect_length(&self->data)));
 
     if(fg == RD_THEME_DEFAULT) fg = RD_THEME_FOREGROUND;
     if(bg == RD_THEME_DEFAULT) bg = RD_THEME_BACKGROUND;
-    vect_push(&self->cells, (RDCell){.ch = ch, .fg = fg, .bg = bg});
+    vect_push(&self->cells, (RDCell){.cp = cp, .fg = fg, .bg = bg});
     vect_push(&self->data, self->curr_meta);
 }

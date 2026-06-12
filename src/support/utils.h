@@ -49,6 +49,7 @@ char* rd_i_get_temp_path(const char* suffix);
 char* rd_i_get_unique_temp_path(const char* suffix);
 const char* rd_i_escape_char(char c, bool isstr);
 const char* rd_i_escape_char16(u16 c, bool isstr);
+int rd_i_utf8_decode(const char* s, u32* cp);
 const char* rd_i_to_base(i64 v, const RDBaseParams* p);
 char* rd_i_vformat(RDCharVect* buf, const char* fmt, va_list args);
 char* rd_i_format(RDCharVect* buf, const char* fmt, ...);
@@ -68,6 +69,7 @@ static inline const char* rd_i_to_hex(i64 v, unsigned int size) {
                            });
 }
 
+int rd_i_cp_push_utf8(RDCharVect* v, u32 cp);
 static inline usize rd_i_min(usize a, usize b) { return a < b ? a : b; }
 static inline usize rd_i_max(usize a, usize b) { return a > b ? a : b; }
 static inline int rd_i_max_i(int a, int b) { return a > b ? a : b; }

@@ -43,7 +43,7 @@ typedef enum {
 } RDNumberFlags;
 
 typedef struct RDCell {
-    char ch;
+    u32 cp;
     RDThemeKind fg;
     RDThemeKind bg;
 } RDCell;
