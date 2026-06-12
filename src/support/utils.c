@@ -115,22 +115,14 @@ const char* rd_i_strip_prefix(const char* s) {
         return s;
     }
 
-    const char* split = strchr(s, '_');
-    const char* r_split = strrchr(s, '_');
-
-    if(!split) { // no underscores found
-        assert(!r_split);
-        return s;
-    }
-
-    // multiple underscores found
-    if(split != r_split) return s;
+    const char* split = strrchr(s, '_');
+    if(!split) return s; // no underscores found
 
     const char* p = s;
 
-    // left part: only characters and numbers allowed
+    // left part: only characters numbers and underscores allowed
     while(p < split) {
-        if(!islower((int)*p) && !isdigit((int)*p)) return s;
+        if(*p != '_' && !islower((int)*p) && !isdigit((int)*p)) return s;
         p++;
     }
 
@@ -218,7 +210,8 @@ const char* rd_i_get_file_ext(const char* filepath) {
     const char* fname = rd_i_get_file_name(filepath);
     if(!fname) return NULL;
 
-    const char* ldot = strrchr(fname, '.'); // search filename only, not full path
+    const char* ldot =
+        strrchr(fname, '.'); // search filename only, not full path
 
     // Has extension if dot exists and isn't at the start (avoid
     // ".gitignore")
