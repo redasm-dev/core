@@ -292,24 +292,23 @@ bool rd_register_command(const RDCommandPlugin* c) {
     return true;
 }
 
-RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
-                            const RDProcessorPlugin* p,
-                            RDDecodedInstruction* dec) {
-    if(!bytes || !n || !(*bytes) || !(*n) || !p || !dec) return false;
+bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
+                     const RDProcessorPlugin* p, RDDecodedInstruction* dec) {
+    if(!bytes || !n || !p || !dec) return false;
 
-    const RDLoaderPlugin* ldr = rd_loader_find(RD_BINARY_LOADER_ID);
-    assert(ldr && "binary loader not found");
+    RDContextSlice slice = rd_test_data(*bytes, *n);
+    if(rd_slice_is_empty(slice)) return false;
 
-    RDByteBuffer* input = rd_i_fromdata(*bytes, *n);
-    RDContext* ctx = rd_i_context_create(ldr, NULL, NULL, input);
-    ctx->processorplugin = p;
-    ctx->processor = p->create ? p->create(p) : NULL;
-    ctx->addressing = (RDLoadAddressing){.address = *addr};
+    RDContext* ctx = rd_slice_at(slice, 0);
 
-    bool ok = ctx->loaderplugin->load(NULL, ctx);
-    assert(ok && "binary loader failed to load");
+    RDLoadAddressing la = {
+        .address = *addr,
+        .entrypoint = *addr,
+    };
 
-    ok = rd_decode(ctx, *addr, &dec->instr);
+    rd_accept(ctx, p, &la);
+
+    bool ok = rd_decode(ctx, *addr, &dec->instr);
 
     if(ok) {
         RDRenderer* r = rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);

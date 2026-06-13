@@ -11,7 +11,7 @@
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
 
 static char* _rd_db_get_dbpath(const RDContext* ctx) {
-    if(!ctx->filepath) return NULL;
+    if(!strcmp(ctx->filepath, ":memory:")) return rd_strdup(ctx->filepath);
 
     char* filestem = rd_i_get_file_stem(ctx->filepath);
     int filestem_len = (int)strlen(filestem);
@@ -52,15 +52,12 @@ static RDSegmentRegVect* _rd_db_segmentregs_get_vect(RDDB* db,
 RDDB* rd_i_db_create(const RDContext* ctx) {
     RDDB* self = rd_alloc0(1, sizeof(*self));
     self->filepath = _rd_db_get_dbpath(ctx);
+    assert(self->filepath);
 
-    if(self->filepath) // Remove old database (if exists)
-        remove(self->filepath);
+    remove(self->filepath); // Remove old database (if exists)
 
-    // create an in memory DB if path is not set
-    const char* dbpath = self->filepath ? self->filepath : ":memory:";
-
-    if(sqlite3_open(dbpath, &self->handle) != SQLITE_OK) {
-        panic("Cannot open database at %s", dbpath);
+    if(sqlite3_open(self->filepath, &self->handle) != SQLITE_OK) {
+        panic("Cannot open database at %s", self->filepath);
         goto fail;
     }
 
