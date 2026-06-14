@@ -70,9 +70,12 @@ static bool _rd_theme_validate_color(const char* color) {
     return true;
 }
 
-void rd_i_theme_init(RDTheme* self) {
-    rd_i_theme_set_color(self, RD_THEME_FOREGROUND, "#000000");
-    rd_i_theme_set_color(self, RD_THEME_BACKGROUND, "#ffffff");
+void rd_i_theme_init(RDTheme* self) { // don't override previous set colors
+    const char* c = rd_get_theme_color(RD_THEME_FOREGROUND);
+    if(!c || !(*c)) rd_i_theme_set_color(self, RD_THEME_FOREGROUND, "#000000");
+
+    c = rd_get_theme_color(RD_THEME_BACKGROUND);
+    if(!c || !(*c)) rd_i_theme_set_color(self, RD_THEME_BACKGROUND, "#ffffff");
 }
 
 bool rd_i_theme_set_color(RDTheme* self, RDThemeKind kind, const char* color) {
