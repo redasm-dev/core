@@ -63,6 +63,8 @@ RDReader* rd_i_reader_create_flags(RDContext* ctx) {
 }
 
 void rd_i_reader_destroy(RDReader* self) {
+    if(!self) return;
+
     if(!vect_is_empty(&self->stack))
         LOG_WARN("reader stack is not empty (begin/end mismatch)");
 

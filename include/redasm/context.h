@@ -113,7 +113,6 @@ RD_API RDSymbolSlice rd_get_all_symbols(const RDContext* self);
 RD_API RDSegmentSlice rd_get_all_segments(const RDContext* self);
 RD_API RDInputMappingSlice rd_get_all_mappings(const RDContext* self);
 RD_API RDLoadAddressing rd_get_load_addressing(const RDContext* self);
-RD_API int rd_get_min_string(const RDContext* self);
 RD_API void rd_set_min_string(RDContext* self, int l);
 RD_API const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr);
 RD_API const RDFunction* rd_find_function(const RDContext* self,

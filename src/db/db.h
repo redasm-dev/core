@@ -19,7 +19,9 @@ typedef struct RDDB {
     sqlite3_stmt* queries[RD_QUERY_COUNT];
 } RDDB;
 
-RDDB* rd_i_db_create(const RDContext* ctx);
+bool rd_i_db_is_valid(const char* dbpath);
+
+RDDB* rd_i_db_create(const char* dbpath);
 void rd_i_db_destroy(RDDB* self);
 void rd_i_db_begin(RDContext* ctx);
 void rd_i_db_commit(RDContext* ctx);

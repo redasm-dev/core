@@ -47,10 +47,9 @@ RDByteBuffer* rd_i_buffer_create(usize n) {
 }
 
 void rd_i_buffer_destroy(RDBuffer* self) {
-    if(self) {
-        vect_destroy(&self->str_buf);
-        self->destroy(self);
-    }
+    if(!self) return;
+    vect_destroy(&self->str_buf);
+    self->destroy(self);
 }
 
 bool rd_i_buffer_is_empty(const RDBuffer* self) { return self->length == 0; }

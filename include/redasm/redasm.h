@@ -24,14 +24,41 @@
 #include <redasm/types/def.h>
 #include <redasm/types/type.h>
 
+typedef struct RDTestResult RDTestResult;
+
+typedef enum {
+    RD_ACCEPT_OK = 0,
+    RD_ACCEPT_FAIL,
+    RD_ACCEPT_FAIL_WRITE,
+} RDAcceptStatus;
+
+typedef enum {
+    RD_AM_NEW = 0,
+    RD_AM_DATABASE,
+    RD_AM_PROJECT,
+} RDAcceptMode;
+
+typedef struct RDAcceptResult {
+    RDAcceptStatus status;
+    RDContext* context;
+} RDAcceptResult;
+
+typedef struct RDAcceptParams {
+    const RDProcessorPlugin* processorplugin;
+    RDLoadAddressing addressing;
+    RDAcceptMode mode;
+    const char* db_path;
+    int min_string;
+} RDAcceptParams;
+
 typedef struct RDInitParams {
     const char** kb_paths;
 } RDInitParams;
 
-typedef struct RDContextSlice {
-    RDContext* const* data;
+typedef struct RDTestResultSlice {
+    const RDTestResult** data;
     usize length;
-} RDContextSlice;
+} RDTestResultSlice;
 
 typedef struct RDDecodedInstruction {
     RDInstruction instr;
@@ -39,15 +66,19 @@ typedef struct RDDecodedInstruction {
     const char* mnemonic;
 } RDDecodedInstruction;
 
+// clang-format off
 RD_API void rd_init(const RDInitParams* params);
 RD_API void rd_deinit(void);
-RD_API RDContextSlice rd_test_data(const char* data, usize n);
-RD_API RDContextSlice rd_test(const char* filepath);
+RD_API RDTestResultSlice rd_test_data(const char* data, usize n);
+RD_API RDTestResultSlice rd_test(const char* filepath);
 RD_API bool rd_module_load(const char* filepath);
-RD_API bool rd_accept(const RDContext* ctx, const RDProcessorPlugin* p,
-                      const RDLoadAddressing* la);
+RD_API RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params);
 RD_API void rd_reject(void);
 RD_API const char* rd_dump_instruction(const RDInstruction* instr);
-RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
-                            const RDProcessorPlugin* p,
-                            RDDecodedInstruction* dec);
+RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr, const RDProcessorPlugin* p, RDDecodedInstruction* dec);
+
+RD_API const RDLoaderPlugin* rd_testresult_get_loader_plugin(const RDTestResult* self);
+RD_API const RDProcessorPlugin* rd_testresult_get_processor_plugin(const RDTestResult* self);
+RD_API const char* rd_testresult_get_loader_name(const RDTestResult* self);
+RD_API const char* rd_testresult_get_filepath(const RDTestResult* self);
+// clang-format on

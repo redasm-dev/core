@@ -33,6 +33,31 @@ static RDModuleFull* _rd_module_find(const char* filepath) {
     return NULL;
 }
 
+RDTestResult* rd_i_testresult_create(const RDLoaderPlugin* lplugin,
+                                     RDLoader* loader, RDByteBuffer* inputbuf,
+                                     const char* filepath) {
+    RDTestResult* self = rd_alloc(sizeof(*self));
+
+    *self = (RDTestResult){
+        .filepath = rd_strdup(filepath),
+        .input_buffer = inputbuf,
+        .loaderplugin = lplugin,
+        .loader = loader,
+        .owns_loader = true,
+    };
+
+    return self;
+}
+
+void rd_i_testresult_destroy(RDTestResult* self) {
+    if(self->owns_loader && self->loaderplugin->destroy)
+        self->loaderplugin->destroy(self->loader);
+
+    rd_free(self->loader_name);
+    rd_free(self->filepath);
+    rd_free(self);
+}
+
 void rd_i_state_init(const RDInitParams* params) {
     if(params) {
         rd_i_kb_paths_init(params->kb_paths);

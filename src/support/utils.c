@@ -10,6 +10,14 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#if defined(_WIN32)
+#include <io.h> // _access
+#define access _access
+#define W_OK 2
+#else
+#include <unistd.h> // access
+#endif
+
 static const char* _rd_get_temp_path(void) {
 #if defined(_WIN32)
     static char tmp[MAX_PATH];
@@ -96,6 +104,19 @@ bool rd_i_file_exists(const char* filepath) {
 
     struct stat st;
     return stat(filepath, &st) == 0;
+}
+
+bool rd_i_path_is_writable(const char* path) {
+    assert(path);
+
+    if(rd_i_file_exists(path)) return access(path, W_OK) == 0;
+
+    char* dir = rd_i_get_file_path(path);
+    if(!dir) return false;
+
+    bool ok = access(dir, W_OK) == 0;
+    rd_free(dir);
+    return ok;
 }
 
 const char* rd_i_strip_prefix(const char* s) {
@@ -218,6 +239,30 @@ const char* rd_i_get_file_ext(const char* filepath) {
     if(ldot && ldot != fname) return ldot + 1;
 
     return filepath + strlen(filepath); // no extension
+}
+
+char* rd_i_get_file_path(const char* filepath) {
+    if(!filepath) return NULL;
+
+    const char* lsep = strrchr(filepath, '/');
+
+#if defined(_WIN32)
+    const char* lsep_win = strrchr(filepath, '\\');
+    if(lsep_win > lsep) lsep = lsep_win;
+#endif
+
+    if(!lsep) {
+        char* dot = rd_alloc(2);
+        dot[0] = '.';
+        dot[1] = '\0';
+        return dot;
+    }
+
+    usize len = (usize)(lsep - filepath);
+    char* out = rd_alloc(len + 1);
+    memcpy(out, filepath, len);
+    out[len] = '\0';
+    return out;
 }
 
 char* rd_i_get_file_stem(const char* filepath) {

@@ -14,8 +14,46 @@
 #include <redasm/plugins/loader.h>
 #include <redasm/plugins/processor/processor.h>
 
-static bool _rd_part_loaders(const RDContext** ctx) {
-    return !((*ctx)->loaderplugin->flags & RD_PF_LAST);
+static bool _rd_part_loaders(const RDTestResult** tr) {
+    return !((*tr)->loaderplugin->flags & RD_PF_LAST);
+}
+
+static char* _rd_derive_dbpath(const RDTestResult* tr,
+                               const RDAcceptParams* params) {
+    if(!strcmp(tr->filepath, ":memory:")) return rd_strdup(tr->filepath);
+
+    char* stem = rd_i_get_file_stem(tr->filepath);
+
+    if(!stem) {
+        LOG_FAIL("stem resolution failed for '%s'", tr->filepath);
+        return NULL;
+    }
+
+    RDCharVect db_path_buf = {0};
+    char* dbpath = NULL;
+
+    if(!params->db_path) {
+        char* path = rd_i_get_file_path(tr->filepath);
+
+        if(!path) {
+            LOG_FAIL("path resolution failed for '%s'", tr->filepath);
+            goto cleanup;
+        }
+
+        dbpath = rd_strdup(
+            rd_i_format(&db_path_buf, "%s%c%s.db", path, RD_PATH_SEP, stem));
+
+        rd_free(path);
+    }
+    else {
+        dbpath = rd_strdup(rd_i_format(&db_path_buf, "%s%c%s.db",
+                                       params->db_path, RD_PATH_SEP, stem));
+    }
+
+cleanup:
+    vect_destroy(&db_path_buf);
+    rd_free(stem);
+    return dbpath;
 }
 
 static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
@@ -53,16 +91,14 @@ static bool _rd_validate_plugin_with_name(u32 level, const char* id,
     return true;
 }
 
-void rd_init(const RDInitParams* params) { rd_i_state_init(params); }
-void rd_deinit(void) { rd_i_state_deinit(); }
-
-RDContextSlice rd_i_test(RDByteBuffer* input, const char* filepath) {
-    if(!input) return (RDContextSlice){0};
+static RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf,
+                                   const char* filepath) {
+    if(!inputbuf) return (RDTestResultSlice){0};
 
     assert(filepath);
     vect_destroy(&rd_i_state.tests);
 
-    if(!rd_i_buffer_is_empty((RDBuffer*)input)) {
+    if(!rd_i_buffer_is_empty((RDBuffer*)inputbuf)) {
         RDPlugin** it;
         vect_each(it, &rd_i_state.loaders) {
             const RDLoaderPlugin* plugin = (*it)->loader;
@@ -72,33 +108,33 @@ RDContextSlice rd_i_test(RDByteBuffer* input, const char* filepath) {
 
             RDLoaderRequest req = {
                 .filepath = filepath,
-                .input = rd_i_reader_create((RDBuffer*)input),
+                .input = rd_i_reader_create((RDBuffer*)inputbuf),
                 .name = rd_i_get_file_name(filepath),
                 .ext = rd_i_get_file_ext(filepath),
             };
 
             if(plugin->parse(ldr, &req)) {
-                RDContext* ctx =
-                    rd_i_context_create(plugin, ldr, filepath, input);
+                RDTestResult* tr =
+                    rd_i_testresult_create(plugin, ldr, inputbuf, filepath);
 
                 if(plugin->get_processor) {
                     const char* procid = plugin->get_processor(ldr);
-                    if(procid) ctx->processorplugin = rd_processor_find(procid);
+                    if(procid) tr->processorplugin = rd_processor_find(procid);
                 }
 
-                if(!ctx->processorplugin) {
-                    ctx->processorplugin =
+                if(!tr->processorplugin) {
+                    tr->processorplugin =
                         rd_processor_find(RD_NULL_PROCESSOR_ID);
                 }
 
                 assert(plugin->get_name);
-                assert(ctx->processorplugin);
+                assert(tr->processorplugin);
 
-                ctx->loader_name = rd_strdup(plugin->get_name(ldr));
-                if(!ctx->loader_name) ctx->loader_name = rd_strdup(plugin->id);
-                assert(ctx->loader_name);
+                tr->loader_name = rd_strdup(plugin->get_name(ldr));
+                if(!tr->loader_name) tr->loader_name = rd_strdup(plugin->id);
+                assert(tr->loader_name);
 
-                vect_push(&rd_i_state.tests, ctx);
+                vect_push(&rd_i_state.tests, tr);
             }
             else if(plugin->destroy)
                 plugin->destroy(ldr);
@@ -108,83 +144,112 @@ RDContextSlice rd_i_test(RDByteBuffer* input, const char* filepath) {
 
         // Sort results by flags
         vect_stable_part(&rd_i_state.tests, _rd_part_loaders);
-        return vect_to_slice(RDContextSlice, &rd_i_state.tests);
+
+        return (RDTestResultSlice){
+            .data = (const RDTestResult**)rd_i_state.tests.data,
+            .length = rd_i_state.tests.length,
+        };
     }
 
-    return (RDContextSlice){0};
+    return (RDTestResultSlice){0};
 }
 
-RDContextSlice rd_test_data(const char* data, usize n) {
-    if(!data || !n) return (RDContextSlice){0};
+void rd_init(const RDInitParams* params) { rd_i_state_init(params); }
+void rd_deinit(void) { rd_i_state_deinit(); }
+
+RDTestResultSlice rd_test_data(const char* data, usize n) {
+    if(!data || !n) return (RDTestResultSlice){0};
 
     RDByteBuffer* input = rd_i_fromdata(data, n);
     return rd_i_test(input, ":memory:");
 }
 
-RDContextSlice rd_test(const char* filepath) {
-    if(!filepath) return (RDContextSlice){0};
+RDTestResultSlice rd_test(const char* filepath) {
+    if(!filepath) return (RDTestResultSlice){0};
 
     RDByteBuffer* input = rd_i_readfile(filepath);
     return rd_i_test(input, filepath);
 }
 
-bool rd_accept(const RDContext* self, const RDProcessorPlugin* p,
-               const RDLoadAddressing* la) {
-    if(!self) return false;
+RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
+    if(!tr || !params) return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
 
-    bool accepted = false;
+    RDAcceptResult res = {0};
+    RDTestResult** it;
+    char* dbpath = NULL;
 
-    RDContext** ctx_it;
-    vect_each(ctx_it, &rd_i_state.tests) {
-        RDContext* ctx = *ctx_it;
+    const RDProcessorPlugin* pplugin =
+        params->processorplugin ? params->processorplugin : tr->processorplugin;
 
-        if(ctx != self) {
-            ctx->input = NULL; // disown input
-            rd_destroy(ctx);
-            continue;
-        }
-
-        if(la) ctx->addressing = *la;   // change only if set
-        if(p) ctx->processorplugin = p; // change only if set
-
-        if(!ctx->processorplugin) {
-            LOG_FAIL("processor plugin not set for loader '%s'",
-                     ctx->loaderplugin->id);
-            rd_destroy(ctx);
-            continue;
-        }
-
-        if(ctx->processorplugin->create)
-            ctx->processor = ctx->processorplugin->create(ctx->processorplugin);
-
-        rd_reader_seek(ctx->input_reader, 0);
-
-        bool load_ok = ctx->loaderplugin->load &&
-                       ctx->loaderplugin->load(ctx->loader, ctx);
-
-        if(load_ok) {
-            LOG_INFO("selected loader '%s' and processor '%s'",
-                     ctx->loaderplugin->id, ctx->processorplugin->id);
-            accepted = true;
-        }
-
-        rd_reader_seek(ctx->input_reader, 0);
+    if(!pplugin) {
+        LOG_FAIL("processor plugin not set for loader '%s'",
+                 tr->loaderplugin->id);
+        goto cleanup;
     }
 
+    if(params->mode == RD_AM_PROJECT) { // TODO: implement .rdx loading
+        LOG_FAIL("project loading not yet implemented");
+        goto cleanup;
+    }
+
+    dbpath = _rd_derive_dbpath(tr, params);
+    if(!dbpath) goto cleanup;
+
+    if(!rd_i_path_is_writable(dbpath)) {
+        rd_free(dbpath);
+        return (RDAcceptResult){.status = RD_ACCEPT_FAIL_WRITE};
+    }
+
+    if(rd_i_file_exists(dbpath)) {
+        if(params->mode == RD_AM_NEW ||
+           (params->mode == RD_AM_DATABASE && !rd_i_db_is_valid(dbpath)))
+            remove(dbpath);
+    }
+
+    res.context = rd_i_context_create(tr->loaderplugin, tr->loader, pplugin,
+                                      tr->input_buffer, tr->filepath, dbpath);
+    if(!res.context) goto cleanup;
+
+    ((RDTestResult*)tr)->owns_loader = false; // owned by context
+
+    res.context->min_string =
+        params->min_string ? params->min_string : RD_MIN_STRING_LENGTH;
+    res.context->addressing = params->addressing;
+
+    rd_reader_seek(res.context->input_reader, 0);
+
+    if(res.context->loaderplugin->load(res.context->loader, res.context)) {
+        LOG_INFO("selected loader '%s' and processor '%s'",
+                 res.context->loaderplugin->id,
+                 res.context->processorplugin->id);
+    }
+    else {
+        rd_destroy(res.context);
+        res.context = NULL;
+        goto cleanup;
+    }
+
+    rd_reader_seek(res.context->input_reader, 0);
+
+cleanup:
+    vect_each(it, &rd_i_state.tests) rd_i_testresult_destroy(*it);
     vect_clear(&rd_i_state.tests);
-    return accepted;
+    rd_free(dbpath);
+    res.status = res.context ? RD_ACCEPT_OK : RD_ACCEPT_FAIL;
+    return res;
 }
 
 void rd_reject(void) {
-    RDContext** ctx;
-    bool needsdisown = false;
+    RDTestResult** tr;
+    RDByteBuffer* inputbuf = NULL;
 
-    vect_each(ctx, &rd_i_state.tests) {
-        if(needsdisown) (*ctx)->input = NULL;
-        rd_destroy(*ctx);
-        needsdisown = true;
+    vect_each(tr, &rd_i_state.tests) {
+        inputbuf = (*tr)->input_buffer;
+        rd_i_testresult_destroy(*tr);
     }
 
+    assert(inputbuf);
+    rd_i_buffer_destroy((RDBuffer*)inputbuf);
     vect_clear(&rd_i_state.tests);
 }
 
@@ -197,7 +262,12 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
     }
 
     if(!l->parse) {
-        LOG_FAIL("loader '%s' requires a parser", l->id);
+        LOG_FAIL("loader '%s' requires a parse function", l->id);
+        return false;
+    }
+
+    if(!l->load) {
+        LOG_FAIL("loader '%s' requires a load function", l->id);
         return false;
     }
 
@@ -296,18 +366,22 @@ bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
                      const RDProcessorPlugin* p, RDDecodedInstruction* dec) {
     if(!bytes || !n || !p || !dec) return false;
 
-    RDContextSlice slice = rd_test_data(*bytes, *n);
+    RDTestResultSlice slice = rd_test_data(*bytes, *n);
     if(rd_slice_is_empty(slice)) return false;
 
-    RDContext* ctx = rd_slice_at(slice, 0);
+    const RDTestResult* tr = rd_slice_at(slice, 0);
+    RDAcceptResult res = rd_accept(tr, &(RDAcceptParams){
+                                           .processorplugin = p,
+                                           .addressing =
+                                               {
+                                                   .address = *addr,
+                                                   .entrypoint = *addr,
+                                               },
+                                       });
 
-    RDLoadAddressing la = {
-        .address = *addr,
-        .entrypoint = *addr,
-    };
+    if(res.status != RD_ACCEPT_OK) return false;
 
-    rd_accept(ctx, p, &la);
-
+    RDContext* ctx = res.context;
     bool ok = rd_decode(ctx, *addr, &dec->instr);
 
     if(ok) {
@@ -345,4 +419,22 @@ bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
 
     rd_destroy(ctx);
     return ok;
+}
+
+const RDLoaderPlugin*
+rd_testresult_get_loader_plugin(const RDTestResult* self) {
+    return self->loaderplugin;
+}
+
+const RDProcessorPlugin*
+rd_testresult_get_processor_plugin(const RDTestResult* self) {
+    return self->processorplugin;
+}
+
+const char* rd_testresult_get_loader_name(const RDTestResult* self) {
+    return self->loader_name;
+}
+
+const char* rd_testresult_get_filepath(const RDTestResult* self) {
+    return self->filepath;
 }

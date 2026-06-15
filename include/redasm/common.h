@@ -22,3 +22,5 @@ typedef enum {
 #define rd_slice_each(it, self)                                                \
     for((it) = (self).data;                                                    \
         (self).data && ((it) < (self).data + (self).length); (it)++)
+
+#define RD_MIN_STRING_LENGTH 4

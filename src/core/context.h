@@ -99,7 +99,9 @@ static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
 }
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
-                               const char* filepath, RDByteBuffer* input);
+                               const RDProcessorPlugin* pplugin,
+                               RDByteBuffer* input, const char* filepath,
+                               const char* dbpath);
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,

@@ -4,28 +4,8 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/utils.h"
-#include <stddef.h>
-#include <stdio.h>
-#include <string.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
-
-static char* _rd_db_get_dbpath(const RDContext* ctx) {
-    if(!strcmp(ctx->filepath, ":memory:")) return rd_strdup(ctx->filepath);
-
-    char* filestem = rd_i_get_file_stem(ctx->filepath);
-    int filestem_len = (int)strlen(filestem);
-    int id_len = (int)strlen(ctx->loaderplugin->id);
-
-    int n = filestem_len + id_len + 5;
-    char* dbname = rd_alloc((usize)n);
-    snprintf(dbname, (usize)n, "%s_%s.db", filestem, ctx->loaderplugin->id);
-
-    char* dbpath = rd_i_get_unique_temp_path(dbname);
-    rd_free(dbname);
-    rd_free(filestem);
-    return dbpath;
-}
 
 static RDSegmentRegVect* _rd_db_segmentregs_find_vect(RDSegmentRegsVect* self,
                                                       const char* reg) {
@@ -49,12 +29,34 @@ static RDSegmentRegVect* _rd_db_segmentregs_get_vect(RDDB* db,
     return vect_last(&db->segment_regs);
 }
 
-RDDB* rd_i_db_create(const RDContext* ctx) {
-    RDDB* self = rd_alloc0(1, sizeof(*self));
-    self->filepath = _rd_db_get_dbpath(ctx);
-    assert(self->filepath);
+bool rd_i_db_is_valid(const char* dbpath) {
+    sqlite3* db = NULL;
+    bool valid = false;
 
-    remove(self->filepath); // Remove old database (if exists)
+    if(sqlite3_open_v2(dbpath, &db, SQLITE_OPEN_READONLY, NULL) != SQLITE_OK)
+        goto done;
+
+    sqlite3_stmt* stmt = NULL;
+    if(sqlite3_prepare_v2(db, "PRAGMA integrity_check", -1, &stmt, NULL) !=
+       SQLITE_OK)
+        goto done;
+
+    if(sqlite3_step(stmt) == SQLITE_ROW) {
+        const char* result = (const char*)sqlite3_column_text(stmt, 0);
+        valid = result && strcmp(result, "ok") == 0;
+    }
+
+    sqlite3_finalize(stmt);
+
+done:
+    if(db) sqlite3_close(db);
+    return valid;
+}
+
+RDDB* rd_i_db_create(const char* dbpath) {
+    RDDB* self = rd_alloc0(1, sizeof(*self));
+    self->filepath = rd_strdup(dbpath);
+    assert(self->filepath);
 
     if(sqlite3_open(self->filepath, &self->handle) != SQLITE_OK) {
         panic("Cannot open database at %s", self->filepath);

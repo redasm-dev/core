@@ -2,7 +2,6 @@
 #include "core/engine.h"
 #include "core/mapping.h"
 #include "core/segment.h"
-#include "core/stringfinder.h"
 #include "hooks.h"
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
@@ -43,17 +42,21 @@ void rd_analyzeritem_select(RDAnalyzerItem* self, bool sel) {
 }
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
-                               const char* filepath, RDByteBuffer* input) {
+                               const RDProcessorPlugin* pplugin,
+                               RDByteBuffer* input, const char* filepath,
+                               const char* dbpath) {
+    assert(pplugin);
     RDContext* self = rd_alloc0(1, sizeof(*self));
 
-    self->loaderplugin = lplugin, self->loader = ldr;
+    self->loaderplugin = lplugin;
+    self->loader = ldr;
+    self->processorplugin = pplugin;
     self->filepath = rd_strdup(filepath);
     self->input = input;
     self->input_reader = rd_i_reader_create((RDBuffer*)input);
     self->reader = rd_i_reader_create_flags(self);
     self->hooks = rd_i_hooks_create();
-    self->min_string = RD_MIN_STRING_LENGTH;
-    self->db = rd_i_db_create(self);
+    self->db = rd_i_db_create(dbpath);
     self->kb = rd_i_kb_create();
 
     rd_i_registermap_init(&self->engine.current.registers);
@@ -63,6 +66,10 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
 
     queue_reserve(&self->engine.qcall, RD_WORKER_QUEUE_SIZE);
     queue_reserve(&self->engine.qjump, RD_WORKER_QUEUE_SIZE);
+
+    if(self->processorplugin->create)
+        self->processor = self->processorplugin->create(self->processorplugin);
+
     return self;
 }
 
@@ -1306,7 +1313,6 @@ RDLoadAddressing rd_get_load_addressing(const RDContext* self) {
     return self->addressing;
 }
 
-int rd_get_min_string(const RDContext* self) { return self->min_string; }
 void rd_set_min_string(RDContext* self, int l) { self->min_string = l; }
 
 bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
