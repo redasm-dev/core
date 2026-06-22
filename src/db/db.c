@@ -357,6 +357,11 @@ bool rd_i_db_del_type(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_del_type(ctx, address);
 }
 
+RDTypeFullVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                      RDTypeFullVect* v) {
+    return _rd_i_db_query_get_all_types(ctx, av, v);
+}
+
 const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_get_comment(ctx, address);
 }

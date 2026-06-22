@@ -553,6 +553,42 @@ bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address) {
     return sqlite3_changes(ctx->db->handle) > 0;
 }
 
+RDTypeFullVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                             RDTypeFullVect* v) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPES, "\
+        SELECT address, name, count, modifier, confidence \
+        FROM Types \
+        ORDER BY address \
+    ");
+
+    vect_clear(av);
+    vect_clear(v);
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
+        usize count = (usize)sqlite3_column_int64(stmt, 1);
+        const char* name = (const char*)sqlite3_column_text(stmt, 2);
+        RDTypeModifier mod = (RDTypeModifier)sqlite3_column_int(stmt, 3);
+        RDConfidence c = (RDConfidence)sqlite3_column_int(stmt, 4);
+
+        vect_push(av, address);
+
+        vect_push(v,
+                  (RDTypeFull){
+                      .base =
+                          {
+                              .mod = mod,
+                              .name = rd_i_strpool_intern(&ctx->strings, name),
+                              .count = count,
+                          },
+                      .confidence = c,
+                  });
+    }
+
+    assert(vect_length(av) == vect_length(v));
+    return v;
+}
+
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     if(tdef->kind == RD_TKIND_PRIM) return;
 

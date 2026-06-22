@@ -38,6 +38,7 @@ enum {
     RD_QUERY_SET_TYPE,
     RD_QUERY_GET_TYPE,
     RD_QUERY_DEL_TYPE,
+    RD_QUERY_GET_ALL_TYPES,
 
     RD_QUERY_ADD_FUNCTION,
 
@@ -109,6 +110,8 @@ void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address,
                              RDConfidence c);
 bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
+RDTypeFullVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                             RDTypeFullVect* v);
 
 void _rd_i_db_query_add_function(RDContext* ctx, const RDFunction* f);
 

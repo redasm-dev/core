@@ -69,6 +69,8 @@ void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
                       usize count, RDTypeModifier mod, RDConfidence c);
 bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 bool rd_i_db_del_type(RDContext* ctx, RDAddress address);
+RDTypeFullVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                      RDTypeFullVect* v);
 
 const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address);
 void rd_i_db_set_comment(RDContext* ctx, RDAddress address, const char* cmt);

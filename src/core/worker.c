@@ -22,13 +22,6 @@ static const char* const RD_STEP_NAMES[] = {
 
 static_assert(rd_count_of(RD_STEP_NAMES) == RD_WS_COUNT, "step names mismatch");
 
-typedef struct RDAddressQueue {
-    RDAddress* data;
-    usize length;
-    usize capacity;
-    usize head;
-} RDAddressQueue;
-
 static int _rd_worker_problem_cmp(const void* a, const void* b) {
     const RDProblem* pa = (const RDProblem*)a;
     const RDProblem* pb = (const RDProblem*)b;
@@ -42,20 +35,25 @@ static int _rd_worker_problem_cmp(const void* a, const void* b) {
 static void _rd_worker_follow_pointers(RDContext* ctx) {
     LOG_INFO("following pointers");
 
-    const RDSymbol* sym;
-    vect_each(sym, &ctx->listing.symbols) {
-        if(sym->kind != RD_SYMBOL_TYPE) continue;
+    RDAddressVect addresses = {0};
+    RDTypeFullVect types = {0};
+    rd_i_db_get_all_types(ctx, &addresses, &types);
 
-        RDTypeFull t;
-        if(!rd_i_get_type(ctx, sym->address, &t) || !rd_type_is_ptr(&t.base))
-            continue;
+    for(usize i = 0; i < vect_length(&addresses); i++) {
+        const RDTypeFull* t = vect_at(&types, i);
+        if(!rd_type_is_ptr(&t->base)) continue;
+
+        RDAddress address = *vect_at(&addresses, i);
 
         RDAddress dst;
-        if(!rd_read_ptr(ctx, sym->address, &dst) || !rd_is_address(ctx, dst))
+        if(!rd_read_ptr(ctx, address, &dst) || !rd_is_address(ctx, dst))
             continue;
 
-        rd_add_xref(ctx, sym->address, dst, RD_DR_ADDRESS);
+        rd_add_xref(ctx, address, dst, RD_DR_ADDRESS);
     }
+
+    vect_destroy(&types);
+    vect_destroy(&addresses);
 }
 
 static void _rd_worker_apply_noret(RDContext* ctx) {
