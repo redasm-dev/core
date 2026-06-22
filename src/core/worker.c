@@ -202,6 +202,8 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {
+    if(!self) return false;
+
     assert(self->engine.step < RD_WS_COUNT);
     bool is_busy = self->engine.step < RD_WS_DONE;
 
