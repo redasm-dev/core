@@ -6,16 +6,6 @@
 
 typedef struct RDModuleFull RDModuleFull;
 
-typedef struct RDTestResult {
-    char* filepath;
-    RDByteBuffer* input_buffer;
-    const RDLoaderPlugin* loaderplugin;
-    const RDProcessorPlugin* processorplugin;
-    char* loader_name;
-    RDLoader* loader;
-    bool owns_loader;
-} RDTestResult;
-
 typedef struct RDPluginVect {
     RDPlugin** data;
     usize length;
@@ -59,8 +49,9 @@ typedef struct RDGlobalState {
 
 extern RDGlobalState rd_i_state;
 
-RDTestResult* rd_i_testresult_create(const RDLoaderPlugin* lplugin,
-                                     RDLoader* loader, RDByteBuffer* inputbuf,
+RDTestResult* rd_i_testresult_create(const RDLoaderPlugin* loaderplugin,
+                                     const RDProcessorPlugin* processorplugin,
+                                     RDByteBuffer* inputbuf,
                                      const char* fileapth);
 void rd_i_testresult_destroy(RDTestResult* self);
 

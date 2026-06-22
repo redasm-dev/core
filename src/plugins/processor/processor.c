@@ -1,5 +1,8 @@
 #include "processor.h"
 #include "core/context.h"
+#include "core/state.h"
+#include "plugins/common.h"
+#include "support/logging.h"
 #include "surface/renderer.h"
 #include <stddef.h>
 
@@ -105,4 +108,40 @@ const char* rd_get_reg_name(const RDContext* ctx, RDReg r) {
         return ctx->processorplugin->get_reg_name(r, ctx->processor);
 
     return NULL;
+}
+
+bool rd_register_processor(const RDProcessorPlugin* p) {
+    if(!rd_i_validate_plugin_with_name(p->level, p->id, p->name, "processor"))
+        return false;
+
+    if(!p->decode) {
+        LOG_FAIL("processor '%s' requires a decoder", p->id);
+        return false;
+    }
+
+    if(!p->emulate) {
+        LOG_FAIL("processor '%s' requires an emulator", p->id);
+        return false;
+    }
+
+    if(!p->ptr_size) {
+        LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
+        return false;
+    }
+
+    if(!p->int_size) {
+        LOG_FAIL("invalid integer-size for processor '%s'", p->id);
+        return false;
+    }
+
+    if(rd_processor_find(p->id)) {
+        LOG_WARN("processor '%s' already registered", p->id);
+        return false;
+    }
+
+    LOG_DEBUG("registering processor '%s' [%s]", p->id, p->name);
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
+    plugin->processor = p;
+    vect_push(&rd_i_state.processors, plugin);
+    return true;
 }

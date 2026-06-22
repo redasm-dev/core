@@ -383,7 +383,7 @@ bool rd_function_contains_address(const RDFunction* self, RDAddress address) {
 
 void rd_i_rebuild_all_functions(RDContext* ctx) {
     LOG_INFO("generating functions...");
-    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDFunctionVect functions = {0};
     vect_reserve(&functions, vect_capacity(&ctx->functions));

@@ -34,7 +34,6 @@ typedef enum {
 
 typedef enum {
     RD_AM_NEW = 0,
-    RD_AM_DATABASE,
     RD_AM_PROJECT,
 } RDAcceptMode;
 
@@ -47,7 +46,7 @@ typedef struct RDAcceptParams {
     const RDProcessorPlugin* processorplugin;
     RDLoadAddressing addressing;
     RDAcceptMode mode;
-    const char* db_path;
+    const char* working_dir;
     int min_string;
 } RDAcceptParams;
 
@@ -72,6 +71,7 @@ RD_API void rd_deinit(void);
 RD_API RDTestResultSlice rd_test_data(const char* data, usize n);
 RD_API RDTestResultSlice rd_test(const char* filepath);
 RD_API bool rd_module_load(const char* filepath);
+RD_API RDAcceptResult rd_project_load(const char* filepath, const char* workingdir);
 RD_API RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params);
 RD_API void rd_reject(void);
 RD_API const char* rd_dump_instruction(const RDInstruction* instr);

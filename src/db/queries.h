@@ -12,11 +12,6 @@ enum {
     RD_QUERY_DEL_NAME,
     RD_QUERY_GET_ADDRESS,
 
-    RD_QUERY_SET_INFO_INT,
-    RD_QUERY_GET_INFO_INT,
-    RD_QUERY_SET_INFO_STR,
-    RD_QUERY_GET_INFO_STR,
-
     RD_QUERY_ADD_XREF,
     RD_QUERY_DEL_XREF,
     RD_QUERY_GET_XREF,
@@ -33,22 +28,30 @@ enum {
     RD_QUERY_GET_COMMENT,
     RD_QUERY_DEL_COMMENT,
 
-    RD_QUERY_SET_TYPEDEF,
-    RD_QUERY_SET_TYPEDEF_PARAMS,
-    RD_QUERY_GET_TYPEDEF,
-    RD_QUERY_GET_TYPEDEF_PARAMS,
+    RD_QUERY_SET_TYPE_DEF,
+    RD_QUERY_SET_TYPE_DEF_PARAMS,
+    RD_QUERY_SET_TYPE_ENUM,
+    RD_QUERY_GET_ALL_TYPE_DEF,
+    RD_QUERY_GET_ALL_TYPE_PARAM,
+    RD_QUERY_GET_TYPE_ENUM,
 
     RD_QUERY_SET_TYPE,
     RD_QUERY_GET_TYPE,
     RD_QUERY_DEL_TYPE,
 
+    RD_QUERY_ADD_FUNCTION,
+
     RD_QUERY_ADD_SEGMENT,
+    RD_QUERY_GET_ALL_SEGMENTS,
+
     RD_QUERY_ADD_MAPPING,
+    RD_QUERY_GET_ALL_MAPPINGS,
 
-    RD_QUERY_SET_IMPORTED,
-    RD_QUERY_GET_IMPORTED,
+    RD_QUERY_SET_EXTERNAL,
+    RD_QUERY_GET_ALL_EXTERNALS,
 
-    RD_QUERY_SET_REGVAL,
+    RD_QUERY_SET_SREGVAL,
+    RD_QUERY_GET_ALL_SREGVAL,
 
     RD_QUERY_SET_OVR_OPERAND,
     RD_QUERY_DEL_OVR_OPERAND,
@@ -58,28 +61,23 @@ enum {
 
     RD_QUERY_ADD_PROBLEM,
 
-    RD_QUERY_SET_USERDATA,
-    RD_QUERY_GET_USERDATA,
-
     RD_QUERY_GET_UNDEFINE_CONFIDENCE,
 
     RD_QUERY_COUNT,
 };
 
-void _rd_i_db_query_set_info_int(RDContext* ctx, const char* key, u64 val);
-bool _rd_i_db_query_get_info_int(RDContext* ctx, const char* key, u64* val);
-void _rd_i_db_query_set_info_str(RDContext* ctx, const char* key,
-                                 const char* val);
-bool _rd_db_i_query_get_info_str(RDContext* ctx, const char* key,
-                                 const char** val);
-
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s);
-void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m);
+RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
+                                                   RDSegmentFullVect* v);
 
-void _rd_i_db_query_set_imported(RDContext* ctx, RDAddress address,
-                                 const RDImported* imp);
-bool _rd_i_db_query_get_imported(RDContext* ctx, RDAddress address,
-                                 RDImported* imp);
+void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m);
+RDMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
+                                               RDMappingVect* v);
+
+void _rd_i_db_query_set_external(RDContext* ctx, const RDExternal* ext);
+RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
+                                                 RDExternalKind kind,
+                                                 RDExternalVect* v);
 
 void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefType type, RDConfidence c);
@@ -111,7 +109,12 @@ void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address,
                              RDConfidence c);
 bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
+
+void _rd_i_db_query_add_function(RDContext* ctx, const RDFunction* f);
+
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
+RDTypeDefVect* _rd_i_db_query_get_all_type_def(RDContext* ctx,
+                                               RDTypeDefVect* v);
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address);
 void _rd_i_db_query_set_comment(RDContext* ctx, RDAddress address,
@@ -123,9 +126,10 @@ void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p);
 bool _rd_i_db_query_get_userdata(RDContext* ctx, const char* key, uptr* ud);
 void _rd_i_db_query_set_userdata(RDContext* ctx, const char* key, uptr ud);
 
-void _rd_i_db_query_set_regval(RDContext* ctx, RDAddress address,
-                               const char* regname, RDRegValue val,
-                               RDConfidence c);
+void _rd_i_db_query_set_sregval(RDContext* ctx, const RDSegmentReg* sreg);
+RDSegmentRegsVect* _rd_i_db_query_get_all_sregval(RDContext* ctx,
+                                                  RDSegmentRegsVect* v,
+                                                  RDSegmentRegNameVect* names);
 
 void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address, int idx);
 void _rd_i_db_query_del_ovr_operand(RDContext* ctx, RDAddress address, int idx);

@@ -1,5 +1,6 @@
 #include "queries.h"
 #include "core/context.h"
+#include "db/types.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/stringpool.h"
@@ -14,6 +15,22 @@
         panic_if(_res != SQLITE_OK, "SQL: %s",                                 \
                  sqlite3_errmsg((ctx)->db->handle));                           \
     } while(0)
+
+static void _rd_db_bind_param_null(const RDContext* ctx, sqlite3_stmt* stmt,
+                                   const char* id) {
+    RD_DB_BIND(ctx, stmt, id, sqlite3_bind_null(stmt, _idx));
+}
+
+static void _rd_db_bind_param_int(const RDContext* ctx, sqlite3_stmt* stmt,
+                                  const char* id, sqlite3_int64 v) {
+    RD_DB_BIND(ctx, stmt, id, sqlite3_bind_int64(stmt, _idx, v));
+}
+
+static void _rd_db_bind_param_str(const RDContext* ctx, sqlite3_stmt* stmt,
+                                  const char* id, const char* s) {
+    RD_DB_BIND(ctx, stmt, id,
+               sqlite3_bind_text(stmt, _idx, s, -1, SQLITE_STATIC));
+}
 
 static int _rd_db_step(const RDContext* ctx, sqlite3_stmt* stmt) {
     int res = sqlite3_step(stmt);
@@ -40,8 +57,12 @@ static sqlite3_stmt* _rd_db_prepare_query(RDContext* ctx, int id,
     return ctx->db->queries[id];
 }
 
-static sqlite3_stmt* _rd_db_prepare_set_typedef_params_query(RDContext* ctx) {
-    return _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF_PARAMS, "\
+static sqlite3_stmt*
+_rd_db_prepare_set_type_def_params_query(RDContext* ctx, const char* owner,
+                                         const RDType* type, const char* name,
+                                         usize member_idx) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF_PARAMS, "\
         INSERT INTO TypeParams \
             VALUES (:owner, :type, :name, :count, :modifier, :member_idx) \
         ON CONFLICT DO \
@@ -50,115 +71,64 @@ static sqlite3_stmt* _rd_db_prepare_set_typedef_params_query(RDContext* ctx) {
                        count = EXCLUDED.count, \
                        modifier = EXCLUDED.modifier, \
                        member_idx = EXCLUDED.member_idx \
-        ");
+    ");
+
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    _rd_db_bind_param_int(ctx, stmt, ":member_idx", (sqlite3_int64)member_idx);
+
+    _rd_db_bind_param_str(ctx, stmt, ":type", type->name);
+    _rd_db_bind_param_int(ctx, stmt, ":count", (sqlite3_int64)type->count);
+    _rd_db_bind_param_int(ctx, stmt, ":modifier", (sqlite3_int64)type->mod);
+    _rd_db_bind_param_str(ctx, stmt, ":name", name);
+
+    return stmt;
 }
 
-static sqlite3_stmt* _rd_db_prepare_get_typedef_params_query(RDContext* ctx) {
-    return _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPEDEF_PARAMS, "\
+static sqlite3_stmt* _rd_db_prepare_get_all_type_param(RDContext* ctx,
+                                                       const char* owner) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPE_PARAM, "\
         SELECT type, name, count, modifier, member_idx \
         FROM TypeParams \
         WHERE owner = :owner \
         ORDER BY member_idx \
-        ");
-}
-
-static int _rd_db_step_params(sqlite3_stmt* stmt, RDContext* ctx, RDParam* p) {
-    if(_rd_db_step(ctx, stmt) != SQLITE_ROW) return -1;
-
-    p->type = (RDType){
-        .name = rd_i_strpool_intern(&ctx->strings,
-                                    (const char*)sqlite3_column_text(stmt, 0)),
-        .count = (usize)sqlite3_column_int(stmt, 2),
-        .mod = (RDTypeModifier)sqlite3_column_int(stmt, 3),
-
-    };
-
-    p->name = rd_i_strpool_intern(&ctx->strings,
-                                  (const char*)sqlite3_column_text(stmt, 1));
-
-    return sqlite3_column_int(stmt, 4);
-}
-
-static void _rd_db_bind_param_null(const RDContext* ctx, sqlite3_stmt* stmt,
-                                   const char* id) {
-    RD_DB_BIND(ctx, stmt, id, sqlite3_bind_null(stmt, _idx));
-}
-
-static void _rd_db_bind_param_int(const RDContext* ctx, sqlite3_stmt* stmt,
-                                  const char* id, sqlite3_int64 v) {
-    RD_DB_BIND(ctx, stmt, id, sqlite3_bind_int64(stmt, _idx, v));
-}
-
-static void _rd_db_bind_param_str(const RDContext* ctx, sqlite3_stmt* stmt,
-                                  const char* id, const char* s) {
-    RD_DB_BIND(ctx, stmt, id,
-               sqlite3_bind_text(stmt, _idx, s, -1, SQLITE_STATIC));
-}
-
-void _rd_i_db_query_set_info_int(RDContext* ctx, const char* key, u64 val) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_INFO_INT, "\
-        INSERT INTO Info(key, int_val) \
-            VALUES (:key, :int_val) \
-        ON CONFLICT(key) DO \
-            UPDATE SET int_val = EXCLUDED.int_val \
     ");
 
-    _rd_db_bind_param_str(ctx, stmt, ":key", key);
-    _rd_db_bind_param_int(ctx, stmt, ":int_val", (sqlite3_int64)val);
-    _rd_db_step(ctx, stmt);
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    return stmt;
 }
 
-bool _rd_i_db_query_get_info_int(RDContext* ctx, const char* key, u64* val) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_INFO_INT, "\
-        SELECT int_val \
-        FROM Info \
-        WHERE key = :key \
-        LIMIT 1 \
+static sqlite3_stmt* _rd_db_prepare_set_type_enum_query(RDContext* ctx,
+                                                        const char* owner,
+                                                        const char* name,
+                                                        i64 value) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_ENUM, "\
+        INSERT INTO TypeEnum \
+            VALUES (:owner, :name, :value) \
+        ON CONFLICT DO \
+            UPDATE SET name = EXCLUDED.name, \
+                       value = EXCLUDED.value \
     ");
 
-    _rd_db_bind_param_str(ctx, stmt, ":key", key);
-
-    if(_rd_db_step(ctx, stmt) == SQLITE_ROW &&
-       sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-        if(val) *val = (u64)sqlite3_column_int64(stmt, 0);
-        return true;
-    }
-
-    return false;
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    _rd_db_bind_param_str(ctx, stmt, ":name", name);
+    _rd_db_bind_param_int(ctx, stmt, ":value", (sqlite3_int64)value);
+    return stmt;
 }
 
-void _rd_i_db_query_set_info_str(RDContext* ctx, const char* key,
-                                 const char* val) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_INFO_STR, "\
-        INSERT INTO Info(key, str_val) \
-            VALUES (:key, :str_val) \
-        ON CONFLICT(key) DO \
-            UPDATE SET str_val = EXCLUDED.str_val \
+static sqlite3_stmt* _rd_db_prepare_get_type_enum_params(RDContext* ctx,
+                                                         const char* owner,
+                                                         const char* name) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPE_ENUM, "\
+        SELECT value \
+        FROM TypeEnum \
+        WHERE owner = :owner \
+        AND name = :name \
     ");
 
-    _rd_db_bind_param_str(ctx, stmt, ":key", key);
-    _rd_db_bind_param_str(ctx, stmt, ":str_val", val);
-    _rd_db_step(ctx, stmt);
-}
-
-bool _rd_db_i_query_get_info_str(RDContext* ctx, const char* key,
-                                 const char** val) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_INFO_STR, "\
-        SELECT str_val \
-        FROM Info \
-        WHERE key = :key \
-        LIMIT 1 \
-    ");
-
-    _rd_db_bind_param_str(ctx, stmt, ":key", key);
-
-    if(_rd_db_step(ctx, stmt) == SQLITE_ROW &&
-       sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-        if(val) *val = (const char*)sqlite3_column_text(stmt, 0);
-        return true;
-    }
-
-    return false;
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    _rd_db_bind_param_str(ctx, stmt, "name", name);
+    return stmt;
 }
 
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
@@ -177,6 +147,31 @@ void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
     _rd_db_step(ctx, stmt);
 }
 
+RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
+                                                   RDSegmentFullVect* v) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_SEGMENTS, "\
+        SELECT name, start_address, end_address, unit, perm \
+        FROM Segments \
+        ORDER BY start_address \
+    ");
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        const char* name = (const char*)sqlite3_column_text(stmt, 0);
+        RDAddress start = (RDAddress)sqlite3_column_int64(stmt, 1);
+        RDAddress end = (RDAddress)sqlite3_column_int64(stmt, 2);
+        u32 unit = (u32)sqlite3_column_int(stmt, 3);
+        u32 perm = (u32)sqlite3_column_int(stmt, 4);
+
+        RDSegmentFull* s =
+            rd_i_segment_create(ctx, name, start, end, perm, unit);
+
+        panic_if(!s, "segment '%s' loading failed", name);
+        vect_push(v, s);
+    }
+
+    return v;
+}
+
 void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_MAPPING, "\
         INSERT INTO InputMappings \
@@ -190,56 +185,91 @@ void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m) {
     _rd_db_step(ctx, stmt);
 }
 
-void _rd_i_db_query_set_imported(RDContext* ctx, RDAddress address,
-                                 const RDImported* imp) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_IMPORTED, "\
-        INSERT INTO Imported \
-            VALUES(:address, :ordinal, :module) \
-        ON CONFLICT DO \
-            UPDATE SET ordinal = EXCLUDED.ordinal, \
-                       module  = EXCLUDED.module \
+RDMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
+                                               RDMappingVect* v) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_MAPPINGS, "\
+        SELECT offset, start_address, end_address \
+        FROM InputMappings \
+        ORDER BY start_address \
     ");
 
-    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        RDOffset offset = (RDOffset)sqlite3_column_int64(stmt, 0);
+        RDAddress start = (RDAddress)sqlite3_column_int64(stmt, 1);
+        RDAddress end = (RDAddress)sqlite3_column_int64(stmt, 2);
 
-    if(imp->ordinal.has_value)
-        _rd_db_bind_param_int(ctx, stmt, ":ordinal", imp->ordinal.value);
+        vect_push(v, (RDInputMapping){
+                         .offset = offset,
+                         .start_address = start,
+                         .end_address = end,
+                     });
+    }
+
+    return v;
+}
+
+void _rd_i_db_query_set_external(RDContext* ctx, const RDExternal* ext) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_EXTERNAL, "\
+        INSERT INTO Externals \
+            VALUES(:address, :ordinal, :module, :kind) \
+        ON CONFLICT DO \
+            UPDATE SET ordinal = EXCLUDED.ordinal, \
+                       module  = EXCLUDED.module, \
+                       kind    = EXCLUDED.kind \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":kind", (sqlite3_int64)ext->kind);
+    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)ext->address);
+
+    if(ext->ordinal.has_value)
+        _rd_db_bind_param_int(ctx, stmt, ":ordinal", ext->ordinal.value);
     else
         _rd_db_bind_param_null(ctx, stmt, ":ordinal");
 
-    if(imp->module)
-        _rd_db_bind_param_str(ctx, stmt, ":module", imp->module);
+    if(ext->module)
+        _rd_db_bind_param_str(ctx, stmt, ":module", ext->module);
     else
         _rd_db_bind_param_null(ctx, stmt, ":module");
 
     _rd_db_step(ctx, stmt);
 }
 
-bool _rd_i_db_query_get_imported(RDContext* ctx, RDAddress address,
-                                 RDImported* imp) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_IMPORTED, "\
-        SELECT module, ordinal \
-        FROM Imported \
-        WHERE address = :address \
+RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
+                                                 RDExternalKind kind,
+                                                 RDExternalVect* v) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_EXTERNALS, "\
+        SELECT address, module, ordinal, kind \
+        FROM Externals \
+        WHERE (:kind = 0 OR kind = :kind) \
     ");
 
-    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    _rd_db_bind_param_int(ctx, stmt, ":kind", (sqlite3_int64)kind);
 
-    if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        imp->module = rd_i_strpool_intern(&ctx->strings,
-                                          (char*)sqlite3_column_text(stmt, 0));
+    vect_clear(v);
 
-        if(sqlite3_column_type(stmt, 1) != SQLITE_NULL) {
-            imp->ordinal.value = (u32)sqlite3_column_int64(stmt, 1);
-            imp->ordinal.has_value = true;
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        RDExternal ext = {
+            .kind = (RDExternalKind)sqlite3_column_int64(stmt, 3),
+            .address = (RDAddress)sqlite3_column_int64(stmt, 0),
+            .module = rd_i_strpool_intern(&ctx->strings,
+                                          (char*)sqlite3_column_text(stmt, 1)),
+        };
+
+        if(sqlite3_column_type(stmt, 2) != SQLITE_NULL) {
+            ext.ordinal.value = (u32)sqlite3_column_int64(stmt, 2);
+            ext.ordinal.has_value = true;
         }
         else
-            imp->ordinal.has_value = false;
+            ext.ordinal.has_value = false;
 
-        return true;
+        if(ext.kind == RD_EXT_EXPORTED && !ext.module)
+            ext.module = ctx->file_name;
+
+        vect_push(v, ext);
     }
 
-    return false;
+    return v;
 }
 
 void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -333,7 +363,7 @@ RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":toaddr", (sqlite3_int64)to);
-    _rd_db_bind_param_int(ctx, stmt, ":type", type);
+    _rd_db_bind_param_int(ctx, stmt, ":type", (sqlite3_int64)type);
 
     vect_clear(refs);
 
@@ -526,7 +556,7 @@ bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address) {
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     if(tdef->kind == RD_TKIND_PRIM) return;
 
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPEDEF, "\
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
         INSERT INTO TypeDefs \
             VALUES (:name, :kind, :size, :is_noret, :enum_type) \
         ON CONFLICT DO \
@@ -556,37 +586,24 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         const RDParam* m;
         usize i = 0;
         vect_each(m, &tdef->compound_) {
-            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
-            _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
-            _rd_db_bind_param_str(ctx, stmt, ":type", m->type.name);
-            _rd_db_bind_param_str(ctx, stmt, ":name", m->name);
-            _rd_db_bind_param_int(ctx, stmt, ":count",
-                                  (sqlite3_int64)m->type.count);
-            _rd_db_bind_param_int(ctx, stmt, ":modifier", m->type.mod);
-            _rd_db_bind_param_int(ctx, stmt, ":member_idx", (sqlite3_int64)++i);
+            stmt = _rd_db_prepare_set_type_def_params_query(
+                ctx, tdef->name, &m->type, m->name, i++);
             _rd_db_step(ctx, stmt);
         }
     }
     else if(tdef->kind == RD_TKIND_ENUM) {
         const RDEnumCase* c;
         vect_each(c, &tdef->enum_) {
-            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
-            _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
-            _rd_db_bind_param_str(ctx, stmt, ":name", c->name);
-            _rd_db_bind_param_int(ctx, stmt, ":value", c->value);
+            stmt = _rd_db_prepare_set_type_enum_query(ctx, tdef->name, c->name,
+                                                      c->value);
             _rd_db_step(ctx, stmt);
         }
     }
     else if(tdef->kind == RD_TKIND_FUNC) {
-        if(!rd_type_is_void(&tdef->func_.ret)) { // return type at member_idx=0
-            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
-            _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
-            _rd_db_bind_param_str(ctx, stmt, ":type", tdef->func_.ret.name);
-            _rd_db_bind_param_str(ctx, stmt, ":name", ""); // return has no name
-            _rd_db_bind_param_int(ctx, stmt, ":count",
-                                  (sqlite3_int64)tdef->func_.ret.count);
-            _rd_db_bind_param_int(ctx, stmt, ":modifier", tdef->func_.ret.mod);
-            _rd_db_bind_param_int(ctx, stmt, ":member_idx", 0);
+        if(!rd_type_is_void(&tdef->func_.ret)) {
+            // return type at member_idx=0 and has no name
+            stmt = _rd_db_prepare_set_type_def_params_query(
+                ctx, tdef->name, &tdef->func_.ret, "", 0);
             _rd_db_step(ctx, stmt);
         }
 
@@ -594,19 +611,86 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         const RDParam* p;
         usize i = 1;
         vect_each(p, &tdef->func_.args) {
-            stmt = _rd_db_prepare_set_typedef_params_query(ctx);
-            _rd_db_bind_param_str(ctx, stmt, ":owner", tdef->name);
-            _rd_db_bind_param_str(ctx, stmt, ":type", p->type.name);
-            _rd_db_bind_param_str(ctx, stmt, ":name", p->name);
-            _rd_db_bind_param_int(ctx, stmt, ":count",
-                                  (sqlite3_int64)p->type.count);
-            _rd_db_bind_param_int(ctx, stmt, ":modifier", p->type.mod);
-            _rd_db_bind_param_int(ctx, stmt, ":member_idx", (sqlite3_int64)i++);
+            stmt = _rd_db_prepare_set_type_def_params_query(
+                ctx, tdef->name, &p->type, p->name, i++);
             _rd_db_step(ctx, stmt);
         }
     }
     else
         unreachable();
+}
+
+RDTypeDefVect* _rd_i_db_query_get_all_type_def(RDContext* ctx,
+                                               RDTypeDefVect* v) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPE_DEF, "\
+        SELECT name, kind, size, is_noret, enum_type \
+        FROM TypeDefs \
+    ");
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        const char* name = (const char*)sqlite3_column_text(stmt, 0);
+        RDTypeKind kind = (RDTypeKind)sqlite3_column_int(stmt, 1);
+        usize size = (usize)sqlite3_column_int64(stmt, 2);
+        bool is_noret = (bool)sqlite3_column_int(stmt, 3);
+        const char* enum_type = (const char*)sqlite3_column_text(stmt, 4);
+
+        sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
+        RDTypeDef* tdef = NULL;
+
+        if(kind == RD_TKIND_STRUCT)
+            tdef = rd_typedef_create_struct(name, ctx);
+        else if(kind == RD_TKIND_UNION)
+            tdef = rd_typedef_create_union(name, ctx);
+        else if(kind == RD_TKIND_ENUM)
+            tdef = rd_typedef_create_enum(name, enum_type, ctx);
+        else if(kind == RD_TKIND_FUNC) {
+            tdef = rd_typedef_create_func(name, ctx);
+            rd_typedef_set_noret(tdef, is_noret);
+        }
+        else
+            unreachable();
+
+        assert(tdef);
+        tdef->size = size;
+
+        while(_rd_db_step(ctx, stmt_param) == SQLITE_ROW) {
+            // clang-format off
+            const char* p_type = (const char*)sqlite3_column_text(stmt_param, 0);
+            const char* p_name = (const char*)sqlite3_column_text(stmt_param, 1);
+            usize p_count = (usize)sqlite3_column_int64(stmt_param, 2);
+            RDTypeModifier p_mod = (RDTypeModifier)sqlite3_column_int64(stmt_param, 3);
+            usize p_midx = (usize)sqlite3_column_int64(stmt_param, 3);
+            // clang-format on
+
+            if(rd_i_typedef_is_compound(tdef)) {
+                rd_typedef_add_member(tdef, p_type, p_name, p_count, p_mod,
+                                      ctx);
+            }
+            else if(kind == RD_TKIND_ENUM) {
+                sqlite3_stmt* type_enum_stmt =
+                    _rd_db_prepare_get_type_enum_params(ctx, tdef->name,
+                                                        p_name);
+                _rd_db_step(ctx, type_enum_stmt);
+
+                i64 e_value = (i64)sqlite3_column_int64(type_enum_stmt, 0);
+                rd_typedef_add_enumval(tdef, p_name, e_value, ctx);
+            }
+            else if(kind == RD_TKIND_FUNC) {
+                if(p_midx > 0) {
+                    rd_typedef_add_arg(tdef, p_type, p_name, p_count, p_mod,
+                                       ctx);
+                }
+                else
+                    rd_typedef_set_ret(tdef, p_type, p_count, p_mod, ctx);
+            }
+            else
+                unreachable();
+        }
+
+        vect_push(v, tdef);
+    }
+
+    return v;
 }
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address) {
@@ -648,10 +732,20 @@ void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address) {
     _rd_db_step(ctx, stmt);
 }
 
+void _rd_i_db_query_add_function(RDContext* ctx, const RDFunction* f) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_FUNCTION, "\
+        INSERT INTO Functions \
+        VALUES (:address) \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)f->address);
+    _rd_db_step(ctx, stmt);
+}
+
 void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_PROBLEM, "\
         INSERT INTO Problems \
-            VALUES (:fromaddr, :address, :message) \
+        VALUES (:fromaddr, :address, :message) \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
@@ -661,43 +755,8 @@ void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p) {
     _rd_db_step(ctx, stmt);
 }
 
-bool _rd_i_db_query_get_userdata(RDContext* ctx, const char* key, uptr* ud) {
-    assert(ud && "userdata is NULL");
-    if(!key || !key[0]) return false;
-
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_USERDATA, "\
-        SELECT v \
-        FROM UserData \
-        WHERE k = :k \
-    ");
-
-    _rd_db_bind_param_str(ctx, stmt, ":k", key);
-
-    if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        *ud = (uptr)sqlite3_column_int64(stmt, 0);
-        return true;
-    }
-
-    return false;
-}
-
-void _rd_i_db_query_set_userdata(RDContext* ctx, const char* key, uptr ud) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_USERDATA, "\
-        INSERT INTO UserData \
-            VALUES (:k, :v) \
-        ON CONFLICT DO  \
-            UPDATE SET v = EXCLUDED.v \
-    ");
-
-    _rd_db_bind_param_str(ctx, stmt, ":k", key);
-    _rd_db_bind_param_int(ctx, stmt, ":v", (sqlite3_int64)ud);
-    _rd_db_step(ctx, stmt);
-}
-
-void _rd_i_db_query_set_regval(RDContext* ctx, RDAddress address,
-                               const char* regname, RDRegValue val,
-                               RDConfidence c) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_REGVAL, "\
+void _rd_i_db_query_set_sregval(RDContext* ctx, const RDSegmentReg* sreg) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_SREGVAL, "\
         INSERT INTO SegmentRegisters \
             VALUES (:address, :reg, :value, :confidence) \
         ON CONFLICT DO  \
@@ -705,20 +764,65 @@ void _rd_i_db_query_set_regval(RDContext* ctx, RDAddress address,
                        confidence = EXCLUDED.confidence \
     ");
 
-    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
-    _rd_db_bind_param_str(ctx, stmt, ":reg", regname);
-    _rd_db_bind_param_int(ctx, stmt, ":value", (sqlite3_int64)val);
-    _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
+    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)sreg->address);
+    _rd_db_bind_param_str(ctx, stmt, ":reg", sreg->name);
+
+    if(sreg->has_value)
+        _rd_db_bind_param_int(ctx, stmt, ":value", (sqlite3_int64)sreg->value);
+    else
+        _rd_db_bind_param_null(ctx, stmt, ":value");
+
+    _rd_db_bind_param_int(ctx, stmt, ":confidence",
+                          (sqlite3_int64)sreg->confidence);
     _rd_db_step(ctx, stmt);
+}
+
+RDSegmentRegsVect* _rd_i_db_query_get_all_sregval(RDContext* ctx,
+                                                  RDSegmentRegsVect* v,
+                                                  RDSegmentRegNameVect* names) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_SREGVAL, "\
+        SELECT address, reg, value, confidence \
+        FROM SegmentRegisters  \
+        ORDER BY address \
+    ");
+
+    assert(vect_is_empty(v));
+    assert(vect_is_empty(names));
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
+        const char* interned = rd_i_strpool_intern(
+            &ctx->strings, (const char*)sqlite3_column_text(stmt, 1));
+        assert(interned);
+
+        RDRegValue value = 0;
+        bool has_value = sqlite3_column_type(stmt, 2) != SQLITE_NULL;
+        if(has_value) value = (RDRegValue)sqlite3_column_int64(stmt, 2);
+
+        RDConfidence c = (RDConfidence)sqlite3_column_int(stmt, 3);
+
+        RDSegmentRegVect* sreg_vect =
+            _rd_i_db_segmentregs_get_vect(v, names, interned);
+
+        vect_push(sreg_vect, (RDSegmentReg){
+                                 .address = address,
+                                 .name = interned,
+                                 .value = value,
+                                 .has_value = has_value,
+                                 .confidence = c,
+                             });
+    }
+
+    return v;
 }
 
 void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address,
                                     int idx) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_OVR_OPERAND, "\
-            INSERT OR IGNORE \
-            INTO OperandOverrides \
-            VALUES(:address, :index) \
-        ");
+        INSERT OR IGNORE \
+        INTO OperandOverrides \
+        VALUES(:address, :index) \
+    ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
     _rd_db_bind_param_int(ctx, stmt, ":index", idx);
@@ -728,9 +832,9 @@ void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address,
 void _rd_i_db_query_del_ovr_operand(RDContext* ctx, RDAddress address,
                                     int idx) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_OVR_OPERAND, "\
-            DELETE FROM OperandOverrides \
-            WHERE address = :address \
-            AND idx = :index \
+        DELETE FROM OperandOverrides \
+        WHERE address = :address \
+        AND idx = :index \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
@@ -754,7 +858,8 @@ RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
                                                      RDAddress address) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_OVR_OPERAND, "\
-            SELECT address, idx FROM OperandOverrides \
+            SELECT address, idx \
+            FROM OperandOverrides \
             WHERE address = :address \
         ");
 

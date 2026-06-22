@@ -1,4 +1,5 @@
 #include "types.h"
+#include "support/containers.h"
 
 int _rd_i_db_segment_cmp_pred(const void* a, const void* b) {
     const RDSegmentFull* sa = *(const RDSegmentFull**)a;
@@ -38,4 +39,27 @@ int _rd_i_db_segmentreg_cmp(const void* a, const void* b) {
     if(ea->address < eb->address) return -1;
     if(ea->address > eb->address) return 1;
     return 0;
+}
+
+RDSegmentRegVect* _rd_i_db_segmentregs_find_vect(RDSegmentRegsVect* self,
+                                                 const char* reg) {
+    RDSegmentRegVect* rv;
+
+    vect_each(rv, self) {
+        if(rv->name == reg) return rv;
+    }
+
+    return NULL;
+}
+
+RDSegmentRegVect* _rd_i_db_segmentregs_get_vect(RDSegmentRegsVect* self,
+                                                RDSegmentRegNameVect* names,
+                                                const char* reg) {
+    RDSegmentRegVect* rv = _rd_i_db_segmentregs_find_vect(self, reg);
+    if(rv) return rv;
+
+    // new register, add to both vects
+    vect_push(self, (RDSegmentRegVect){.name = reg});
+    vect_push(names, reg);
+    return vect_last(self);
 }

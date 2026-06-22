@@ -4,11 +4,17 @@
 #include <redasm/context.h>
 #include <redasm/registers.h>
 
-typedef struct RDSegmentVect {
+typedef struct RDAddressVect {
+    RDAddress* data;
+    usize length;
+    usize capacity;
+} RDAddressVect;
+
+typedef struct RDSegmentFullVect {
     RDSegmentFull** data;
     usize length;
     usize capacity;
-} RDSegmentVect;
+} RDSegmentFullVect;
 
 typedef struct RDMappingVect {
     RDInputMapping* data;
@@ -41,6 +47,12 @@ typedef struct RDName {
     RDConfidence confidence;
 } RDName;
 
+typedef struct RDExternalVect {
+    RDExternal* data;
+    usize length;
+    usize capacity;
+} RDExternalVect;
+
 typedef struct RDOvrOperand {
     RDAddress address;
     usize index;
@@ -71,3 +83,9 @@ int _rd_i_db_mapping_cmp_pred(const void* a, const void* b);
 int _rd_i_db_mapping_find_pred(const void* key, const void* item);
 
 int _rd_i_db_segmentreg_cmp(const void* a, const void* b);
+
+RDSegmentRegVect* _rd_i_db_segmentregs_find_vect(RDSegmentRegsVect* self,
+                                                 const char* reg);
+RDSegmentRegVect* _rd_i_db_segmentregs_get_vect(RDSegmentRegsVect* self,
+                                                RDSegmentRegNameVect* names,
+                                                const char* reg);

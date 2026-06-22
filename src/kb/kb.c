@@ -6,6 +6,7 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/logging.h"
+#include "support/tomlschema.h"
 #include <errno.h>
 #include <redasm/allocator.h>
 
@@ -95,8 +96,8 @@ static RDKBOrdinalModule* _rd_kb_check_ordinal_module(RDContext* ctx,
     return vect_at(&ctx->kb->ordinal_modules, idx);
 }
 
-static const char* _rd_kb_get_param_impl(const RDKBObject* obj, RDType* t,
-                                         const RDContext* ctx) {
+static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
+                                    const RDContext* ctx) {
     const RDProcessorPlugin* plugin = ctx->processorplugin;
     i64 count = 0;
 
@@ -146,41 +147,6 @@ static const char* _rd_kb_get_param_impl(const RDKBObject* obj, RDType* t,
     return rd_kbobject_get_str(obj, "name");
 }
 
-static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
-                                    const RDContext* ctx) {
-    if(!rd_i_kb_validate_param(obj)) return NULL;
-    return _rd_kb_get_param_impl(obj, t, ctx);
-}
-
-static void _rd_kb_get_ret(const RDKBObject* obj, RDType* t,
-                           const RDContext* ctx) {
-    if(!rd_i_kb_validate_ret(obj)) return;
-    _rd_kb_get_param_impl(obj, t, ctx);
-}
-
-static bool _rd_kb_load_struct(const char* name, const RDKBObject* def,
-                               RDContext* ctx) {
-    RDTypeDef* tdef = rd_typedef_create_struct(name, ctx);
-
-    const RDKBObject* members = rd_kbobject_get_array(def, "members");
-    assert(members);
-
-    const RDKBObject* m;
-    rd_kbobject_each(m, members) {
-        RDType t;
-        const char* param_name = _rd_kb_get_param(m, &t, ctx);
-
-        if(!param_name) {
-            rd_typedef_destroy(tdef);
-            return false;
-        }
-
-        rd_typedef_add_member(tdef, t.name, param_name, t.count, t.mod, ctx);
-    }
-
-    return rd_typedef_register(tdef, ctx);
-}
-
 static void _rd_kb_apply_noret(RDContext* ctx) {
     const char** it;
     vect_each(it, &ctx->kb->noret_names) {
@@ -205,21 +171,72 @@ static void _rd_kb_load_dependencies(const RDKBObject* root, RDContext* ctx) {
     }
 }
 
-static bool _rd_kb_load_types(const RDKBObject* root, RDContext* ctx) {
+static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx) {
     const RDKBObject* types = rd_kbobject_get_table(root, "types");
     if(!types) return false;
 
     const char* name;
     const RDKBObject* def;
     rd_kbobject_each_pair(name, def, types) {
-        if(!rd_i_kb_validate_type(def)) continue;
+        if(!rd_i_kb_validate_compound(def)) continue;
 
-        const char* kind = rd_kbobject_get_str(def, "kind");
+        RDTypeDef* tdef = rd_typedef_create_struct(name, ctx);
 
-        if(!strcmp(kind, "struct"))
-            _rd_kb_load_struct(name, def, ctx);
-        else
-            unreachable();
+        const RDKBObject* members = rd_kbobject_get_array(def, "members");
+        assert(members);
+
+        const RDKBObject* m;
+        rd_kbobject_each(m, members) {
+            RDType t;
+            const char* param_name = _rd_kb_get_param(m, &t, ctx);
+
+            if(!param_name) {
+                rd_typedef_destroy(tdef);
+                return false;
+            }
+
+            rd_typedef_add_member(tdef, t.name, param_name, t.count, t.mod,
+                                  ctx);
+        }
+
+        rd_typedef_register(tdef, ctx);
+    }
+
+    return true;
+}
+
+static bool _rd_kb_load_enums(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* enums = rd_kbobject_get_table(root, "enums");
+    if(!enums) return false;
+
+    const char* name;
+    const RDKBObject* e;
+    rd_kbobject_each_pair(name, e, enums) {
+        if(!rd_i_kb_validate_enum(e)) continue;
+
+        const char* base_type = rd_kbobject_get_str(e, "base_type");
+        assert(base_type);
+
+        RDTypeDef* tdef = rd_typedef_create_enum(name, base_type, ctx);
+
+        const RDKBObject* members = rd_kbobject_get_array(e, "members");
+        assert(members);
+
+        const RDKBObject* m;
+        rd_kbobject_each(m, members) {
+            const char* m_name = rd_kbobject_get_str(m, "name");
+            i64 m_value;
+            bool value_ok = rd_kbobject_get_int(m, "value", &m_value);
+
+            if(!m_name || !value_ok) {
+                rd_typedef_destroy(tdef);
+                return false;
+            }
+
+            rd_typedef_add_enumval(tdef, m_name, m_value, ctx);
+        }
+
+        rd_typedef_register(tdef, ctx);
     }
 
     return true;
@@ -243,7 +260,7 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
         assert(ret);
 
         RDType ret_type;
-        _rd_kb_get_ret(ret, &ret_type, ctx);
+        _rd_kb_get_param(ret, &ret_type, ctx);
         rd_typedef_set_ret(tdef, ret_type.name, ret_type.count, ret_type.mod,
                            ctx);
 
@@ -296,8 +313,8 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
             if(!func_name) {
                 LOG_WARN("ordinal-name must be '%s', got '%s' for module '%s', "
                          "skipping...",
-                         rd_i_kb_schema_kind_str(RD_KB_STR),
-                         rd_i_kb_schema_kind_str(rd_kbobject_get_kind(ord)),
+                         rd_i_toml_type_str(TOML_STRING),
+                         rd_i_toml_type_str(rd_i_kbobject_toml_type(ord)),
                          modname);
                 continue;
             }
@@ -340,11 +357,7 @@ void rd_i_kb_paths_deinit(RDPathVect* self) {
     vect_destroy(self);
 }
 
-RDKB* rd_i_kb_create(void) {
-    RDKB* self = rd_alloc0(1, sizeof(RDKB));
-
-    return self;
-}
+RDKB* rd_i_kb_create(void) { return rd_alloc0(1, sizeof(RDKB)); }
 
 void rd_i_kb_destroy(RDKB* self) {
     RDKBFile** f;
@@ -423,7 +436,8 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     _rd_kb_load_dependencies(kbfile->root, ctx);
 
     LOG_INFO("loading KB '%s'", kb);
-    _rd_kb_load_types(kbfile->root, ctx);
+    _rd_kb_load_compound(kbfile->root, ctx);
+    _rd_kb_load_enums(kbfile->root, ctx);
     _rd_kb_load_functions(kbfile->root, ctx);
     _rd_kb_load_ordinals(kbfile->root, ctx);
 

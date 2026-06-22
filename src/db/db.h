@@ -7,7 +7,7 @@
 #include <sqlite3.h>
 
 typedef struct RDDB {
-    RDSegmentVect segments;
+    RDSegmentFullVect segments;
     RDMappingVect mappings;
     RDSegmentRegsVect segment_regs;
     RDSegmentRegNameVect segment_reg_names;
@@ -26,22 +26,21 @@ void rd_i_db_destroy(RDDB* self);
 void rd_i_db_begin(RDContext* ctx);
 void rd_i_db_commit(RDContext* ctx);
 void rd_i_db_rollback(RDContext* ctx);
-void rd_i_db_flush(RDContext* ctx);
+void rd_i_db_save(RDContext* ctx);
+void rd_i_db_load(RDContext* ctx);
+bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg);
 const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
                                           RDAddress address);
-const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx);
+const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx);
 
 bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m);
 const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx);
 
-void rd_i_db_set_entry_point(RDContext* ctx, RDAddress address);
-bool rd_i_db_get_entry_point(RDContext* ctx, RDAddress* address);
-
-void rd_i_db_set_imported(RDContext* ctx, RDAddress address,
-                          const RDImported* imp);
-bool rd_i_db_get_imported(RDContext* ctx, RDAddress address, RDImported* imp);
+void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp);
+RDExternalVect* rd_i_db_get_externals(RDContext* ctx, RDExternalKind kind,
+                                      RDExternalVect* v);
 
 void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType t, RDConfidence c);
@@ -76,9 +75,6 @@ void rd_i_db_set_comment(RDContext* ctx, RDAddress address, const char* cmt);
 void rd_i_db_del_comment(RDContext* ctx, RDAddress address);
 
 void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p);
-
-bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud);
-void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud);
 
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue val, RDConfidence c);

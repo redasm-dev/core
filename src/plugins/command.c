@@ -1,3 +1,6 @@
+#include "core/state.h"
+#include "plugins/common.h"
+#include "support/containers.h"
 #include "support/logging.h"
 #include <redasm/plugins/command.h>
 
@@ -90,4 +93,25 @@ RDCommandValue rd_command_run(RDContext* ctx, const char* name,
         return (RDCommandValue){0};
 
     return commandplugin->execute(ctx, args);
+}
+
+bool rd_register_command(const RDCommandPlugin* c) {
+    if(!rd_i_validate_plugin_with_name(c->level, c->id, c->name, "command"))
+        return false;
+
+    if(!c->execute) {
+        LOG_FAIL("command '%s' requires an executor", c->id);
+        return false;
+    }
+
+    if(rd_command_find(c->id)) {
+        LOG_WARN("command '%s' already registered", c->id);
+        return false;
+    }
+
+    LOG_DEBUG("registering command '%s' [%s]", c->id, c->name);
+    RDPlugin* plugin = rd_alloc(sizeof(*plugin));
+    plugin->command = c;
+    vect_push(&rd_i_state.commands, plugin);
+    return true;
 }

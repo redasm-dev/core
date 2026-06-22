@@ -47,7 +47,11 @@ target_sources(${PROJECT_NAME}
         src/plugins/processor/processor.c
         src/plugins/analyzer.c
         src/plugins/command.c
+        src/plugins/common.c
+        src/plugins/loader.c
         src/plugins/module.c
+        src/project/save.c
+        src/project/load.c
         src/rdil/opcodes.c
         src/rdil/rdil.c
         src/rdil/renderer.c
@@ -58,6 +62,7 @@ target_sources(${PROJECT_NAME}
         src/support/logging.c
         src/support/utils.c
         src/support/stringpool.c
+        src/support/tomlschema.c
         src/surface/graph.c
         src/surface/items.c
         src/surface/path.c
@@ -87,6 +92,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         SQLite3::SQLite3
         tomlc17
+        miniz
 )
 
 include(cmake/Version.cmake)

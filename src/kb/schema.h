@@ -10,8 +10,6 @@ typedef struct RDKBFieldSchema {
     const char* const* str_values;
 } RDKBFieldSchema;
 
-const char* rd_i_kb_schema_kind_str(RDKBObjectKind kind);
 bool rd_i_kb_validate_function(const RDKBObject* obj);
-bool rd_i_kb_validate_type(const RDKBObject* obj);
-bool rd_i_kb_validate_param(const RDKBObject* obj);
-bool rd_i_kb_validate_ret(const RDKBObject* obj);
+bool rd_i_kb_validate_compound(const RDKBObject* obj);
+bool rd_i_kb_validate_enum(const RDKBObject* obj);

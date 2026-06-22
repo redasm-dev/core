@@ -1,33 +1,13 @@
 #include "db.h"
 #include "core/context.h"
 #include "db/schema.h"
+#include "db/types.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/logging.h"
 #include "support/utils.h"
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
-
-static RDSegmentRegVect* _rd_db_segmentregs_find_vect(RDSegmentRegsVect* self,
-                                                      const char* reg) {
-    RDSegmentRegVect* rv;
-
-    vect_each(rv, self) {
-        if(rv->name == reg) return rv;
-    }
-
-    return NULL;
-}
-
-static RDSegmentRegVect* _rd_db_segmentregs_get_vect(RDDB* db,
-                                                     const char* reg) {
-    RDSegmentRegVect* rv = _rd_db_segmentregs_find_vect(&db->segment_regs, reg);
-    if(rv) return rv;
-
-    // new register, add to both vects
-    vect_push(&db->segment_regs, (RDSegmentRegVect){.name = reg});
-    vect_push(&db->segment_reg_names, reg);
-    return vect_last(&db->segment_regs);
-}
 
 bool rd_i_db_is_valid(const char* dbpath) {
     sqlite3* db = NULL;
@@ -59,7 +39,7 @@ RDDB* rd_i_db_create(const char* dbpath) {
     assert(self->filepath);
 
     if(sqlite3_open(self->filepath, &self->handle) != SQLITE_OK) {
-        panic("Cannot open database at %s", self->filepath);
+        panic("cannot open database at %s", self->filepath);
         goto fail;
     }
 
@@ -122,7 +102,70 @@ void rd_i_db_rollback(RDContext* ctx) {
     sqlite3_exec(ctx->db->handle, "ROLLBACK", NULL, NULL, NULL);
 }
 
-void rd_i_db_flush(RDContext* ctx) {}
+void rd_i_db_save(RDContext* ctx) {
+    rd_i_db_begin(ctx);
+
+    // clang-format off
+    sqlite3_exec(ctx->db->handle, "DELETE FROM Functions", NULL, NULL, NULL);
+    sqlite3_exec(ctx->db->handle, "DELETE FROM SegmentRegisters", NULL, NULL, NULL);
+    // clang-format on
+
+    RDFunction** f;
+    vect_each(f, &ctx->functions) _rd_i_db_query_add_function(ctx, *f);
+
+    RDSegmentRegVect* sreg_vect;
+    vect_each(sreg_vect, &ctx->db->segment_regs) {
+        RDSegmentReg* sreg;
+        vect_each(sreg, sreg_vect) _rd_i_db_query_set_sregval(ctx, sreg);
+    }
+
+    rd_i_db_commit(ctx);
+}
+
+void rd_i_db_load(RDContext* ctx) {
+    _rd_i_db_query_get_all_segments(ctx, &ctx->db->segments);
+    _rd_i_db_query_get_all_mappings(ctx, &ctx->db->mappings);
+    _rd_i_db_query_get_all_type_def(ctx, &ctx->types);
+    _rd_i_db_query_get_all_sregval(ctx, &ctx->db->segment_regs,
+                                   &ctx->db->segment_reg_names);
+}
+
+bool rd_i_db_export(RDContext* ctx, const char* filepath) {
+    if(!filepath) return false;
+
+    if(!strcmp(filepath, ctx->db->filepath)) {
+        LOG_FAIL("cannot export to the active database path '%s'", filepath);
+        return false;
+    }
+
+    if(rd_i_file_exists(filepath))
+        remove(filepath); // clean db, don't merge an existing one
+
+    sqlite3_backup* backup = NULL;
+    sqlite3* exported = NULL;
+    bool ok = false;
+
+    if(sqlite3_open(filepath, &exported) != SQLITE_OK) {
+        LOG_FAIL("cannot export database at %s", filepath);
+        goto done;
+    }
+
+    rd_i_db_save(ctx);
+    backup = sqlite3_backup_init(exported, "main", ctx->db->handle, "main");
+    if(!backup) goto done;
+
+    sqlite3_backup_step(backup, -1);
+    sqlite3_backup_finish(backup);
+
+    ok = sqlite3_errcode(exported) == SQLITE_OK;
+    if(!ok) LOG_FAIL("SQL: %s", sqlite3_errmsg(exported));
+
+    sqlite3_exec(exported, "VACUUM", NULL, NULL, NULL);
+
+done:
+    if(exported) sqlite3_close(exported);
+    return ok;
+}
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
     if(seg->base.start_address >= seg->base.end_address) return false;
@@ -144,6 +187,7 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
 
     vect_push(&ctx->db->segments, seg);
     vect_sort(&ctx->db->segments, _rd_i_db_segment_cmp_pred);
+    _rd_i_db_query_add_segment(ctx, seg);
     return true;
 }
 
@@ -171,7 +215,7 @@ const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
     return ctx->db->last_segment;
 }
 
-const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx) {
+const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx) {
     return &ctx->db->segments;
 }
 
@@ -221,6 +265,7 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m) {
 
     vect_push(&ctx->db->mappings, m);
     vect_sort(&ctx->db->mappings, _rd_i_db_mapping_cmp_pred);
+    _rd_i_db_query_add_mapping(ctx, &m);
     return true;
 }
 
@@ -228,21 +273,13 @@ const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx) {
     return &ctx->db->mappings;
 }
 
-void rd_i_db_set_entry_point(RDContext* ctx, RDAddress address) {
-    _rd_i_db_query_set_info_int(ctx, RD_DB_KEY_ENTRY_POINT, address);
+void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp) {
+    _rd_i_db_query_set_external(ctx, exp);
 }
 
-bool rd_i_db_get_entry_point(RDContext* ctx, RDAddress* address) {
-    return _rd_i_db_query_get_info_int(ctx, RD_DB_KEY_ENTRY_POINT, address);
-}
-
-void rd_i_db_set_imported(RDContext* ctx, RDAddress address,
-                          const RDImported* imp) {
-    _rd_i_db_query_set_imported(ctx, address, imp);
-}
-
-bool rd_i_db_get_imported(RDContext* ctx, RDAddress address, RDImported* imp) {
-    return _rd_i_db_query_get_imported(ctx, address, imp);
+RDExternalVect* rd_i_db_get_externals(RDContext* ctx, RDExternalKind kind,
+                                      RDExternalVect* v) {
+    return _rd_i_db_query_get_all_externals(ctx, kind, v);
 }
 
 void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -336,18 +373,11 @@ void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p) {
     _rd_i_db_query_add_problem(ctx, p);
 }
 
-bool rd_i_db_get_userdata(RDContext* ctx, const char* key, uptr* ud) {
-    return _rd_i_db_query_get_userdata(ctx, key, ud);
-}
-
-void rd_i_db_set_userdata(RDContext* ctx, const char* key, uptr ud) {
-    _rd_i_db_query_set_userdata(ctx, key, ud);
-}
-
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue val, RDConfidence c) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, regname);
-    RDSegmentRegVect* rv = _rd_db_segmentregs_get_vect(ctx->db, interned);
+    RDSegmentRegVect* rv = _rd_i_db_segmentregs_get_vect(
+        &ctx->db->segment_regs, &ctx->db->segment_reg_names, interned);
 
     RDSegmentReg entry = {
         .address = address,
@@ -374,7 +404,7 @@ bool rd_i_db_del_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDConfidence c) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, regname);
     RDSegmentRegVect* rv =
-        _rd_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
+        _rd_i_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
     if(!rv) return false;
 
     RDSegmentReg entry = {
@@ -402,7 +432,7 @@ bool rd_i_db_get_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue* value) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, regname);
     RDSegmentRegVect* rv =
-        _rd_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
+        _rd_i_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
     if(!rv || vect_is_empty(rv)) return false;
 
     // upper_bound then step back: largest address <= query_address
@@ -425,7 +455,7 @@ const RDSegmentRegVect* rd_i_db_get_all_sregval(RDContext* ctx,
     if(!regname) return NULL;
 
     const char* interned = rd_i_strpool_intern(&ctx->strings, regname);
-    return _rd_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
+    return _rd_i_db_segmentregs_find_vect(&ctx->db->segment_regs, interned);
 }
 
 void rd_i_db_set_ovr_operand(RDContext* ctx, RDAddress address, int idx) {

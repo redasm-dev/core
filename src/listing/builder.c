@@ -235,7 +235,7 @@ void rd_i_listing_build(RDContext* ctx) {
     RDListingBuilder b = {.context = ctx};
     rd_i_listing_init(&b.listing, &ctx->listing);
 
-    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDSegmentFull** s;
     vect_each(s, segments) {

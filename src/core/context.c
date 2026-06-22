@@ -41,23 +41,26 @@ void rd_analyzeritem_select(RDAnalyzerItem* self, bool sel) {
     self->is_selected = sel;
 }
 
-RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
+RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
                                const RDProcessorPlugin* pplugin,
-                               RDByteBuffer* input, const char* filepath,
-                               const char* dbpath) {
+                               RDByteBuffer* input, const char* workingdir,
+                               const char* filename, const char* dbpath) {
     assert(pplugin);
     RDContext* self = rd_alloc0(1, sizeof(*self));
 
     self->loaderplugin = lplugin;
-    self->loader = ldr;
     self->processorplugin = pplugin;
-    self->filepath = rd_strdup(filepath);
+    self->working_dir = rd_strdup(workingdir);
+    self->file_name = rd_strdup(filename);
     self->input = input;
     self->input_reader = rd_i_reader_create((RDBuffer*)input);
     self->reader = rd_i_reader_create_flags(self);
     self->hooks = rd_i_hooks_create();
     self->db = rd_i_db_create(dbpath);
     self->kb = rd_i_kb_create();
+
+    assert(self->working_dir);
+    assert(self->file_name);
 
     rd_i_registermap_init(&self->engine.current.registers);
     rd_i_strpool_init(&self->strings);
@@ -186,8 +189,6 @@ const RDLoaderPlugin* rd_get_loader_plugin(const RDContext* self) {
     return self->loaderplugin;
 }
 
-RDProcessor* rd_get_processor(const RDContext* self) { return self->processor; }
-
 const RDProcessorPlugin* rd_get_processor_plugin(const RDContext* self) {
     return self->processorplugin;
 }
@@ -196,8 +197,6 @@ RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self) {
     return vect_to_slice(RDAnalyzerItemSlice, &self->analyzerplugins);
 }
 
-RDLoader* rd_get_loader(const RDContext* self) { return self->loader; }
-
 bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                     RDAddress endaddr, u32 perm) {
     if(!name) { // autogenerate name
@@ -205,12 +204,9 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
                            (int)vect_length(&self->db->segments));
     }
 
-    RDSegmentFull* s = rd_alloc0(1, sizeof(*s));
-    s->base.name = rd_i_strpool_intern(&self->strings, name);
-    s->base.start_address = addr;
-    s->base.end_address = endaddr;
-    s->base.perm = perm;
-    s->flags = rd_i_flagsbuffer_create(endaddr - addr);
+    // FIXME: unit argument is missing
+    RDSegmentFull* s = rd_i_segment_create(self, name, addr, endaddr, perm, 0);
+    if(!s) return false;
 
     if(rd_i_db_add_segment(self, s)) {
         LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr,
@@ -562,9 +558,9 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->chunk_buf);
     vect_destroy(&self->imp_hint_buf);
+    vect_destroy(&self->externals);
     hmap_destroy(&self->engine.current.registers);
-    vect_destroy(&self->exported);
-    vect_destroy(&self->imported);
+    rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
     rd_i_functionvect_destroy(&self->functions);
     rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
@@ -572,28 +568,19 @@ void rd_destroy(RDContext* self) {
     rd_i_kb_destroy(self->kb);
     rd_i_db_destroy(self->db);
 
-    for(unsigned i = 0; i < rd_count_of(self->types); i++) {
-        RDTypeDef** def;
-        vect_each(def, &self->types[i]) rd_typedef_destroy(*def);
-        vect_destroy(&self->types[i]);
-    }
-
-    RDAnalyzerItem** ai;
-    vect_each(ai, &self->analyzerplugins) rd_free(*ai);
-    vect_destroy(&self->analyzerplugins);
+    RDTypeDef** def;
+    vect_each(def, &self->types) rd_typedef_destroy(*def);
+    vect_destroy(&self->types);
 
     if(self->processorplugin && self->processorplugin->destroy)
         self->processorplugin->destroy(self->processor);
-
-    if(self->loaderplugin && self->loaderplugin->destroy)
-        self->loaderplugin->destroy(self->loader);
 
     rd_i_reader_destroy(self->input_reader);
     rd_i_reader_destroy(self->reader);
     rd_i_buffer_destroy((RDBuffer*)self->input);
     rd_i_strpool_destroy(&self->strings);
-    rd_free(self->loader_name);
-    rd_free(self->filepath);
+    rd_free(self->working_dir);
+    rd_free(self->file_name);
     rd_free(self);
 }
 
@@ -849,13 +836,15 @@ bool rd_fill(RDContext* self, RDAddress address, usize n) {
     return true;
 }
 
-const char* rd_get_imported_hint(RDContext* ctx, const char* name) {
-    return rd_i_get_imported_hint(ctx, name, &ctx->imp_hint_buf);
+const char* rd_get_external_hint(RDContext* ctx, const char* name,
+                                 RDExternalKind kind) {
+    return rd_i_get_external_hint(ctx, name, kind, &ctx->imp_hint_buf);
 }
 
-const char* rd_get_imported_ord_hint(RDContext* ctx, const char* module,
-                                     u32 ordinal) {
-    return rd_i_get_imported_ord_hint(ctx, module, ordinal, &ctx->imp_hint_buf);
+const char* rd_get_external_ord_hint(RDContext* ctx, const char* module,
+                                     u32 ordinal, RDExternalKind kind) {
+    return rd_i_get_external_ord_hint(ctx, module, ordinal, kind,
+                                      &ctx->imp_hint_buf);
 }
 
 RDProblemSlice rd_get_all_problems(const RDContext* self) {
@@ -863,7 +852,7 @@ RDProblemSlice rd_get_all_problems(const RDContext* self) {
 }
 
 RDSegmentSlice rd_get_all_segments(const RDContext* self) {
-    const RDSegmentVect* segments = rd_i_db_get_segments(self);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(self);
 
     return (RDSegmentSlice){
         .data = (const RDSegment**)segments->data,
@@ -882,12 +871,11 @@ RDFunctionSlice rd_get_all_functions(const RDContext* self) {
     };
 }
 
-RDAddressSlice rd_get_all_exported(const RDContext* self) {
-    return vect_to_slice(RDAddressSlice, &self->exported);
-}
-
-RDAddressSlice rd_get_all_imported(const RDContext* self) {
-    return vect_to_slice(RDAddressSlice, &self->imported);
+RDExternalSlice rd_get_all_externals(const RDContext* self,
+                                     RDExternalKind kind) {
+    RDExternalVect* v = rd_i_db_get_externals(
+        (RDContext*)self, kind, (RDExternalVect*)&self->externals);
+    return vect_to_slice(RDExternalSlice, v);
 }
 
 RDSymbolSlice rd_get_all_symbols(const RDContext* self) {
@@ -1000,51 +988,72 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
     return rd_get_name(ctx, self->address);
 }
 
-bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
-                       const RDImported* imp) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
-    if(!seg) return false;
+bool rd_i_set_external(RDContext* self, const char* name,
+                       const RDExternal* ext) {
+    assert(ext);
 
-    usize idx = rd_i_address2index(seg, address);
+    if(ext->kind != RD_EXT_EXPORTED && ext->kind != RD_EXT_IMPORTED)
+        return false;
+
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, ext->address);
+
+    if(!seg) {
+        rd_i_add_problem(self, ext->address, ext->address,
+                         "skipping external '%s' to unmapped address",
+                         name ? name : "<unnamed>");
+
+        return false;
+    }
+
+    usize idx = rd_i_address2index(seg, ext->address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set imported on tail byte");
+        rd_i_add_problem(self, ext->address, ext->address,
+                         "cannot set external on tail byte");
         return false;
     }
 
-    if(imp->ordinal.has_value) {
-        name = rd_i_get_imported_ord_hint(self, imp->module, imp->ordinal.value,
-                                          &self->imp_buf);
-    }
-    else if(name)
-        name = rd_i_get_imported_hint(self, name, &self->imp_buf);
-    else {
-        rd_i_add_problem(self, address, address, "invalid import name");
+    if(ext->kind == RD_EXT_EXPORTED &&
+       rd_flagsbuffer_has_imported(seg->flags, idx)) {
+        rd_i_add_problem(
+            self, ext->address, ext->address,
+            "already marked as imported, cannot mark '%s' as exported",
+            name ? name : "<unnamed>");
         return false;
+    }
+
+    if(ext->kind == RD_EXT_IMPORTED &&
+       rd_flagsbuffer_has_exported(seg->flags, idx)) {
+        rd_i_add_problem(
+            self, ext->address, ext->address,
+            "already marked as exported, cannot mark '%s' as imported",
+            name ? name : "<unnamed>");
+        return false;
+    }
+
+    if(name)
+        name = rd_i_get_external_hint(self, name, ext->kind, &self->imp_buf);
+    else if(ext->ordinal.has_value) {
+        name = rd_i_get_external_ord_hint(self, ext->module, ext->ordinal.value,
+                                          ext->kind, &self->imp_buf);
     }
 
     if(name) {
-        rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
+        rd_i_set_name(self, ext->address, name, RD_CONFIDENCE_LIBRARY);
 
         if(rd_i_kb_is_noret(self, rd_i_strip_prefix(name)))
-            rd_i_set_noret(self, address);
+            rd_i_set_noret(self, ext->address);
     }
 
-    const unsigned int PTR_SIZE = self->processorplugin->ptr_size;
-    const char* ptrtype = rd_integral_from_size(PTR_SIZE);
-    rd_i_set_type(self, address, ptrtype, 0, RD_TYPE_PTR, RD_CONFIDENCE_AUTO);
+    if(ext->kind == RD_EXT_EXPORTED &&
+       !rd_i_flagsbuffer_set_exported(seg->flags, idx))
+        return false;
 
-    if(!rd_i_flagsbuffer_set_imported(seg->flags, idx)) return false;
+    if(ext->kind == RD_EXT_IMPORTED &&
+       !rd_i_flagsbuffer_set_imported(seg->flags, idx))
+        return false;
 
-    rd_i_db_set_imported(self, address, imp);
-
-    usize imp_idx =
-        vect_lower_bound(&self->imported, &address, rd_i_address_kcmp_pred);
-
-    if(imp_idx == vect_length(&self->imported) ||
-       *vect_at(&self->imported, imp_idx) != address)
-        vect_ins(&self->imported, imp_idx, address);
+    rd_i_db_set_external(self, ext);
 
     return true;
 }
@@ -1143,7 +1152,7 @@ bool rd_get_entry_point(const RDContext* self, RDAddress* address) {
     }
 
     // try to fallback to the first address available
-    const RDSegmentVect* segments = rd_i_db_get_segments(self);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(self);
 
     if(!vect_is_empty(segments)) {
         if(address) *address = (*vect_first(segments))->base.start_address;
@@ -1172,69 +1181,31 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     assert(n && "invalid entry point name");
 
     rd_library_function(self, address, n);
-    rd_set_exported(self, address, NULL);
-    rd_i_db_set_entry_point(self, address);
+    rd_set_external(self, address, NULL, NULL, RD_EXT_EXPORTED);
     optional_set(&self->entry_point, address);
     return true;
 }
 
-bool rd_set_exported(RDContext* self, RDAddress address, const char* name) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
-
-    if(!seg) {
-        rd_i_add_problem(self, address, address,
-                         "skipping export '%s' to unmapped address",
-                         name ? name : "<unnamed>");
-
-        return false;
-    }
-
-    usize idx = rd_i_address2index(seg, address);
-
-    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set exported on tail byte");
-        return false;
-    }
-
-    if(name) rd_i_set_name(self, address, name, RD_CONFIDENCE_LIBRARY);
-    if(!rd_i_flagsbuffer_set_exported(seg->flags, idx)) return false;
-
-    usize exp_idx =
-        vect_lower_bound(&self->exported, &address, rd_i_address_kcmp_pred);
-
-    if(exp_idx == vect_length(&self->exported) ||
-       *vect_at(&self->exported, exp_idx) != address)
-        vect_ins(&self->exported, exp_idx, address);
-
-    return true;
-}
-
-bool rd_set_imported(RDContext* self, RDAddress address, const char* module,
-                     const char* name) {
-    return rd_i_set_imported(self, address, name,
-                             &(RDImported){
+bool rd_set_external(RDContext* self, RDAddress address, const char* module,
+                     const char* name, RDExternalKind kind) {
+    return rd_i_set_external(self, name,
+                             &(RDExternal){
+                                 .kind = kind,
+                                 .address = address,
                                  .module = module,
                                  .ordinal = {.has_value = false},
                              });
 }
 
-bool rd_set_imported_ord(RDContext* self, RDAddress address, const char* module,
-                         u32 ord) {
-    return rd_i_set_imported(self, address, NULL,
-                             &(RDImported){
+bool rd_set_external_ord(RDContext* self, RDAddress address, const char* module,
+                         u32 ord, RDExternalKind kind) {
+    return rd_i_set_external(self, NULL,
+                             &(RDExternal){
+                                 .kind = kind,
+                                 .address = address,
                                  .module = module,
                                  .ordinal = {.value = ord, .has_value = true},
                              });
-}
-
-bool rd_get_imported(RDContext* self, RDAddress address, RDImported* imp) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
-    if(!seg) return false;
-
-    usize idx = rd_i_address2index(seg, address);
-    if(!rd_flagsbuffer_has_imported(seg->flags, idx)) return false;
-    return rd_i_db_get_imported(self, address, imp);
 }
 
 bool rd_i_set_noret(RDContext* self, RDAddress address) {
@@ -1258,20 +1229,34 @@ bool rd_i_set_noret(RDContext* self, RDAddress address) {
     return true;
 }
 
-const char* rd_i_get_imported_hint(RDContext* ctx, const char* name,
-                                   RDCharVect* v) {
+const char* rd_i_get_external_hint(RDContext* ctx, const char* name,
+                                   RDExternalKind kind, RDCharVect* v) {
     RD_UNUSED(ctx);
 
-    if(name) return rd_i_format(v, "__imp_%s", name);
+    if(name) {
+        if(kind == RD_EXT_EXPORTED) return name;
+        return rd_i_format(v, "__imp_%s", name);
+    }
+
     return NULL;
 }
 
-const char* rd_i_get_imported_ord_hint(RDContext* ctx, const char* module,
-                                       u32 ordinal, RDCharVect* v) {
+const char* rd_i_get_external_ord_hint(RDContext* ctx, const char* module,
+                                       u32 ordinal, RDExternalKind kind,
+                                       RDCharVect* v) {
     const char* name = rd_i_kb_find_ordinal_name(ctx, module, ordinal);
-    if(name) return rd_i_get_imported_hint(ctx, name, v);
+    if(name) return rd_i_get_external_hint(ctx, name, kind, v);
 
-    if(module) return rd_i_format(v, "__imp_%s_%" PRIu32, module, ordinal);
+    if(module) {
+        if(kind == RD_EXT_EXPORTED)
+            return rd_i_format(v, "%s_%" PRIu32, module, ordinal);
+
+        return rd_i_format(v, "__imp_%s_%" PRIu32, module, ordinal);
+    }
+
+    if(kind == RD_EXT_EXPORTED)
+        return rd_i_format(v, "__exp_%" PRIu32, ordinal);
+
     return rd_i_format(v, "__imp_%" PRIu32, ordinal);
 }
 
@@ -1365,4 +1350,16 @@ bool rd_operand_as_immediate(RDContext* self, RDAddress address, int index) {
         rd_i_flagsbuffer_undefine_op_over(seg->flags, flag_idx);
 
     return true;
+}
+
+void rd_set_scan_char16(RDContext* self, bool b) { self->scan_char16 = b; }
+
+const char* rd_get_working_dir(const RDContext* self) {
+    return self->working_dir;
+}
+
+const char* rd_get_file_name(const RDContext* self) { return self->file_name; }
+
+const char* rd_str_intern(RDContext* self, const char* s) {
+    return rd_i_strpool_intern(&self->strings, s);
 }

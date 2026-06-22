@@ -6,6 +6,7 @@
 #include "io/buffer.h"
 #include "kb/kb.h"
 #include "listing/listing.h"
+#include "plugins/analyzer.h"
 #include "plugins/processor/processor.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
@@ -23,14 +24,9 @@ typedef struct RDDelaySlotInfo {
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
-    RDLoader* loader;
-    RDProcessor* processor;
+    RDAnalyzerItemVect analyzerplugins;
 
-    struct {
-        RDAnalyzerItem** data;
-        usize length;
-        usize capacity;
-    } analyzerplugins;
+    RDProcessor* processor;
 
     RDStringPool strings;
     RDXRefVect xrefs_from;
@@ -50,8 +46,9 @@ typedef struct RDContext {
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
 
-    char* loader_name;
-    char* filepath;
+    char* working_dir;
+    char* file_name;
+
     RDByteBuffer* input;
     RDReader* input_reader;
     RDReader* reader;
@@ -64,11 +61,10 @@ typedef struct RDContext {
     RDKB* kb;
     RDListing listing;
     RDFunctionVect functions;
-    RDAddressVect exported;
-    RDAddressVect imported;
+    RDExternalVect externals;
     RDHooks* hooks;
 
-    RDTypeDefVect types[RD_TKIND_COUNT];
+    RDTypeDefVect types;
 
     struct {
         RDAddress value;
@@ -98,18 +94,18 @@ static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
     return addr >= seg->base.start_address && addr < seg->base.end_address;
 }
 
-RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin, RDLoader* ldr,
+RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
                                const RDProcessorPlugin* pplugin,
-                               RDByteBuffer* input, const char* filepath,
-                               const char* dbpath);
+                               RDByteBuffer* input, const char* workingdir,
+                               const char* filename, const char* dbpath);
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c);
 bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
                        RDConfidence c);
-bool rd_i_set_imported(RDContext* self, RDAddress address, const char* name,
-                       const RDImported* imp);
+bool rd_i_set_external(RDContext* self, const char* name,
+                       const RDExternal* ext);
 
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c);
@@ -133,10 +129,11 @@ RDFunction* rd_i_find_function(const RDContext* self, RDAddress address);
 
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
-const char* rd_i_get_imported_hint(RDContext* ctx, const char* name,
-                                   RDCharVect* v);
-const char* rd_i_get_imported_ord_hint(RDContext* ctx, const char* module,
-                                       u32 ordinal, RDCharVect* v);
+const char* rd_i_get_external_hint(RDContext* ctx, const char* name,
+                                   RDExternalKind kind, RDCharVect* v);
+const char* rd_i_get_external_ord_hint(RDContext* ctx, const char* module,
+                                       u32 ordinal, RDExternalKind kind,
+                                       RDCharVect* v);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
                       const char* fmt, ...);

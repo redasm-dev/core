@@ -11,12 +11,6 @@
 typedef struct RDFunction RDFunction;
 typedef usize LIndex;
 
-typedef struct RDAddressVect {
-    RDAddress* data;
-    usize length;
-    usize capacity;
-} RDAddressVect;
-
 typedef struct RDSymbolVect {
     RDSymbol* data;
     usize length;

@@ -33,20 +33,32 @@ typedef enum {
     RD_CR_JUMP,
 } RDXRefType;
 
+typedef enum {
+    RD_EXT_NONE = 0,
+    RD_EXT_IMPORTED,
+    RD_EXT_EXPORTED,
+} RDExternalKind;
+
+typedef enum {
+    RD_EXPORT_DB = 0,
+} RDExportFormat;
+
 typedef struct RDProblem {
     RDAddress from_address;
     RDAddress address;
     const char* message;
 } RDProblem;
 
-typedef struct RDImported {
+typedef struct RDExternal {
+    RDExternalKind kind;
+    RDAddress address;
     const char* module;
 
     struct {
         u32 value;
         bool has_value;
     } ordinal;
-} RDImported;
+} RDExternal;
 
 typedef struct RDProblemSlice {
     const RDProblem* data;
@@ -77,6 +89,11 @@ typedef struct RDSymbolSlice {
     usize length;
 } RDSymbolSlice;
 
+typedef struct RDExternalSlice {
+    const RDExternal* data;
+    usize length;
+} RDExternalSlice;
+
 typedef struct RDXRef {
     RDAddress address;
     RDXRefType type;
@@ -95,10 +112,12 @@ typedef struct RDLoadAddressing {
 
 RD_API void rd_destroy(RDContext* self);
 RD_API bool rd_step(RDContext* self, RDWorkerStatus* status);
-RD_API bool rd_is_busy(const RDContext* self);
+RD_API bool rd_export(RDContext* self, const char* filepath, RDExportFormat f);
+RD_API bool rd_project_save(RDContext* self, const char* filepath);
 RD_API void rd_disassemble(RDContext* self);
 RD_API void rd_set_scan_char16(RDContext* self, bool b);
-RD_API const char* rd_get_loader_name(const RDContext* self);
+RD_API const char* rd_get_working_dir(const RDContext* self);
+RD_API const char* rd_get_file_name(const RDContext* self);
 RD_API const char* rd_str_intern(RDContext* self, const char* s);
 RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_decode_n(RDContext* ctx, RDAddress address,
@@ -107,8 +126,8 @@ RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address,
                            RDInstruction* instr);
 RD_API RDProblemSlice rd_get_all_problems(const RDContext* self);
 RD_API RDFunctionSlice rd_get_all_functions(const RDContext* self);
-RD_API RDAddressSlice rd_get_all_exported(const RDContext* self);
-RD_API RDAddressSlice rd_get_all_imported(const RDContext* self);
+RD_API RDExternalSlice rd_get_all_externals(const RDContext* self,
+                                            RDExternalKind kind);
 RD_API RDSymbolSlice rd_get_all_symbols(const RDContext* self);
 RD_API RDSegmentSlice rd_get_all_segments(const RDContext* self);
 RD_API RDInputMappingSlice rd_get_all_mappings(const RDContext* self);
@@ -117,9 +136,7 @@ RD_API void rd_set_min_string(RDContext* self, int l);
 RD_API const RDSegment* rd_find_segment(const RDContext* self, RDAddress addr);
 RD_API const RDFunction* rd_find_function(const RDContext* self,
                                           RDAddress address);
-RD_API RDLoader* rd_get_loader(const RDContext* self);
 RD_API const RDLoaderPlugin* rd_get_loader_plugin(const RDContext* self);
-RD_API RDProcessor* rd_get_processor(const RDContext* self);
 RD_API const RDProcessorPlugin* rd_get_processor_plugin(const RDContext* self);
 RD_API RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self);
 RD_API bool rd_is_address(const RDContext* self, RDAddress address);
@@ -150,14 +167,12 @@ RD_API bool rd_user_function(RDContext* self, RDAddress address,
 RD_API bool rd_get_entry_point(const RDContext* self, RDAddress* address);
 RD_API bool rd_set_entry_point(RDContext* self, RDAddress address,
                                const char* name);
-RD_API bool rd_set_exported(RDContext* self, RDAddress address,
-                            const char* name);
-RD_API bool rd_set_imported(RDContext* self, RDAddress address,
-                            const char* module, const char* name);
-RD_API bool rd_set_imported_ord(RDContext* self, RDAddress address,
-                                const char* module, u32 ord);
-RD_API bool rd_get_imported(RDContext* self, RDAddress address,
-                            RDImported* imp);
+RD_API bool rd_set_external(RDContext* self, RDAddress address,
+                            const char* module, const char* name,
+                            RDExternalKind kind);
+RD_API bool rd_set_external_ord(RDContext* self, RDAddress address,
+                                const char* module, u32 ord,
+                                RDExternalKind kind);
 RD_API void rd_flow(RDContext* self, RDAddress addr);
 RD_API bool rd_has_refs_from(const RDContext* self, RDAddress address);
 RD_API bool rd_has_refs_to(const RDContext* self, RDAddress address);
@@ -221,6 +236,7 @@ RD_API usize rd_write(RDContext* self, RDAddress address, const void* data,
 
 RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
 
-RD_API const char* rd_get_imported_hint(RDContext* ctx, const char* name);
-RD_API const char* rd_get_imported_ord_hint(RDContext* ctx, const char* module,
-                                            u32 ordinal);
+RD_API const char* rd_get_external_hint(RDContext* ctx, const char* name,
+                                        RDExternalKind kind);
+RD_API const char* rd_get_external_ord_hint(RDContext* ctx, const char* module,
+                                            u32 ordinal, RDExternalKind kind);

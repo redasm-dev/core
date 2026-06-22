@@ -1,187 +1,101 @@
 #include "schema.h"
-#include "core/state.h"
-#include "support/containers.h"
-#include "support/logging.h"
-#include <string.h>
+#include "kb/object.h"
+#include "support/tomlschema.h"
 
-static const char* const RD_KB_KIND_VALUES[] = {
+static const char* rd_kb_kind_compound_values[] = {
     "struct",
-    "enum",
-    "function",
+    "union",
     NULL,
 };
 
-static const char* const RD_KB_MOD_VALUES[] = {
+static const char* rd_kb_mod_values[] = {
     "ptr",
     "cptr",
     NULL,
 };
 
-static const RDKBFieldSchema RD_KB_SCHEMA_FUNCTION[] = {
-    {.key = "cc", .kind = RD_KB_STR, .required = false},
-    {.key = "noret", .kind = RD_KB_BOOL, .required = false},
-    {.key = "ret", .kind = RD_KB_STR, .required = true},
-    {.key = "args", .kind = RD_KB_ARRAY, .required = true},
+static const RDTomlSchema RD_KB_SCHEMA_ENUM_PARAM[] = {
+    {.key = "name", .type = TOML_STRING},
+    {.key = "value", .type = TOML_INT64},
+    {0},
 };
 
-static const RDKBFieldSchema RD_KB_SCHEMA_TYPE[] = {
+static const RDTomlSchema RD_KB_SCHEMA_PARAM[] = {
+    {.key = "type", .type = TOML_STRING},
+    {.key = "name", .type = TOML_STRING},
+    {.key = "count", .type = TOML_INT64, .optional = true},
+
+    {
+        .key = "mod",
+        .type = TOML_STRING,
+        .optional = true,
+        .string_values = rd_kb_mod_values,
+    },
+    {0},
+};
+
+static const RDTomlSchema RD_KB_SCHEMA_COMPOUND[] = {
     {
         .key = "kind",
-        .kind = RD_KB_STR,
-        .required = true,
-        .str_values = RD_KB_KIND_VALUES,
+        .type = TOML_STRING,
+        .string_values = rd_kb_kind_compound_values,
     },
-
-    {.key = "members", .kind = RD_KB_ARRAY, .required = true},
+    {.key = "members", .type = TOML_ARRAY, .array_type = RD_KB_SCHEMA_PARAM},
+    {0},
 };
 
-static const RDKBFieldSchema RD_KB_SCHEMA_RET[] = {
-    {.key = "type", .kind = RD_KB_STR, .required = true},
-    {.key = "count", .kind = RD_KB_INT, .required = false},
+static const RDTomlSchema RD_KB_SCHEMA_ENUM[] = {
+    {
+        .key = "base_type",
+        .type = TOML_STRING,
+    },
+    {
+        .key = "members",
+        .type = TOML_ARRAY,
+        .array_type = RD_KB_SCHEMA_ENUM_PARAM,
+    },
+    {0},
+};
+
+static const RDTomlSchema RD_KB_SCHEMA_RET[] = {
+    {.key = "type", .type = TOML_STRING},
+    {.key = "count", .type = TOML_INT64, .optional = true},
 
     {
         .key = "mod",
-        .kind = RD_KB_STR,
-        .required = false,
-        .str_values = RD_KB_MOD_VALUES,
+        .type = TOML_STRING,
+        .optional = true,
+        .string_values = rd_kb_mod_values,
     },
+    {0},
 };
 
-static const RDKBFieldSchema RD_KB_SCHEMA_PARAM[] = {
-    {.key = "type", .kind = RD_KB_STR, .required = true},
-    {.key = "name", .kind = RD_KB_STR, .required = true},
-    {.key = "count", .kind = RD_KB_INT, .required = false},
-
+static const RDTomlSchema RD_KB_SCHEMA_FUNCTION[] = {
+    {.key = "cc", .type = TOML_STRING, .optional = true},
+    {.key = "noret", .type = TOML_BOOLEAN, .optional = true},
     {
-        .key = "mod",
-        .kind = RD_KB_STR,
-        .required = false,
-        .str_values = RD_KB_MOD_VALUES,
+        .key = "ret",
+        .type = TOML_TABLE,
+        .table_type = RD_KB_SCHEMA_RET,
     },
+    {.key = "args", .type = TOML_ARRAY, .array_type = RD_KB_SCHEMA_PARAM},
+    {0},
 };
-
-static const char* _rd_kb_get_str_values(const RDKBFieldSchema* s) {
-    RDCharVect* schema_buf = &rd_i_state.kb_schema_buf;
-    const char* const* str_v = s->str_values;
-    str_clear(schema_buf);
-
-    while(*str_v) {
-        if(str_v > s->str_values) str_append(schema_buf, ", ");
-        str_append(schema_buf, *str_v);
-        str_v++;
-    }
-
-    return rd_i_state.kb_schema_buf.data;
-}
-
-static bool _rd_kb_validate_kind(const RDKBObject* o,
-                                 const RDKBFieldSchema* s) {
-    assert(o);
-    RDKBObjectKind t = rd_kbobject_get_kind(o);
-    if(t == s->kind) return true;
-
-    const char* got_kind = rd_i_kb_schema_kind_str(t);
-    const char* expected_kind = rd_i_kb_schema_kind_str(s->kind);
-
-    LOG_FAIL("expected kind '%s', got '%s' for key '%s'", expected_kind,
-             got_kind, s->key);
-
-    return true;
-}
-
-static bool _rd_kb_validate_str_values(const char* v,
-                                       const RDKBFieldSchema* s) {
-    assert(v);
-    assert(s->str_values);
-
-    const char* const* str_v = s->str_values;
-    bool found = false;
-
-    while(*str_v) {
-        if(!strcmp(v, *str_v)) {
-            found = true;
-            break;
-        }
-
-        str_v++;
-    }
-
-    if(!found) {
-        LOG_FAIL("value '%s' is not valid, possible values are %s", v,
-                 _rd_kb_get_str_values(s));
-    }
-
-    return found;
-}
-
-static bool _rd_kb_validate_schema(const RDKBObject* obj,
-                                   const RDKBFieldSchema* schema, usize n) {
-    RDKBObjectKind k = rd_kbobject_get_kind(obj);
-
-    if(k != RD_KB_TABLE) {
-        LOG_FAIL("cannot validate object of type '%s', only table allowed",
-                 rd_i_kb_schema_kind_str(k));
-        return false;
-    }
-
-    for(usize i = 0; i < n; i++) {
-        const RDKBFieldSchema* s = &schema[i];
-        const RDKBObject* o = rd_kbobject_get(obj, s->key);
-
-        if(!o) {
-            if(s->required) {
-                LOG_FAIL("missing required field '%s'", s->key);
-                return false;
-            }
-
-            return true;
-        }
-
-        if(!_rd_kb_validate_kind(o, s)) return false;
-
-        if(rd_kbobject_get_kind(o) == RD_KB_STR && s->str_values) {
-            const char* v = rd_kbobject_to_str(o);
-            if(!_rd_kb_validate_str_values(v, s)) return false;
-        }
-    }
-
-    return true;
-}
-
-const char* rd_i_kb_schema_kind_str(RDKBObjectKind kind) {
-    switch(kind) {
-        case RD_KB_STR: return "STR";
-        case RD_KB_INT: return "INT";
-        case RD_KB_FLOAT: return "FLOAT";
-        case RD_KB_BOOL: return "BOOL";
-        case RD_KB_DATE: return "DATE";
-        case RD_KB_TIME: return "TIME";
-        case RD_KB_DATETIME: return "DATETIME";
-        case RD_KB_ARRAY: return "ARRAY";
-        case RD_KB_TABLE: return "TABLE";
-
-        default: break;
-    }
-
-    return "UNKNOWN";
-}
 
 bool rd_i_kb_validate_function(const RDKBObject* obj) {
-    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_FUNCTION,
-                                  rd_count_of(RD_KB_SCHEMA_FUNCTION));
+    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+    assert(d);
+    return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_FUNCTION);
 }
 
-bool rd_i_kb_validate_type(const RDKBObject* obj) {
-    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_TYPE,
-                                  rd_count_of(RD_KB_SCHEMA_TYPE));
+bool rd_i_kb_validate_compound(const RDKBObject* obj) {
+    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+    assert(d);
+    return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_COMPOUND);
 }
 
-bool rd_i_kb_validate_param(const RDKBObject* obj) {
-    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_PARAM,
-                                  rd_count_of(RD_KB_SCHEMA_PARAM));
-}
-
-bool rd_i_kb_validate_ret(const RDKBObject* obj) {
-    return _rd_kb_validate_schema(obj, RD_KB_SCHEMA_RET,
-                                  rd_count_of(RD_KB_SCHEMA_RET));
+bool rd_i_kb_validate_enum(const RDKBObject* obj) {
+    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+    assert(d);
+    return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_ENUM);
 }

@@ -79,7 +79,7 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
 
 static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
                                   RDCharVect* fmt_buf) {
-    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDSegmentFull** it;
     vect_each(it, segments) {
@@ -120,7 +120,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
 
 static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
                                     RDCharVect* fmt_buf) {
-    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDSegmentFull** it;
     vect_each(it, segments) {

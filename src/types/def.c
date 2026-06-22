@@ -37,20 +37,6 @@ static bool _rd_typedef_enum_in_range(const char* type, i64 val) {
     return false;
 }
 
-static RDTypeDef* _rd_typedef_create(RDContext* ctx, const char* name,
-                                     RDTypeKind kind) {
-    if(!name) return NULL;
-
-    RDTypeDef* self = rd_alloc(sizeof(*self));
-
-    *self = (RDTypeDef){
-        .name = rd_i_strpool_intern(&ctx->strings, name),
-        .kind = kind,
-    };
-
-    return self;
-}
-
 static const char* _rd_typedef_kind_str(RDTypeKind kind) {
     switch(kind) {
         case RD_TKIND_PRIM: return "primitive";
@@ -64,21 +50,37 @@ static const char* _rd_typedef_kind_str(RDTypeKind kind) {
     return "???";
 }
 
+static RDTypeDef* _rd_typedef_create(const char* name, RDTypeKind kind,
+                                     RDContext* ctx) {
+    assert(kind < RD_TKIND_COUNT);
+
+    if(!name) return NULL;
+
+    RDTypeDef* self = rd_alloc(sizeof(*self));
+
+    *self = (RDTypeDef){
+        .name = rd_i_strpool_intern(&ctx->strings, name),
+        .kind = kind,
+    };
+
+    return self;
+}
+
 RDTypeDef* rd_typedef_create_func(const char* name, RDContext* ctx) {
-    return _rd_typedef_create(ctx, name, RD_TKIND_FUNC);
+    return _rd_typedef_create(name, RD_TKIND_FUNC, ctx);
 }
 
 RDTypeDef* rd_typedef_create_struct(const char* name, RDContext* ctx) {
-    return _rd_typedef_create(ctx, name, RD_TKIND_STRUCT);
+    return _rd_typedef_create(name, RD_TKIND_STRUCT, ctx);
 }
 
 RDTypeDef* rd_typedef_create_union(const char* name, RDContext* ctx) {
-    return _rd_typedef_create(ctx, name, RD_TKIND_UNION);
+    return _rd_typedef_create(name, RD_TKIND_UNION, ctx);
 }
 
 RDTypeDef* rd_typedef_create_enum(const char* name, const char* type,
                                   RDContext* ctx) {
-    RDTypeDef* self = _rd_typedef_create(ctx, name, RD_TKIND_ENUM);
+    RDTypeDef* self = _rd_typedef_create(name, RD_TKIND_ENUM, ctx);
     self->enum_.base_type = rd_i_strpool_intern(&ctx->strings, type);
     return self;
 }
@@ -168,11 +170,9 @@ bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
 }
 
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
-    for(usize i = 0; i < rd_count_of(ctx->types); i++) {
-        RDTypeDef** it;
-        vect_each(it, &ctx->types[i]) {
-            if(strcmp((*it)->name, name) == 0) return *it;
-        }
+    RDTypeDef** it;
+    vect_each(it, &ctx->types) {
+        if(strcmp((*it)->name, name) == 0) return *it;
     }
 
     return NULL;
@@ -262,13 +262,14 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     else if(self->kind != RD_TKIND_PRIM)
         unreachable();
 
-    rd_i_db_set_type_def(ctx, self);
-    vect_push(&ctx->types[self->kind], self);
+    vect_push(&ctx->types, self);
 
     if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
         rd_i_kb_add_noret(ctx, self->name);
 
     if(self->kind != RD_TKIND_PRIM) {
+        rd_i_db_set_type_def(ctx, self); // don't save primitives in DB
+
         LOG_INFO("%s definition '%s' registered",
                  _rd_typedef_kind_str(self->kind), self->name);
     }

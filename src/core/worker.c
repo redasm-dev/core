@@ -1,3 +1,4 @@
+#include "worker.h"
 #include "core/autorename.h"
 #include "core/context.h"
 #include "core/engine.h"
@@ -9,23 +10,6 @@
 #include "support/logging.h"
 
 // clang-format off
-typedef enum {
-    RD_WS_INIT = 0,
-
-    // 1st pass
-    RD_WS_EMULATE1, RD_WS_ANALYZE1, 
-    RD_WS_MERGEDATA1, 
-
-    // 2nd pass
-    RD_WS_EMULATE2, RD_WS_ANALYZE2, 
-    RD_WS_MERGEDATA2, 
-
-    // Finalize pass
-    RD_WS_FINALIZE, RD_WS_DONE, 
-
-    RD_WS_COUNT, 
-} RDWorkerSteps;
-
 static const char* const RD_STEP_NAMES[] = {
     "Init",
     "Emulate #1", "Analyze #1", 
@@ -86,9 +70,9 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
 
     // integrate with KB, if available
     RDTypeDef** it;
-    vect_each(it, &ctx->types[RD_TKIND_FUNC]) {
+    vect_each(it, &ctx->types) {
         const RDTypeDef* tdef = *it;
-        if(!tdef->func_.is_noret) continue;
+        if(tdef->kind != RD_TKIND_FUNC || !tdef->func_.is_noret) continue;
 
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
@@ -124,15 +108,21 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
 }
 
 static void _rd_worker_resolve_ordinals(RDContext* ctx) {
-    const RDAddress* it;
-    vect_each(it, &ctx->imported) {
-        RDImported imp;
-        if(!rd_get_imported(ctx, *it, &imp) || !imp.ordinal.has_value) continue;
+    RDExternalVect v = {0};
+    rd_i_db_get_externals(ctx, RD_EXT_NONE, &v);
+
+    RDExternal* ext;
+    vect_each(ext, &v) {
+        if(!ext->ordinal.has_value) continue;
 
         const char* name =
-            rd_i_kb_find_ordinal_name(ctx, imp.module, imp.ordinal.value);
-        if(name) rd_set_imported(ctx, *it, imp.module, name);
+            rd_i_kb_find_ordinal_name(ctx, ext->module, ext->ordinal.value);
+        if(!name) continue;
+
+        rd_i_set_external(ctx, name, ext);
     }
+
+    vect_destroy(&v);
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
@@ -203,16 +193,12 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 
-    rd_i_db_flush(ctx);
+    rd_i_db_save(ctx);
 
     // post-analysis summary
     LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
              vect_length(&ctx->functions), vect_length(&ctx->listing.symbols),
              vect_length(&ctx->problems));
-}
-
-bool rd_is_busy(const RDContext* self) {
-    return self->engine.step < RD_WS_DONE || rd_i_engine_has_pending_code(self);
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {
@@ -253,14 +239,4 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 void rd_disassemble(RDContext* ctx) {
     while(rd_step(ctx, NULL))
         ;
-}
-
-void rd_set_scan_char16(RDContext* self, bool b) { self->scan_char16 = b; }
-
-const char* rd_get_loader_name(const RDContext* self) {
-    return self->loader_name;
-}
-
-const char* rd_str_intern(RDContext* self, const char* s) {
-    return rd_i_strpool_intern(&self->strings, s);
 }

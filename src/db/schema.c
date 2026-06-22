@@ -5,37 +5,25 @@ PRAGMA synchronous = OFF; \
 PRAGMA journal_mode = MEMORY; \
 PRAGMA foreign_keys = ON; \
 \
-CREATE TABLE Info ( \
-    key TEXT PRIMARY KEY, \
-    str_val TEXT, \
-    int_val INTEGER, \
-    CHECK((str_val IS NULL) != (int_val IS NULL)) \
-); \
-\
-CREATE TABLE UserData ( \
-    k TEXT PRIMARY KEY,  \
-    v INTEGER NOT NULL \
-); \
-\
-CREATE TABLE Segments ( \
+CREATE TABLE IF NOT EXISTS Segments ( \
     name          TEXT NOT NULL, \
     start_address INTEGER NOT NULL, \
     end_address   INTEGER NOT NULL, \
     unit          INTEGER NOT NULL, \
     perm          INTEGER NOT NULL \
 ); \
-CREATE TABLE InputMappings ( \
+CREATE TABLE IF NOT EXISTS InputMappings ( \
     offset        INTEGER NOT NULL, \
     start_address INTEGER NOT NULL, \
     end_address   INTEGER NOT NULL \
 ); \
 \
-CREATE TABLE Comments ( \
+CREATE TABLE IF NOT EXISTS Comments ( \
     address INTEGER PRIMARY KEY, \
     comment TEXT NOT NULL \
 ); \
 \
-CREATE TABLE XRefs ( \
+CREATE TABLE IF NOT EXISTS XRefs ( \
     from_address INTEGER NOT NULL, \
     to_address   INTEGER NOT NULL, \
     type         INTEGER NOT NULL, \
@@ -43,7 +31,7 @@ CREATE TABLE XRefs ( \
     UNIQUE(from_address, to_address) \
 ); \
 \
-CREATE TABLE TypeDefs( \
+CREATE TABLE IF NOT EXISTS TypeDefs( \
     name      TEXT PRIMARY KEY, \
     kind      INTEGER NOT NULL, \
     size      INTEGER NOT NULL, \
@@ -51,7 +39,7 @@ CREATE TABLE TypeDefs( \
     enum_type TEXT \
 ); \
 \
-CREATE TABLE TypeParams ( \
+CREATE TABLE IF NOT EXISTS TypeParams ( \
     owner      TEXT NOT NULL REFERENCES TypeDefs(name), \
     type       TEXT NOT NULL, \
     name       TEXT NOT NULL, \
@@ -61,14 +49,14 @@ CREATE TABLE TypeParams ( \
     PRIMARY KEY(owner, member_idx) \
 ); \
 \
-CREATE TABLE TypeEnum ( \
+CREATE TABLE IF NOT EXISTS TypeEnum ( \
     owner TEXT NOT NULL REFERENCES TypeDefs(name), \
     name  TEXT NOT NULL, \
     value INTEGER NOT NULL, \
     PRIMARY KEY(owner, name) \
 ); \
 \
-CREATE TABLE Types ( \
+CREATE TABLE IF NOT EXISTS Types ( \
     address    INTEGER PRIMARY KEY, \
     name       TEXT NOT NULL, \
     count      INTEGER NOT NULL, \
@@ -76,31 +64,35 @@ CREATE TABLE Types ( \
     confidence INTEGER NOT NULL \
 ); \
 \
-CREATE TABLE Names ( \
+CREATE TABLE IF NOT EXISTS Names ( \
     address    INTEGER PRIMARY KEY, \
     name       TEXT NOT NULL, \
     confidence INTEGER NOT NULL \
 ); \
-CREATE TABLE Imported ( \
+CREATE TABLE IF NOT EXISTS Externals ( \
     address INTEGER PRIMARY KEY, \
     ordinal INTEGER, \
-    module  TEXT \
+    module  TEXT, \
+    kind    INTEGER NOT NULL \
+); \
+CREATE TABLE IF NOT EXISTS Functions ( \
+    address INTEGER PRIMARY KEY \
 ); \
 \
-CREATE TABLE SegmentRegisters ( \
+CREATE TABLE IF NOT EXISTS SegmentRegisters ( \
     address  INTEGER NOT NULL, \
     reg      TEXT NOT NULL, \
     value    INTEGER, \
     confidence INTEGER NOT NULL, \
     PRIMARY KEY(address, reg) \
 ); \
-CREATE TABLE OperandOverrides ( \
+CREATE TABLE IF NOT EXISTS OperandOverrides ( \
     address  INTEGER NOT NULL, \
     idx      INTEGER NOT NULL, \
     PRIMARY KEY (address, idx) \
 ); \
 \
-CREATE TABLE Problems ( \
+CREATE TABLE IF NOT EXISTS Problems ( \
     from_address INTEGER NOT NULL, \
     address      INTEGER NOT NULL, \
     message      TEXT NOT NULL \
