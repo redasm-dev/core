@@ -66,7 +66,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
 static void _rd_project_manifest_destroy(RDProjectManifest* m) {
     rd_i_analyzeritemvect_destroy(&m->analyzers);
     toml_free(m->toml);
-    mz_free(m->raw);
+    rd_free(m->raw);
 }
 
 static void _rd_project_paths_destroy(RDProjectPaths* p) {
@@ -116,18 +116,23 @@ static bool _rd_project_resolve_paths(const char* filepath,
 static bool _rd_project_read_manifest(mz_zip_archive* zip,
                                       RDProjectManifest* out) {
     size_t n = 0;
-    out->raw = (char*)mz_zip_reader_extract_file_to_heap(
+    char* manifest_buf = (char*)mz_zip_reader_extract_file_to_heap(
         zip, RD_PROJECT_MANIFEST, &n, 0);
 
-    if(!out->raw || !n) {
+    if(!manifest_buf || !n) {
         LOG_FAIL("project manifest not found");
         return false;
     }
 
+    // tomlc17 seems to ignore length and wants a null terminator
+    out->raw = rd_alloc0(n + 1, sizeof(char));
+    memcpy(out->raw, manifest_buf, n);
+    mz_free(manifest_buf);
+
     out->toml = toml_parse(out->raw, (int)n);
 
     if(!out->toml.ok) {
-        LOG_FAIL("invalid project manifest");
+        LOG_FAIL("invalid project manifest: %s", out->toml.errmsg);
         return false;
     }
 
