@@ -21,6 +21,17 @@ typedef struct RDDelaySlotInfo {
     u8 n;
 } RDDelaySlotInfo;
 
+typedef struct RDPendingRename {
+    RDAddress address;
+    RDName name;
+} RDPendingRename;
+
+typedef struct RDPendingRenameVect {
+    RDPendingRename* data;
+    usize length;
+    usize capacity;
+} RDPendingRenameVect;
+
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
@@ -40,7 +51,6 @@ typedef struct RDContext {
     RDCharVect problem_buf;
     RDCharVect tdef_buf;
     RDCharVect type_buf;
-    RDCharVect imp_hint_buf;
     RDCharVect seg_buf;
     RDFunctionChunkVect chunk_buf;
     RDOvrOperandVect ovr_ops_buf;
@@ -64,7 +74,8 @@ typedef struct RDContext {
     RDExternalVect externals;
     RDHooks* hooks;
 
-    RDTypeDefVect types;
+    RDTypeDefVect typedefs;
+    RDPendingRenameVect pending_renames;
 
     struct {
         RDAddress value;
@@ -104,13 +115,12 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c);
 bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
                        RDConfidence c);
-bool rd_i_set_external(RDContext* self, const char* name,
-                       const RDExternal* ext);
-
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c);
 bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c);
+
+bool rd_i_set_external(RDContext* self, const RDExternal* ext);
 
 bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c);
 bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
@@ -128,12 +138,6 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
 RDFunction* rd_i_find_function(const RDContext* self, RDAddress address);
 
 bool rd_i_set_noret(RDContext* self, RDAddress address);
-
-const char* rd_i_get_external_hint(RDContext* ctx, const char* name,
-                                   RDExternalKind kind, RDCharVect* v);
-const char* rd_i_get_external_ord_hint(RDContext* ctx, const char* module,
-                                       u32 ordinal, RDExternalKind kind,
-                                       RDCharVect* v);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
                       const char* fmt, ...);

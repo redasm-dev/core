@@ -7,7 +7,7 @@
 
 #define RD_AUTORENAME_DEPTH 8
 
-static void _rd_autorename_trampoline(RDContext* ctx, const RDFunction* f,
+static void _rd_autorename_trampoline(RDContext* ctx, RDFunction* f,
                                       RDAddress target, RDCharVect* namebuf) {
     RDName n;
     RDInstruction instr;
@@ -18,11 +18,17 @@ static void _rd_autorename_trampoline(RDContext* ctx, const RDFunction* f,
             const RDSegmentFull* seg = rd_i_db_find_segment(ctx, target);
             assert(seg);
 
+            const RDTypeDef* tdef = rd_i_typedef_find(ctx, n.value);
+            if(tdef && tdef->kind == RD_TKIND_FUNC)
+                rd_i_function_set_type_def(f, tdef);
+
             usize idx = rd_i_address2index(seg, target);
             const char* name = NULL;
 
             if(rd_flagsbuffer_has_imported(seg->flags, idx))
-                name = rd_i_strip_prefix(n.value);
+                name = rd_i_format(namebuf, "imp_%s", n.value);
+            else if(rd_flagsbuffer_has_exported(seg->flags, idx))
+                name = rd_i_format(namebuf, "exp_%s", n.value);
             else
                 name = rd_i_format(namebuf, "j_%s", n.value);
 

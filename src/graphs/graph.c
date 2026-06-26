@@ -440,7 +440,7 @@ const char* rd_graph_generate_dot(const RDGraph* self, RDGraphPropCallback cb,
         str_append(buf, ";\n");
     }
 
-    if(!vect_is_empty(&self->nodes)) str_push(buf, '\n');
+    if(!vect_is_empty(&self->edges)) str_push(buf, '\n');
 
     vect_each(n, &self->nodes) {
         const RDEdgeVect* edges = rd_i_graph_get_outgoing_edges(self, *n);

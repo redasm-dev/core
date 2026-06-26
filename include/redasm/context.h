@@ -167,9 +167,12 @@ RD_API bool rd_user_function(RDContext* self, RDAddress address,
 RD_API bool rd_get_entry_point(const RDContext* self, RDAddress* address);
 RD_API bool rd_set_entry_point(RDContext* self, RDAddress address,
                                const char* name);
+RD_API bool rd_get_external(RDContext* self, RDAddress address,
+                            RDExternal* ext);
+RD_API bool rd_get_external_ord(RDContext* self, const char* module, u32 ord,
+                                RDExternalKind kind, RDExternal* ext);
 RD_API bool rd_set_external(RDContext* self, RDAddress address,
-                            const char* module, const char* name,
-                            RDExternalKind kind);
+                            const char* module, RDExternalKind kind);
 RD_API bool rd_set_external_ord(RDContext* self, RDAddress address,
                                 const char* module, u32 ord,
                                 RDExternalKind kind);
@@ -235,8 +238,3 @@ RD_API usize rd_write(RDContext* self, RDAddress address, const void* data,
                       usize n);
 
 RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
-
-RD_API const char* rd_get_external_hint(RDContext* ctx, const char* name,
-                                        RDExternalKind kind);
-RD_API const char* rd_get_external_ord_hint(RDContext* ctx, const char* module,
-                                            u32 ordinal, RDExternalKind kind);

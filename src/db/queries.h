@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/function.h"
 #include "core/segment.h"
 #include "db/types.h"
 #include "types/def.h"
@@ -31,7 +32,7 @@ enum {
     RD_QUERY_SET_TYPE_DEF,
     RD_QUERY_SET_TYPE_DEF_PARAMS,
     RD_QUERY_SET_TYPE_ENUM,
-    RD_QUERY_GET_ALL_TYPE_DEF,
+    RD_QUERY_GET_ALL_TYPE_DEFS,
     RD_QUERY_GET_ALL_TYPE_PARAM,
     RD_QUERY_GET_TYPE_ENUM,
 
@@ -41,6 +42,7 @@ enum {
     RD_QUERY_GET_ALL_TYPES,
 
     RD_QUERY_ADD_FUNCTION,
+    RD_QUERY_GET_ALL_FUNCTIONS,
 
     RD_QUERY_ADD_SEGMENT,
     RD_QUERY_GET_ALL_SEGMENTS,
@@ -49,6 +51,8 @@ enum {
     RD_QUERY_GET_ALL_MAPPINGS,
 
     RD_QUERY_SET_EXTERNAL,
+    RD_QUERY_GET_EXTERNAL,
+    RD_QUERY_GET_EXTERNAL_ORD,
     RD_QUERY_GET_ALL_EXTERNALS,
 
     RD_QUERY_SET_SREGVAL,
@@ -76,6 +80,11 @@ RDMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
                                                RDMappingVect* v);
 
 void _rd_i_db_query_set_external(RDContext* ctx, const RDExternal* ext);
+bool _rd_i_db_query_get_external(RDContext* ctx, RDAddress address,
+                                 RDExternal* ext);
+bool _rd_i_db_query_get_external_ord(RDContext* ctx, const char* module,
+                                     u32 ord, RDExternalKind kind,
+                                     RDExternal* ext);
 RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
                                                  RDExternalKind kind,
                                                  RDExternalVect* v);
@@ -114,10 +123,12 @@ RDTypeFullVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
                                              RDTypeFullVect* v);
 
 void _rd_i_db_query_add_function(RDContext* ctx, const RDFunction* f);
+RDFunctionVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
+                                                 RDFunctionVect* v);
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
-RDTypeDefVect* _rd_i_db_query_get_all_type_def(RDContext* ctx,
-                                               RDTypeDefVect* v);
+RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
+                                                RDTypeDefVect* v);
 
 const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address);
 void _rd_i_db_query_set_comment(RDContext* ctx, RDAddress address,

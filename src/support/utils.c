@@ -124,9 +124,7 @@ const char* rd_i_strip_prefix(const char* s) {
 
     const char* res = NULL;
 
-    if(strstr(s, "__imp_") == s)
-        res = s + sizeof("__imp_") - 1;
-    else if(strstr(s, "loc_") == s)
+    if(strstr(s, "loc_") == s)
         res = s + sizeof("loc_") - 1;
     else if(strstr(s, "sub_") == s)
         res = s + sizeof("sub_") - 1;

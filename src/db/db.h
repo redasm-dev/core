@@ -27,6 +27,7 @@ void rd_i_db_begin(RDContext* ctx);
 void rd_i_db_commit(RDContext* ctx);
 void rd_i_db_rollback(RDContext* ctx);
 void rd_i_db_save(RDContext* ctx);
+void rd_i_db_load_segments(RDContext* ctx);
 void rd_i_db_load(RDContext* ctx);
 bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
@@ -39,8 +40,12 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m);
 const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx);
 
 void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp);
-RDExternalVect* rd_i_db_get_externals(RDContext* ctx, RDExternalKind kind,
-                                      RDExternalVect* v);
+bool rd_i_db_get_external(RDContext* ctx, RDAddress address, RDExternal* ext);
+bool rd_i_db_get_external_ord(RDContext* ctx, const char* module, u32 ord,
+                              RDExternalKind kind, RDExternal* ext);
+
+RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
+                                          RDExternalVect* v);
 
 void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType t, RDConfidence c);

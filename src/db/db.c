@@ -122,10 +122,14 @@ void rd_i_db_save(RDContext* ctx) {
     rd_i_db_commit(ctx);
 }
 
-void rd_i_db_load(RDContext* ctx) {
+void rd_i_db_load_segments(RDContext* ctx) {
     _rd_i_db_query_get_all_segments(ctx, &ctx->db->segments);
     _rd_i_db_query_get_all_mappings(ctx, &ctx->db->mappings);
-    _rd_i_db_query_get_all_type_def(ctx, &ctx->types);
+}
+
+void rd_i_db_load(RDContext* ctx) {
+    _rd_i_db_query_get_all_type_defs(ctx, &ctx->typedefs);
+    _rd_i_db_query_get_all_functions(ctx, &ctx->functions);
     _rd_i_db_query_get_all_sregval(ctx, &ctx->db->segment_regs,
                                    &ctx->db->segment_reg_names);
 }
@@ -277,8 +281,17 @@ void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp) {
     _rd_i_db_query_set_external(ctx, exp);
 }
 
-RDExternalVect* rd_i_db_get_externals(RDContext* ctx, RDExternalKind kind,
-                                      RDExternalVect* v) {
+bool rd_i_db_get_external(RDContext* ctx, RDAddress address, RDExternal* ext) {
+    return _rd_i_db_query_get_external(ctx, address, ext);
+}
+
+bool rd_i_db_get_external_ord(RDContext* ctx, const char* module, u32 ord,
+                              RDExternalKind kind, RDExternal* ext) {
+    return _rd_i_db_query_get_external_ord(ctx, module, ord, kind, ext);
+}
+
+RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
+                                          RDExternalVect* v) {
     return _rd_i_db_query_get_all_externals(ctx, kind, v);
 }
 

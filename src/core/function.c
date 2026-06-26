@@ -4,7 +4,6 @@
 #include "io/flags.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include <inttypes.h>
 #include <redasm/allocator.h>
 #include <redasm/function.h>
@@ -43,8 +42,9 @@ static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
     const RDFunctionChunk* c = (const RDFunctionChunk*)rd_graph_get_data(g, n);
     assert(c);
 
-    return rd_i_format(&self->fmt_buf, "[label=\"0x%" PRIx64 " (%zu)\"]",
-                       c->start, c->n_instructions);
+    return rd_i_format(&self->fmt_buf,
+                       "[label=\"0x%" PRIx64 " (%zu)\", noret = %s]", c->start,
+                       c->n_instructions, c->has_noret ? "true" : "false");
 }
 
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
@@ -76,8 +76,8 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
     return n;
 }
 
-static void _rd_function_rebuild_graph(RDFunction* self,
-                                       RDFunctionChunkVect* chunks) {
+void rd_i_function_rebuild_graph(RDFunction* self,
+                                 RDFunctionChunkVect* chunks) {
     RDContext* ctx = self->context;
     RDGraph* g = rd_graph_create();
     RDFunctionWorkVect w = {0};
@@ -291,7 +291,15 @@ void rd_i_function_destroy(RDFunction* self) {
     rd_free(self);
 }
 
+void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef) {
+    assert(tdef);
+    assert(tdef->kind == RD_TKIND_FUNC);
+    self->type_def = tdef;
+}
+
 bool rd_function_is_noret(const RDFunction* self) {
+    if(self->type_def && self->type_def->func_.is_noret) return true;
+
     if(!self->n_norets) return false;
 
     const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);
@@ -381,45 +389,15 @@ bool rd_function_contains_address(const RDFunction* self, RDAddress address) {
     return false;
 }
 
-void rd_i_rebuild_all_functions(RDContext* ctx) {
-    LOG_INFO("generating functions...");
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+void rd_i_function_rebuild(RDFunction* self) {
+    RDFunctionChunkVect* chunks = &self->context->functions.chunks;
+    RDFunctionChunkVect* tmp_chunks = &self->context->chunk_buf;
 
-    RDFunctionVect functions = {0};
-    vect_reserve(&functions, vect_capacity(&ctx->functions));
-    vect_reserve(&functions.chunks, vect_capacity(&ctx->functions.chunks));
-
-    RDSegmentFull** it;
-    vect_each(it, segments) {
-        const RDSegmentFull* s = *it;
-        if(!(s->base.perm & RD_SP_X)) continue;
-
-        RDAddress address = s->base.start_address;
-
-        for(usize i = 0; i < rd_flagsbuffer_get_length(s->flags);
-            i++, address++) {
-            if(!rd_flagsbuffer_has_func(s->flags, i)) continue;
-
-            RDFunction* f = rd_i_function_create(ctx, address);
-            _rd_function_rebuild_graph(f, &functions.chunks);
-            vect_push(&functions, f);
-        }
-    }
-
-    rd_i_functionchunk_sort(&functions.chunks);
-    mem_swap(RDFunctionVect, &functions, &ctx->functions);
-    rd_i_functionvect_destroy(&functions);
-}
-
-void rd_i_rebuild_function(RDFunction* f) {
-    RDFunctionChunkVect* chunks = &f->context->functions.chunks;
-    RDFunctionChunkVect* tmp_chunks = &f->context->chunk_buf;
-
-    if(f->graph && !rd_graph_is_empty(f->graph))
-        vect_del_if(chunks, &f->address, _rd_functionchunks_del_if_pred);
+    if(self->graph && !rd_graph_is_empty(self->graph))
+        vect_del_if(chunks, &self->address, _rd_functionchunks_del_if_pred);
 
     assert(vect_is_empty(tmp_chunks));
-    _rd_function_rebuild_graph(f, tmp_chunks);
+    rd_i_function_rebuild_graph(self, tmp_chunks);
 
     RDFunctionChunk** it;
     vect_each(it, tmp_chunks) {

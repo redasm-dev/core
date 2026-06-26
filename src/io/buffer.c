@@ -56,6 +56,7 @@ bool rd_i_buffer_is_empty(const RDBuffer* self) { return self->length == 0; }
 usize rd_i_buffer_get_length(const RDBuffer* self) { return self->length; }
 
 const char* rd_i_buffer_read_str(RDBuffer* self, usize idx, usize* len) {
+    if(len) *len = 0;
     if(idx >= self->length) return NULL;
 
     vect_clear(&self->str_buf);

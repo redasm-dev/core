@@ -1,9 +1,11 @@
 #pragma once
 
 #include "support/utils.h"
+#include "types/def.h"
 #include <redasm/function.h>
 
 typedef struct RDFunction {
+    const RDTypeDef* type_def;
     RDContext* context;
     RDAddress address;
     usize n_instructions;
@@ -28,6 +30,9 @@ typedef struct RDFunctionVect {
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_destroy(RDFunction* self);
+void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef);
+void rd_i_function_rebuild(RDFunction* self);
+void rd_i_function_rebuild_graph(RDFunction* self, RDFunctionChunkVect* chunks);
 usize rd_i_function_get_terminal_count(const RDFunction* self);
 const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx);
 RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);
@@ -35,8 +40,6 @@ RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);
 void rd_i_functionchunk_sort(RDFunctionChunkVect* self);
 void rd_i_functionchunk_destroy(RDFunctionChunkVect* self);
 
-void rd_i_rebuild_all_functions(RDContext* ctx);
-void rd_i_rebuild_function(RDFunction* f);
 void rd_i_functionvect_destroy(RDFunctionVect* self);
 
 int rd_i_functionchunk_kcmp_pred(const void* key, const void* item);

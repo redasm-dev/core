@@ -13,7 +13,8 @@
 
 static bool _rd_is_char_skippable(const RDCell* c) {
     if(c->cp > 0x7f) return true; // non-ASCII, always skippable
-    if(c->cp == '_' || c->cp == '@' || c->cp == '.') return false;
+    if(c->cp == '_' || c->cp == '@' || c->cp == '.' || c->cp == '#')
+        return false;
     return isspace((int)c->cp) || ispunct((int)c->cp);
 }
 

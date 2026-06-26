@@ -236,7 +236,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
     if(!ctx) return NULL;
 
-    rd_i_db_load(ctx);
+    rd_i_db_load_segments(ctx);
 
     RDCharVect buf = {0};
 
@@ -268,8 +268,8 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
     ctx->entry_point.value = manifest->entry_point.value;
     mem_swap(RDAnalyzerItemVect, &ctx->analyzerplugins, &manifest->analyzers);
 
-    rd_i_rebuild_all_functions(ctx);
     ctx->engine.step = RD_WS_DONE;
+    rd_i_db_load(ctx);
     rd_i_listing_build(ctx);
 
     return ctx;

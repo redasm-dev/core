@@ -32,6 +32,36 @@ static int _rd_worker_problem_cmp(const void* a, const void* b) {
     return 0;
 }
 
+static void _rd_worker_rebuild_functions(RDContext* ctx) {
+    LOG_INFO("generating functions");
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+
+    RDFunctionVect functions = {0};
+    vect_reserve(&functions, vect_capacity(&ctx->functions));
+    vect_reserve(&functions.chunks, vect_capacity(&ctx->functions.chunks));
+
+    RDSegmentFull** it;
+    vect_each(it, segments) {
+        const RDSegmentFull* s = *it;
+        if(!(s->base.perm & RD_SP_X)) continue;
+
+        RDAddress address = s->base.start_address;
+
+        for(usize i = 0; i < rd_flagsbuffer_get_length(s->flags);
+            i++, address++) {
+            if(!rd_flagsbuffer_has_func(s->flags, i)) continue;
+
+            RDFunction* f = rd_i_function_create(ctx, address);
+            rd_i_function_rebuild_graph(f, &functions.chunks);
+            vect_push(&functions, f);
+        }
+    }
+
+    rd_i_functionchunk_sort(&functions.chunks);
+    mem_swap(RDFunctionVect, &functions, &ctx->functions);
+    rd_i_functionvect_destroy(&functions);
+}
+
 static void _rd_worker_follow_pointers(RDContext* ctx) {
     LOG_INFO("following pointers");
 
@@ -56,6 +86,20 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     vect_destroy(&addresses);
 }
 
+static void _rd_worker_apply_function_types(RDContext* ctx) {
+    RDTypeDef** it;
+    vect_each(it, &ctx->typedefs) {
+        const RDTypeDef* tdef = *it;
+        if(tdef->kind != RD_TKIND_FUNC) continue;
+
+        RDAddress address;
+        if(!rd_get_address(ctx, tdef->name, &address)) continue;
+
+        RDFunction* f = rd_i_find_function(ctx, address);
+        if(f) rd_i_function_set_type_def(f, tdef);
+    }
+}
+
 static void _rd_worker_apply_noret(RDContext* ctx) {
     RDXRefVect xrefs = {0};
     RDAddressVect v = {0};
@@ -66,27 +110,14 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
         vect_push(&v, (*func_it)->address);
     }
 
-    // integrate with KB, if available
-    RDTypeDef** it;
-    vect_each(it, &ctx->types) {
-        const RDTypeDef* tdef = *it;
-        if(tdef->kind != RD_TKIND_FUNC || !tdef->func_.is_noret) continue;
-
-        RDAddress address;
-        if(!rd_get_address(ctx, tdef->name, &address)) continue;
-
-        usize idx = vect_lower_bound(&v, &address, rd_i_address_kcmp_pred);
-        if(idx < vect_length(&v) && *vect_at(&v, idx) == address) continue;
-
-        vect_ins(&v, idx, address);
-    }
-
     while(!vect_is_empty(&v)) {
         RDAddress address = vect_pop_last(&v);
-        rd_i_get_xrefs_to_ex(ctx, address, RD_CR_CALL, &xrefs);
+        rd_i_get_xrefs_to_ex(ctx, address, RD_XR_NONE, &xrefs);
 
         const RDXRef* r;
         vect_each(r, &xrefs) {
+            if(r->type != RD_CR_JUMP && r->type != RD_CR_CALL) continue;
+
             // stamp FL_NORET on the call site
             if(!rd_i_set_noret(ctx, r->address)) continue;
 
@@ -94,7 +125,7 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
             RDFunction* f = rd_i_find_function(ctx, r->address);
             if(!f) continue;
 
-            rd_i_rebuild_function(f);
+            rd_i_function_rebuild(f);
 
             // if all exit blocks are now NORET, propagate further
             if(rd_function_is_noret(f)) vect_push(&v, f->address);
@@ -107,7 +138,7 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
 
 static void _rd_worker_resolve_ordinals(RDContext* ctx) {
     RDExternalVect v = {0};
-    rd_i_db_get_externals(ctx, RD_EXT_NONE, &v);
+    rd_i_db_get_all_externals(ctx, RD_EXT_NONE, &v);
 
     RDExternal* ext;
     vect_each(ext, &v) {
@@ -115,12 +146,27 @@ static void _rd_worker_resolve_ordinals(RDContext* ctx) {
 
         const char* name =
             rd_i_kb_find_ordinal_name(ctx, ext->module, ext->ordinal.value);
-        if(!name) continue;
 
-        rd_i_set_external(ctx, name, ext);
+        if(name) rd_i_set_name(ctx, ext->address, name, RD_CONFIDENCE_LIBRARY);
     }
 
     vect_destroy(&v);
+}
+
+// check if duplicate names are now free
+static void _rd_worker_dedup_names(RDContext* ctx) {
+    LOG_INFO("deduping names");
+
+    // duplicate vector because rd_i_set_name mutates ctx->pending_renames
+    RDPendingRenameVect pending = {0};
+    vect_dup(&pending, &ctx->pending_renames);
+
+    const RDPendingRename* p;
+    vect_each(p, &pending)
+        rd_i_set_name(ctx, p->address, p->name.value, p->name.confidence);
+
+    vect_destroy(&pending);
+    vect_clear(&ctx->pending_renames);
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
@@ -179,10 +225,12 @@ static void _rd_worker_step_mergedata(RDContext* ctx) {
 }
 
 static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
-    rd_i_rebuild_all_functions(ctx);
+    _rd_worker_rebuild_functions(ctx);
     _rd_worker_follow_pointers(ctx);
     _rd_worker_resolve_ordinals(ctx);
+    _rd_worker_dedup_names(ctx);
     rd_i_autorename(ctx);
+    _rd_worker_apply_function_types(ctx);
     _rd_worker_apply_noret(ctx);
     rd_i_listing_build(ctx);
     rd_fire_hook(ctx, "redasm.finalized");

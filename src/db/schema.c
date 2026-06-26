@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS Externals ( \
     kind    INTEGER NOT NULL \
 ); \
 CREATE TABLE IF NOT EXISTS Functions ( \
-    address INTEGER PRIMARY KEY \
+    address   INTEGER PRIMARY KEY, \
+    type_name TEXT \
 ); \
 \
 CREATE TABLE IF NOT EXISTS SegmentRegisters ( \

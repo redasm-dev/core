@@ -171,7 +171,7 @@ bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
 
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
     RDTypeDef** it;
-    vect_each(it, &ctx->types) {
+    vect_each(it, &ctx->typedefs) {
         if(strcmp((*it)->name, name) == 0) return *it;
     }
 
@@ -262,7 +262,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     else if(self->kind != RD_TKIND_PRIM)
         unreachable();
 
-    vect_push(&ctx->types, self);
+    vect_push(&ctx->typedefs, self);
 
     if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
         rd_i_kb_add_noret(ctx, self->name);

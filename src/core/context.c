@@ -88,29 +88,66 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
     n->confidence = RD_CONFIDENCE_AUTO;
 
     usize idx = rd_i_address2index(seg, address);
-    const char* prefix = NULL;
+    const char* s = NULL;
 
-    if(rd_i_flagsbuffer_has_type(seg->flags, idx)) {
-        RDTypeFull t;
-        bool ok = rd_i_db_get_type(self, address, &t);
-        assert(ok && "type not found in database");
+    if(rd_flagsbuffer_has_exported(seg->flags, idx) ||
+       rd_flagsbuffer_has_imported(seg->flags, idx)) {
+        RDExternal ext;
 
-        if(!strcmp(t.base.name, "char") && t.base.count > 0)
-            prefix = "str";
-        else if(!strcmp(t.base.name, "char16") && t.base.count > 0)
-            prefix = "str16";
-        else
-            prefix = t.base.name;
+        if(rd_i_db_get_external(self, address, &ext)) {
+            const char* kind_prefix = NULL;
+
+            if(ext.kind == RD_EXT_IMPORTED)
+                kind_prefix = "imp";
+            else if(ext.kind == RD_EXT_EXPORTED)
+                kind_prefix = "exp";
+            else
+                unreachable();
+
+            if(ext.ordinal.has_value) {
+                if(ext.module) {
+                    s = rd_i_format(&self->name_buf, "%s_%s_#%" PRId32,
+                                    kind_prefix, ext.module, ext.ordinal.value);
+                }
+                else {
+                    s = rd_i_format(&self->name_buf, "%s_#%" PRId32,
+                                    kind_prefix, ext.ordinal.value);
+                }
+            }
+            else if(ext.module) {
+                s = rd_i_format(&self->name_buf, "%s_%s_%" PRIx64, kind_prefix,
+                                ext.module, address);
+            }
+            else {
+                s = rd_i_format(&self->name_buf, "%s_%" PRIx64, kind_prefix,
+                                address);
+            }
+        }
     }
-    else if(rd_flagsbuffer_has_func(seg->flags, idx))
-        prefix = "sub";
-    else
-        prefix = "loc";
 
-    assert(prefix && "invalid name prefix");
+    if(!s) {
+        if(rd_i_flagsbuffer_has_type(seg->flags, idx)) {
+            RDTypeFull t;
+            bool ok = rd_i_db_get_type(self, address, &t);
+            assert(ok && "type not found in database");
 
-    char* name = rd_i_format(&self->name_buf, "%s_%" PRIx64, prefix, address);
-    n->value = rd_i_tolower(name);
+            if(!strcmp(t.base.name, "char") && t.base.count > 0)
+                s = "str";
+            else if(!strcmp(t.base.name, "char16") && t.base.count > 0)
+                s = "str16";
+            else
+                s = t.base.name;
+        }
+        else if(rd_flagsbuffer_has_func(seg->flags, idx))
+            s = "sub";
+        else
+            s = "loc";
+
+        assert(s && "invalid name prefix");
+        rd_i_format(&self->name_buf, "%s_%" PRIx64, s, address);
+    }
+
+    n->value = rd_i_tolower(self->name_buf.data);
     return true;
 }
 
@@ -169,16 +206,28 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
 
             // AUTO or LIBRARY vs non-USER: disambiguate with suffix
             int suffix = 1;
-            RDAddress dummy;
+            RDAddress curraddr;
             do {
                 finalname =
                     rd_i_format(&self->name_buf, "%s_%d", name, suffix++);
-            } while(rd_i_db_get_address(self, finalname, &dummy));
+            } while(rd_i_db_get_address(self, finalname, &curraddr) &&
+                    curraddr != address);
+
+            // try dedup in finalization
+            vect_push(
+                &self->pending_renames,
+                (RDPendingRename){
+                    .address = address,
+                    .name =
+                        {
+                            .value = rd_i_strpool_intern(&self->strings, name),
+                            .confidence = c,
+                        },
+                });
         }
 
         rd_i_db_set_name(self, address, finalname, c);
         rd_i_flagsbuffer_set_name(seg->flags, idx);
-
         return true;
     }
 
@@ -552,12 +601,12 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->tdef_buf);
     vect_destroy(&self->type_buf);
     vect_destroy(&self->problems);
+    vect_destroy(&self->pending_renames);
     vect_destroy(&self->xrefs_to);
     vect_destroy(&self->und_xrefs);
     vect_destroy(&self->xrefs_from);
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->chunk_buf);
-    vect_destroy(&self->imp_hint_buf);
     vect_destroy(&self->externals);
     hmap_destroy(&self->engine.current.registers);
     rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
@@ -569,8 +618,8 @@ void rd_destroy(RDContext* self) {
     rd_i_db_destroy(self->db);
 
     RDTypeDef** def;
-    vect_each(def, &self->types) rd_typedef_destroy(*def);
-    vect_destroy(&self->types);
+    vect_each(def, &self->typedefs) rd_typedef_destroy(*def);
+    vect_destroy(&self->typedefs);
 
     if(self->processorplugin && self->processorplugin->destroy)
         self->processorplugin->destroy(self->processor);
@@ -581,6 +630,8 @@ void rd_destroy(RDContext* self) {
     rd_i_strpool_destroy(&self->strings);
     rd_free(self->working_dir);
     rd_free(self->file_name);
+
+    *self = (RDContext){0};
     rd_free(self);
 }
 
@@ -836,17 +887,6 @@ bool rd_fill(RDContext* self, RDAddress address, usize n) {
     return true;
 }
 
-const char* rd_get_external_hint(RDContext* ctx, const char* name,
-                                 RDExternalKind kind) {
-    return rd_i_get_external_hint(ctx, name, kind, &ctx->imp_hint_buf);
-}
-
-const char* rd_get_external_ord_hint(RDContext* ctx, const char* module,
-                                     u32 ordinal, RDExternalKind kind) {
-    return rd_i_get_external_ord_hint(ctx, module, ordinal, kind,
-                                      &ctx->imp_hint_buf);
-}
-
 RDProblemSlice rd_get_all_problems(const RDContext* self) {
     return vect_to_slice(RDProblemSlice, &self->problems);
 }
@@ -873,7 +913,7 @@ RDFunctionSlice rd_get_all_functions(const RDContext* self) {
 
 RDExternalSlice rd_get_all_externals(const RDContext* self,
                                      RDExternalKind kind) {
-    RDExternalVect* v = rd_i_db_get_externals(
+    RDExternalVect* v = rd_i_db_get_all_externals(
         (RDContext*)self, kind, (RDExternalVect*)&self->externals);
     return vect_to_slice(RDExternalSlice, v);
 }
@@ -988,9 +1028,8 @@ const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
     return rd_get_name(ctx, self->address);
 }
 
-bool rd_i_set_external(RDContext* self, const char* name,
-                       const RDExternal* ext) {
-    assert(ext);
+bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
+    if(!ext) return false;
 
     if(ext->kind != RD_EXT_EXPORTED && ext->kind != RD_EXT_IMPORTED)
         return false;
@@ -999,9 +1038,7 @@ bool rd_i_set_external(RDContext* self, const char* name,
 
     if(!seg) {
         rd_i_add_problem(self, ext->address, ext->address,
-                         "skipping external '%s' to unmapped address",
-                         name ? name : "<unnamed>");
-
+                         "skipping external to unmapped address");
         return false;
     }
 
@@ -1015,34 +1052,16 @@ bool rd_i_set_external(RDContext* self, const char* name,
 
     if(ext->kind == RD_EXT_EXPORTED &&
        rd_flagsbuffer_has_imported(seg->flags, idx)) {
-        rd_i_add_problem(
-            self, ext->address, ext->address,
-            "already marked as imported, cannot mark '%s' as exported",
-            name ? name : "<unnamed>");
+        rd_i_add_problem(self, ext->address, ext->address,
+                         "already marked as imported, cannot mark as exported");
         return false;
     }
 
     if(ext->kind == RD_EXT_IMPORTED &&
        rd_flagsbuffer_has_exported(seg->flags, idx)) {
-        rd_i_add_problem(
-            self, ext->address, ext->address,
-            "already marked as exported, cannot mark '%s' as imported",
-            name ? name : "<unnamed>");
+        rd_i_add_problem(self, ext->address, ext->address,
+                         "already marked as exported, cannot mark as imported");
         return false;
-    }
-
-    if(name)
-        name = rd_i_get_external_hint(self, name, ext->kind, &self->imp_buf);
-    else if(ext->ordinal.has_value) {
-        name = rd_i_get_external_ord_hint(self, ext->module, ext->ordinal.value,
-                                          ext->kind, &self->imp_buf);
-    }
-
-    if(name) {
-        rd_i_set_name(self, ext->address, name, RD_CONFIDENCE_LIBRARY);
-
-        if(rd_i_kb_is_noret(self, rd_i_strip_prefix(name)))
-            rd_i_set_noret(self, ext->address);
     }
 
     if(ext->kind == RD_EXT_EXPORTED &&
@@ -1054,7 +1073,6 @@ bool rd_i_set_external(RDContext* self, const char* name,
         return false;
 
     rd_i_db_set_external(self, ext);
-
     return true;
 }
 
@@ -1164,9 +1182,30 @@ bool rd_get_entry_point(const RDContext* self, RDAddress* address) {
 }
 
 bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+
+    if(!seg) {
+        rd_i_add_problem(
+            self, address, address,
+            "trying to set an entry point '%s' to unmapped address",
+            name ? name : "<unnamed>");
+
+        return false;
+    }
+
+    usize idx = rd_i_address2index(seg, address);
+
+    if(rd_flagsbuffer_has_imported(seg->flags, idx)) {
+        rd_i_add_problem(
+            self, address, address,
+            "trying to set an entry point '%s' to an imported address",
+            name ? name : "<unnamed>");
+        return false;
+    }
+
     if(self->entry_point.has_value && self->entry_point.value != address) {
         rd_i_add_problem(self, self->entry_point.value, address,
-                         "entry point redefined");
+                         "redefining entry point");
     }
 
     const char* n = name;
@@ -1181,25 +1220,37 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     assert(n && "invalid entry point name");
 
     rd_library_function(self, address, n);
-    rd_set_external(self, address, NULL, NULL, RD_EXT_EXPORTED);
+
+    // don't override existing exports
+    if(!rd_flagsbuffer_has_exported(seg->flags, idx))
+        rd_set_external(self, address, NULL, RD_EXT_EXPORTED);
+
     optional_set(&self->entry_point, address);
     return true;
 }
 
+bool rd_get_external(RDContext* self, RDAddress address, RDExternal* ext) {
+    return ext && rd_i_db_get_external(self, address, ext);
+}
+
+bool rd_get_external_ord(RDContext* self, const char* module, u32 ord,
+                         RDExternalKind kind, RDExternal* ext) {
+    return ext && rd_i_db_get_external_ord(self, module, ord, kind, ext);
+}
+
 bool rd_set_external(RDContext* self, RDAddress address, const char* module,
-                     const char* name, RDExternalKind kind) {
-    return rd_i_set_external(self, name,
-                             &(RDExternal){
-                                 .kind = kind,
-                                 .address = address,
-                                 .module = module,
-                                 .ordinal = {.has_value = false},
-                             });
+                     RDExternalKind kind) {
+    return rd_i_set_external(self, &(RDExternal){
+                                       .kind = kind,
+                                       .address = address,
+                                       .module = module,
+                                       .ordinal = {.has_value = false},
+                                   });
 }
 
 bool rd_set_external_ord(RDContext* self, RDAddress address, const char* module,
                          u32 ord, RDExternalKind kind) {
-    return rd_i_set_external(self, NULL,
+    return rd_i_set_external(self,
                              &(RDExternal){
                                  .kind = kind,
                                  .address = address,
@@ -1227,37 +1278,6 @@ bool rd_i_set_noret(RDContext* self, RDAddress address) {
         rd_i_flagsbuffer_undefine_flow(seg->flags, idx);
 
     return true;
-}
-
-const char* rd_i_get_external_hint(RDContext* ctx, const char* name,
-                                   RDExternalKind kind, RDCharVect* v) {
-    RD_UNUSED(ctx);
-
-    if(name) {
-        if(kind == RD_EXT_EXPORTED) return name;
-        return rd_i_format(v, "__imp_%s", name);
-    }
-
-    return NULL;
-}
-
-const char* rd_i_get_external_ord_hint(RDContext* ctx, const char* module,
-                                       u32 ordinal, RDExternalKind kind,
-                                       RDCharVect* v) {
-    const char* name = rd_i_kb_find_ordinal_name(ctx, module, ordinal);
-    if(name) return rd_i_get_external_hint(ctx, name, kind, v);
-
-    if(module) {
-        if(kind == RD_EXT_EXPORTED)
-            return rd_i_format(v, "%s_%" PRIu32, module, ordinal);
-
-        return rd_i_format(v, "__imp_%s_%" PRIu32, module, ordinal);
-    }
-
-    if(kind == RD_EXT_EXPORTED)
-        return rd_i_format(v, "__exp_%" PRIu32, ordinal);
-
-    return rd_i_format(v, "__imp_%" PRIu32, ordinal);
 }
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
