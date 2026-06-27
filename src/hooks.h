@@ -17,6 +17,11 @@ typedef struct RDAddressHookItem {
     RDAddressHook hook;
 } RDAddressHookItem;
 
+typedef struct RDStringHookItem {
+    const char* name;
+    RDStringHook hook;
+} RDStringHookItem;
+
 typedef struct RDXRefHookItem {
     const char* name;
     RDXRefHook hook;
@@ -46,6 +51,12 @@ typedef struct RDHooks {
         usize length;
         usize capacity;
     } address;
+
+    struct {
+        RDStringHookItem* data;
+        usize length;
+        usize capacity;
+    } string;
 
     struct {
         RDXRefHookItem* data;

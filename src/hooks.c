@@ -46,6 +46,14 @@ static int _rd_address_hook_cmp(const void* a, const void* b) {
     return 0;
 }
 
+static int _rd_string_hook_cmp(const void* a, const void* b) {
+    const RDStringHookItem* ia = a;
+    const RDStringHookItem* ib = b;
+    if(ia->name < ib->name) return -1;
+    if(ia->name > ib->name) return 1;
+    return 0;
+}
+
 static int _rd_xref_hook_cmp(const void* a, const void* b) {
     const RDXRefHookItem* ia = a;
     const RDXRefHookItem* ib = b;
@@ -86,6 +94,14 @@ static int _rd_address_hook_search(const void* key, const void* elem) {
     return 0;
 }
 
+static int _rd_string_hook_search(const void* key, const void* elem) {
+    const char* name = (const char*)key;
+    const char* ename = ((const RDStringHookItem*)elem)->name;
+    if(name < ename) return -1;
+    if(name > ename) return 1;
+    return 0;
+}
+
 static int _rd_xref_hook_search(const void* key, const void* elem) {
     const char* name = (const char*)key;
     const char* ename = ((const RDXRefHookItem*)elem)->name;
@@ -109,6 +125,7 @@ void rd_i_hooks_destroy(RDHooks* self) {
     vect_destroy(&self->general);
     vect_destroy(&self->instruction);
     vect_destroy(&self->address);
+    vect_destroy(&self->string);
     vect_destroy(&self->xref);
     vect_destroy(&self->render);
     rd_free(self);
@@ -199,6 +216,35 @@ bool rd_register_address_hook(RDContext* ctx, const char* name,
                                     });
 
     vect_sort(&ctx->hooks->address, _rd_address_hook_cmp);
+    return true;
+}
+
+bool rd_register_string_hook(RDContext* ctx, const char* name, RDStringHook h) {
+    if(!name || !h) return false;
+
+    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
+
+    size_t i =
+        vect_lower_bound(&ctx->hooks->string, interned, _rd_string_hook_search);
+
+    // check for duplicate
+    while(i < vect_length(&ctx->hooks->string) &&
+          vect_at(&ctx->hooks->string, i)->name == interned) {
+        if(vect_at(&ctx->hooks->string, i)->hook == h) {
+            LOG_WARN("string hook '%s' already registered with same handler, "
+                     "ignoring",
+                     name);
+            return false;
+        }
+        i++;
+    }
+
+    vect_push(&ctx->hooks->string, (RDStringHookItem){
+                                       .name = interned,
+                                       .hook = h,
+                                   });
+
+    vect_sort(&ctx->hooks->string, _rd_string_hook_cmp);
     return true;
 }
 
@@ -303,8 +349,15 @@ void rd_fire_instruction_hook(RDContext* ctx, const char* name,
 void rd_fire_address_hook(RDContext* ctx, const char* name, RDAddress addr) {
     RDAddressHookItem* item;
     rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->address,
-                           _rd_instruction_hook_search,
-                           { item->hook(ctx, addr); });
+                           _rd_address_hook_search, { item->hook(ctx, addr); });
+}
+
+void rd_fire_string_hook(RDContext* ctx, const char* name, RDAddress addr,
+                         const char* str, usize n) {
+    RDStringHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->string,
+                           _rd_string_hook_search,
+                           { item->hook(ctx, addr, str, n); });
 }
 
 void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,

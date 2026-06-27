@@ -8,6 +8,7 @@
 typedef void (*RDHook)(RDContext*);
 typedef void (*RDInstructionHook)(RDContext*, RDInstruction*);
 typedef void (*RDAddressHook)(RDContext*, RDAddress);
+typedef void (*RDStringHook)(RDContext*, RDAddress, const char* s, usize n);
 typedef void (*RDXRefHook)(RDContext*, RDAddress from, RDAddress to,
                            RDXRefType type);
 typedef void (*RDRenderMnemonicHook)(RDContext*, RDRenderer*,
@@ -20,6 +21,8 @@ RD_API bool rd_register_instruction_hook(RDContext* ctx, const char* name,
                                          RDInstructionHook h);
 RD_API bool rd_register_address_hook(RDContext* ctx, const char* name,
                                      RDAddressHook h);
+RD_API bool rd_register_string_hook(RDContext* ctx, const char* name,
+                                    RDStringHook h);
 RD_API bool rd_register_xref_hook(RDContext* ctx, const char* name,
                                   RDXRefHook h);
 RD_API bool rd_register_render_mnemonic_hook(RDContext* ctx, const char* name,
@@ -32,6 +35,8 @@ RD_API void rd_fire_instruction_hook(RDContext* ctx, const char* name,
                                      RDInstruction*);
 RD_API void rd_fire_address_hook(RDContext* ctx, const char* name,
                                  RDAddress addr);
+RD_API void rd_fire_string_hook(RDContext* ctx, const char* name,
+                                RDAddress addr, const char* str, usize n);
 RD_API void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,
                               RDAddress to, RDXRefType type);
 RD_API bool rd_fire_render_mnemonic_hook(RDContext*, const char* name,
