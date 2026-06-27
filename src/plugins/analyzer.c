@@ -25,7 +25,11 @@ static int _rd_analyzeritem_kcmp_pred(const void* key, const void* v) {
 
 bool rd_analyzer_enable(RDContext* ctx, const char* id) {
     const RDAnalyzerPlugin* plugin = rd_analyzer_find(id);
-    if(!plugin) return false;
+
+    if(!plugin) {
+        LOG_WARN("analyzer '%s' not found, ignoring...", id ? id : "<null>");
+        return false;
+    }
 
     usize idx = vect_lower_bound(&ctx->analyzerplugins, plugin,
                                  _rd_analyzeritem_kcmp_pred);
