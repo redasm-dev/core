@@ -370,8 +370,13 @@ bool rd_i_db_del_type(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_del_type(ctx, address);
 }
 
-RDTypeFullVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,
-                                      RDTypeFullVect* v) {
+RDAddressVect* rd_i_db_get_all_address_by_type(RDContext* ctx, RDAddressVect* v,
+                                               const char* filter) {
+    return _rd_i_db_query_get_address_by_type(ctx, v, filter);
+}
+
+RDTypeVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                  RDTypeVect* v) {
     return _rd_i_db_query_get_all_types(ctx, av, v);
 }
 

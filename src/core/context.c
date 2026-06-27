@@ -600,6 +600,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->ovr_ops_buf);
     vect_destroy(&self->tdef_buf);
     vect_destroy(&self->type_buf);
+    vect_destroy(&self->addr_type_buf);
     vect_destroy(&self->problems);
     vect_destroy(&self->pending_renames);
     vect_destroy(&self->xrefs_to);
@@ -909,6 +910,14 @@ RDSegmentSlice rd_get_all_segments(const RDContext* self) {
 
 RDInputMappingSlice rd_get_all_mappings(const RDContext* self) {
     return vect_to_slice(RDInputMappingSlice, rd_i_db_get_mappings(self));
+}
+
+RDAddressSlice rd_get_all_address_by_type(const RDContext* self,
+                                          const char* filter) {
+    return vect_to_slice(
+        RDAddressSlice,
+        rd_i_db_get_all_address_by_type(
+            (RDContext*)self, (RDAddressVect*)&self->addr_type_buf, filter));
 }
 
 RDFunctionSlice rd_get_all_functions(const RDContext* self) {

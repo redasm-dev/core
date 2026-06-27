@@ -125,6 +125,8 @@ RD_API bool rd_decode_n(RDContext* ctx, RDAddress address,
 RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address,
                            RDInstruction* instr);
 RD_API RDProblemSlice rd_get_all_problems(const RDContext* self);
+RD_API RDAddressSlice rd_get_all_address_by_type(const RDContext* self,
+                                                 const char* filter);
 RD_API RDFunctionSlice rd_get_all_functions(const RDContext* self);
 RD_API RDExternalSlice rd_get_all_externals(const RDContext* self,
                                             RDExternalKind kind);

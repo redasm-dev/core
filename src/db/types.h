@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/segment.h"
-#include "types/type.h"
 #include <redasm/context.h>
 #include <redasm/registers.h>
+#include <redasm/types/type.h>
 
 typedef struct RDAddressVect {
     RDAddress* data;
@@ -77,11 +77,11 @@ typedef struct RDXRefFull {
     RDConfidence confidence;
 } RDXRefFull;
 
-typedef struct RDTypeFullVect {
-    RDTypeFull* data;
+typedef struct RDTypeVect {
+    RDType* data;
     usize length;
     usize capacity;
-} RDTypeFullVect;
+} RDTypeVect;
 
 int _rd_i_db_segment_cmp_pred(const void* a, const void* b);
 int _rd_i_db_segment_find_pred(const void* key, const void* item);

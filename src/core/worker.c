@@ -66,12 +66,12 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
     LOG_INFO("following pointers");
 
     RDAddressVect addresses = {0};
-    RDTypeFullVect types = {0};
+    RDTypeVect types = {0};
     rd_i_db_get_all_types(ctx, &addresses, &types);
 
     for(usize i = 0; i < vect_length(&addresses); i++) {
-        const RDTypeFull* t = vect_at(&types, i);
-        if(!rd_type_is_ptr(&t->base)) continue;
+        const RDType* t = vect_at(&types, i);
+        if(!rd_type_is_ptr(t)) continue;
 
         RDAddress address = *vect_at(&addresses, i);
 

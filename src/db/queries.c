@@ -625,10 +625,34 @@ bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address) {
     return sqlite3_changes(ctx->db->handle) > 0;
 }
 
-RDTypeFullVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
-                                             RDTypeFullVect* v) {
+RDAddressVect* _rd_i_db_query_get_address_by_type(RDContext* ctx,
+                                                  RDAddressVect* v,
+                                                  const char* filter) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_ADDRESS_BY_TYPE, "\
+        SELECT address \
+        FROM Types \
+        WHERE (:name = 0 OR name = :name) \
+        ORDER BY address \
+    ");
+
+    vect_clear(v);
+
+    if(filter)
+        _rd_db_bind_param_str(ctx, stmt, ":name", filter);
+    else
+        _rd_db_bind_param_null(ctx, stmt, ":name");
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW)
+        vect_push(v, (RDAddress)sqlite3_column_int64(stmt, 0));
+
+    return v;
+}
+
+RDTypeVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
+                                         RDTypeVect* v) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPES, "\
-        SELECT address, name, count, modifier, confidence \
+        SELECT address, name, count, modifier \
         FROM Types \
         ORDER BY address \
     ");
@@ -641,20 +665,14 @@ RDTypeFullVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
         usize count = (usize)sqlite3_column_int64(stmt, 1);
         const char* name = (const char*)sqlite3_column_text(stmt, 2);
         RDTypeModifier mod = (RDTypeModifier)sqlite3_column_int(stmt, 3);
-        RDConfidence c = (RDConfidence)sqlite3_column_int(stmt, 4);
 
         vect_push(av, address);
 
-        vect_push(v,
-                  (RDTypeFull){
-                      .base =
-                          {
-                              .mod = mod,
-                              .name = rd_i_strpool_intern(&ctx->strings, name),
-                              .count = count,
-                          },
-                      .confidence = c,
-                  });
+        vect_push(v, (RDType){
+                         .mod = mod,
+                         .name = rd_i_strpool_intern(&ctx->strings, name),
+                         .count = count,
+                     });
     }
 
     assert(vect_length(av) == vect_length(v));
