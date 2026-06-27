@@ -762,6 +762,13 @@ bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
     return true;
 }
 
+const char* rd_read_str(const RDContext* self, RDAddress address, usize* n) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return NULL;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_read_str((RDBuffer*)s->flags, idx, n);
+}
+
 bool rd_expect_u8(const RDContext* self, RDAddress address, u8 v) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
