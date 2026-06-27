@@ -7,10 +7,10 @@
 #include <redasm/allocator.h>
 
 static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
-    const RDAnalyzerPlugin* a1 = *(const RDAnalyzerPlugin**)arg1;
-    const RDAnalyzerPlugin* a2 = *(const RDAnalyzerPlugin**)arg2;
-    if(a1->order < a2->order) return -1;
-    if(a1->order > a2->order) return 1;
+    const RDPlugin* a1 = *(const RDPlugin**)arg1;
+    const RDPlugin* a2 = *(const RDPlugin**)arg2;
+    if(a1->analyzer->order < a2->analyzer->order) return -1;
+    if(a1->analyzer->order > a2->analyzer->order) return 1;
     return 0;
 }
 
