@@ -35,6 +35,7 @@ typedef struct RDGlobalState {
     RDCharVect kb_key_buf;
 
     RDCharVect fmt_buf;
+    RDCharVect demangle_buf;
     RDCharVect log_buf;
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;

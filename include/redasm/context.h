@@ -119,6 +119,8 @@ RD_API void rd_set_scan_char16(RDContext* self, bool b);
 RD_API const char* rd_get_working_dir(const RDContext* self);
 RD_API const char* rd_get_file_name(const RDContext* self);
 RD_API const char* rd_str_intern(RDContext* self, const char* s);
+RD_API const char* rd_resolve_name(RDContext* self, RDAddress address,
+                                   RDAddress* resolved);
 RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_decode_n(RDContext* ctx, RDAddress address,
                         RDInstruction* instrs, usize n);
@@ -156,10 +158,14 @@ RD_API bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n);
 RD_API bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n);
 RD_API bool rd_set_noreturn(RDContext* self, RDAddress address);
 RD_API bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt);
+RD_API bool rd_placeholder_name(RDContext* self, RDAddress address,
+                                const char* name);
 RD_API bool rd_auto_name(RDContext* self, RDAddress address, const char* name);
 RD_API bool rd_library_name(RDContext* self, RDAddress address,
                             const char* name);
 RD_API bool rd_user_name(RDContext* self, RDAddress address, const char* name);
+RD_API bool rd_placeholder_function(RDContext* self, RDAddress address,
+                                    const char* name);
 RD_API bool rd_auto_function(RDContext* self, RDAddress address,
                              const char* name);
 RD_API bool rd_library_function(RDContext* self, RDAddress address,

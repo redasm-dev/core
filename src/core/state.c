@@ -82,6 +82,7 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.loaders);
     vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
+    vect_destroy(&rd_i_state.demangle_buf);
     vect_destroy(&rd_i_state.kb_path_buf);
     vect_destroy(&rd_i_state.kb_schema_buf);
     vect_destroy(&rd_i_state.kb_key_buf);

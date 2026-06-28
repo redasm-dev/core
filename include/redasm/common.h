@@ -3,7 +3,8 @@
 typedef struct RDContext RDContext;
 
 typedef enum {
-    RD_CONFIDENCE_AUTO = 0,
+    RD_CONFIDENCE_PLACEHOLDER = 0,
+    RD_CONFIDENCE_AUTO,
     RD_CONFIDENCE_LIBRARY,
     RD_CONFIDENCE_USER,
 } RDConfidence;

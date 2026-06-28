@@ -184,8 +184,10 @@ typedef bool (*VectPredicate)(const void*);
 #define stack_top(s)                                                           \
     (assert((s)->top >= 0 && "stack_top: stack is empty"), (s)->data[(s)->top])
 
-#define str_append(self, cstr)                                                 \
-    _str_append(&(self)->data, &(self)->capacity, &(self)->length, (cstr))
+#define str_append_n(self, cstr, n)                                            \
+    _str_append(&(self)->data, &(self)->capacity, &(self)->length, (cstr), n)
+
+#define str_append(self, cstr) str_append_n(self, cstr, strlen(cstr))
 
 #define str_push(self, c)                                                      \
     _str_push(&(self)->data, &(self)->capacity, &(self)->length, (c))
@@ -328,7 +330,8 @@ void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
                  size_t elem_size);
 void _queue_reserve(void** data, size_t* currcap, size_t newcap,
                     size_t elem_size);
-void _str_append(char** data, size_t* cap, size_t* len, const char* cstr);
+void _str_append(char** data, size_t* cap, size_t* len, const char* cstr,
+                 size_t slen);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
 void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
                size_t elem_size);

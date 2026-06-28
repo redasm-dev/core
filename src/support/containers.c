@@ -53,8 +53,8 @@ void _queue_reserve(void** data, size_t* currcap, size_t newcap,
     *data = realloc(*data, elem_size * newcap);
 }
 
-void _str_append(char** data, size_t* cap, size_t* len, const char* cstr) {
-    size_t slen = strlen(cstr);
+void _str_append(char** data, size_t* cap, size_t* len, const char* cstr,
+                 size_t slen) {
     size_t newlen = *len + slen;
 
     if(newlen + 1 > *cap) {
@@ -64,7 +64,8 @@ void _str_append(char** data, size_t* cap, size_t* len, const char* cstr) {
         *cap = newcap;
     }
 
-    memcpy(*data + *len, cstr, slen + 1);
+    memcpy(*data + *len, cstr, slen);
+    (*data)[newlen] = '\0';
     *len = newlen;
 }
 

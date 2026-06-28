@@ -7,38 +7,25 @@
 
 #define RD_AUTORENAME_DEPTH 8
 
-static void _rd_autorename_trampoline(RDContext* ctx, RDFunction* f,
-                                      RDAddress target, RDCharVect* namebuf) {
+static const char* _rd_resolve_name(RDContext* ctx, RDAddress target,
+                                    RDAddress* resolved, RDConfidence* c) {
     RDName n;
     RDInstruction instr;
     bool found = false;
 
     for(int depth = 0; depth < RD_AUTORENAME_DEPTH; depth++) {
         if(rd_i_get_name(ctx, target, false, &n)) {
-            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, target);
-            assert(seg);
+            if(resolved) *resolved = target;
+            if(c) *c = n.confidence;
 
-            const RDTypeDef* tdef = rd_i_typedef_find(ctx, n.value);
-            if(tdef && tdef->kind == RD_TKIND_FUNC)
-                rd_i_function_set_type_def(f, tdef);
-
-            usize idx = rd_i_address2index(seg, target);
-            const char* name = NULL;
-
-            if(rd_flagsbuffer_has_imported(seg->flags, idx))
-                name = rd_i_format(namebuf, "imp_%s", n.value);
-            else if(rd_flagsbuffer_has_exported(seg->flags, idx))
-                name = rd_i_format(namebuf, "exp_%s", n.value);
-            else
-                name = rd_i_format(namebuf, "j_%s", n.value);
-
-            assert(name);
-            rd_auto_name(ctx, f->address, name);
-            return;
+            str_clear(&ctx->autoname_buf);
+            str_append(&ctx->autoname_buf, n.value);
+            return ctx->autoname_buf.data;
         }
 
         // follow chain: decode target and check for simple jump
-        if(!rd_decode(ctx, target, &instr) || instr.flow != RD_IF_JUMP) return;
+        if(!rd_decode(ctx, target, &instr) || instr.flow != RD_IF_JUMP)
+            return NULL;
 
         found = false;
 
@@ -59,13 +46,15 @@ static void _rd_autorename_trampoline(RDContext* ctx, RDFunction* f,
             }
         }
 
-        if(!found || target == instr.address) return;
+        if(!found || target == instr.address) return NULL;
     }
+
+    return NULL;
 }
 
 static void _rd_autorename_functions(RDContext* ctx) {
     LOG_INFO("autorenaming functions");
-    RDCharVect name_buf = {0};
+    RDCharVect namebuf = {0};
     RDIL* rdil = rd_il_create(ctx, NULL);
 
     RDFunction** it;
@@ -77,36 +66,36 @@ static void _rd_autorename_functions(RDContext* ctx) {
            n.confidence > RD_CONFIDENCE_AUTO)
             continue;
 
-        bool is_nullsub = true;
-        int i = 0;
         rd_il_assign(rdil, f);
 
-        for(; i < RD_AUTORENAME_DEPTH && rd_il_step(rdil); i++) {
-            const RDInstruction* instr = rd_il_current_instr(rdil);
-            assert(instr);
+        RDAddress resolved;
+        RDConfidence c;
+        const char* resolved_name = rd_i_resolve_name(ctx, rdil, &resolved, &c);
+        if(!resolved_name) continue;
 
-            RDAddress target;
-            if(instr->flow == RD_IF_JUMP && rd_il_get_target(rdil, &target)) {
-                is_nullsub = false;
-                _rd_autorename_trampoline(ctx, f, target, &name_buf);
-                break;
-            }
+        const RDTypeDef* tdef = rd_i_typedef_find(ctx, resolved_name);
+        if(tdef && tdef->kind == RD_TKIND_FUNC)
+            rd_i_function_set_type_def(f, tdef);
 
-            if(!rd_instr_is_transparent(instr))
-                is_nullsub = false; // latch false, never recocver
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, resolved);
+        assert(seg);
 
-            if(instr->flow == RD_IF_STOP) break;
-        }
+        usize idx = rd_i_address2index(seg, resolved);
+        const char* auto_name = NULL;
 
-        if(i < RD_AUTORENAME_DEPTH && is_nullsub) {
-            const char* new_name = rd_i_format(&name_buf, "nullsub_%s",
-                                               rd_i_to_hex((i64)f->address, 0));
-            rd_auto_name(ctx, f->address, new_name);
-        }
+        if(rd_flagsbuffer_has_imported(seg->flags, idx))
+            auto_name = rd_i_format(&namebuf, "imp_%s", resolved_name);
+        else if(rd_flagsbuffer_has_exported(seg->flags, idx))
+            auto_name = rd_i_format(&namebuf, "exp_%s", resolved_name);
+        else
+            auto_name = rd_i_format(&namebuf, "j_%s", resolved_name);
+
+        assert(auto_name);
+        rd_i_set_name(ctx, f->address, auto_name, c);
     }
 
     rd_il_destroy(rdil);
-    vect_destroy(&name_buf);
+    vect_destroy(&namebuf);
 }
 
 static void _rd_autorename_types(RDContext* ctx) {
@@ -142,7 +131,40 @@ static void _rd_autorename_types(RDContext* ctx) {
     vect_destroy(&name_buf);
 }
 
+const char* rd_i_resolve_name(RDContext* ctx, RDIL* rdil, RDAddress* resolved,
+                              RDConfidence* c) {
+    for(int i = 0; i < RD_AUTORENAME_DEPTH && rd_il_step(rdil); i++) {
+        const RDInstruction* instr = rd_il_current_instr(rdil);
+        assert(instr);
+
+        RDAddress target;
+        if(instr->flow == RD_IF_JUMP && rd_il_get_target(rdil, &target))
+            return _rd_resolve_name(ctx, target, resolved, c);
+
+        if(instr->flow == RD_IF_STOP) break;
+    }
+
+    return NULL;
+}
+
 void rd_i_autorename(RDContext* ctx) {
     _rd_autorename_functions(ctx);
     _rd_autorename_types(ctx);
+}
+
+const char* rd_resolve_name(RDContext* self, RDAddress address,
+                            RDAddress* resolved) {
+    RDName n;
+    if(rd_i_get_name(self, address, false, &n)) {
+        if(resolved) *resolved = address;
+        return n.value;
+    }
+
+    const RDFunction* f = rd_find_function(self, address);
+    if(!f) return NULL;
+
+    RDIL* rdil = rd_il_create(self, f);
+    const char* name = rd_i_resolve_name(self, rdil, resolved, NULL);
+    rd_il_destroy(rdil);
+    return name;
 }

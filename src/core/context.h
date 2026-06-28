@@ -44,6 +44,7 @@ typedef struct RDContext {
     RDXRefVect xrefs_to;
     RDXRefVect und_xrefs;
 
+    RDCharVect autoname_buf;
     RDCharVect name_buf;
     RDCharVect str_buf;
     RDCharVect sym_buf;

@@ -85,7 +85,7 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
         return rd_i_db_get_name(self, address, n);
 
     if(!autoname) return false;
-    n->confidence = RD_CONFIDENCE_AUTO;
+    n->confidence = RD_CONFIDENCE_PLACEHOLDER;
 
     usize idx = rd_i_address2index(seg, address);
     const char* s = NULL;
@@ -462,6 +462,11 @@ bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n) {
     return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_USER);
 }
 
+bool rd_placeholder_function(RDContext* self, RDAddress address,
+                             const char* name) {
+    return rd_i_set_function(self, address, name, RD_CONFIDENCE_PLACEHOLDER);
+}
+
 bool rd_auto_function(RDContext* self, RDAddress address, const char* name) {
     return rd_i_set_function(self, address, name, RD_CONFIDENCE_AUTO);
 }
@@ -472,6 +477,10 @@ bool rd_library_function(RDContext* self, RDAddress address, const char* name) {
 
 bool rd_user_function(RDContext* self, RDAddress address, const char* name) {
     return rd_i_set_function(self, address, name, RD_CONFIDENCE_USER);
+}
+
+bool rd_placeholder_name(RDContext* self, RDAddress address, const char* name) {
+    return rd_i_set_name(self, address, name, RD_CONFIDENCE_PLACEHOLDER);
 }
 
 bool rd_auto_name(RDContext* self, RDAddress address, const char* name) {
@@ -596,6 +605,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->str_buf);
     vect_destroy(&self->seg_buf);
     vect_destroy(&self->imp_buf);
+    vect_destroy(&self->autoname_buf);
     vect_destroy(&self->name_buf);
     vect_destroy(&self->ovr_ops_buf);
     vect_destroy(&self->tdef_buf);
