@@ -18,6 +18,14 @@
 #include <unistd.h> // access
 #endif
 
+#define _rd_rol_impl(val, n, bits)                                             \
+    (((val) << ((n) & ((bits) - 1))) |                                         \
+     ((val) >> (((bits) - (n)) & ((bits) - 1))))
+
+#define _rd_ror_impl(val, n, bits)                                             \
+    (((val) >> ((n) & ((bits) - 1))) |                                         \
+     ((val) << (((bits) - (n)) & ((bits) - 1))))
+
 static const char* _rd_get_temp_path(void) {
 #if defined(_WIN32)
     static char tmp[MAX_PATH];
@@ -541,3 +549,12 @@ const char* rd_format(const char* fmt, ...) {
     va_end(args);
     return result;
 }
+
+u8 rd_ror8(u8 val, u8 n) { return (u8)_rd_ror_impl(val, n, 8); }
+u16 rd_ror16(u16 val, u16 n) { return (u16)_rd_ror_impl(val, n, 16); }
+u32 rd_ror32(u32 val, u32 n) { return _rd_ror_impl(val, n, 32); }
+u64 rd_ror64(u64 val, u64 n) { return _rd_ror_impl(val, n, 64); }
+u8 rd_rol8(u8 val, u8 n) { return (u8)_rd_rol_impl(val, n, 8); }
+u16 rd_rol16(u16 val, u16 n) { return (u16)_rd_rol_impl(val, n, 16); }
+u32 rd_rol32(u32 val, u32 n) { return _rd_rol_impl(val, n, 32); }
+u64 rd_rol64(u64 val, u64 n) { return _rd_rol_impl(val, n, 64); }
