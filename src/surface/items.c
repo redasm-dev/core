@@ -150,6 +150,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                              RD_THEME_BACKGROUND);
         else
             rd_renderer_muted(r, "?");
+
         rd_renderer_norm(r, "'");
         return;
     }
@@ -160,7 +161,11 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         unsigned int sz =
             (unsigned int)rd_i_size_of(r->context, t->name, 0, t->mod);
         panic_if(!sz, "type '%s' has unresolved size", t->name);
-        rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
+
+        if(sz == PTR_SIZE)
+            rd_renderer_loc(r, (RDAddress)v, sz * 2, RD_NUM_DEFAULT);
+        else
+            rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
     }
     else
         rd_renderer_muted(r, "?");

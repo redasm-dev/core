@@ -451,8 +451,10 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
             if(seg) {
                 usize idx = rd_i_address2index(seg, address);
 
-                // auto-generated name with inbound references
-                if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
+                // auto-generated name with inbound refs/types/functions
+                if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
+                   rd_i_flagsbuffer_has_type(seg->flags, idx) ||
+                   rd_flagsbuffer_has_func(seg->flags, idx))
                     hasname = rd_i_get_name(self->context, address, true, &n);
             }
         }
