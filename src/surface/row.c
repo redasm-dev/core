@@ -12,7 +12,7 @@ void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address) {
     vect_push(self, (RDRow){
                         .index = index,
                         .address = address,
-                        .curr_meta = rd_i_default_cell_data(),
+                        .curr_data = rd_i_default_cell_data(),
                     });
 }
 
@@ -27,5 +27,5 @@ void rd_i_row_push(RDRow* self, u32 cp, RDThemeKind fg, RDThemeKind bg) {
     if(fg == RD_THEME_DEFAULT) fg = RD_THEME_FOREGROUND;
     if(bg == RD_THEME_DEFAULT) bg = RD_THEME_BACKGROUND;
     vect_push(&self->cells, (RDCell){.cp = cp, .fg = fg, .bg = bg});
-    vect_push(&self->data, self->curr_meta);
+    vect_push(&self->data, self->curr_data);
 }

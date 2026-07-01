@@ -7,21 +7,8 @@
 #include "rdil/renderer.h"
 #include "support/containers.h"
 #include "support/utils.h"
-#include <ctype.h>
 
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
-
-static bool _rd_is_char_skippable(const RDCell* c) {
-    if(c->cp > 0x7f) return true; // non-ASCII, always skippable
-
-    static const char NON_SKIPPABLE_CHARS[] = {'_', '@', '.', '#', ':', '?'};
-
-    for(usize i = 0; i < rd_count_of(NON_SKIPPABLE_CHARS); i++) {
-        if((char)c->cp == NON_SKIPPABLE_CHARS[i]) return false;
-    }
-
-    return isspace((int)c->cp) || ispunct((int)c->cp);
-}
 
 static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
                                         int row, int col) {
@@ -29,17 +16,19 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
 
     RDRow* r = vect_at(rows, row);
     if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
-    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col))) return NULL;
 
     vect_clear(&self->word_buf);
 
+    unsigned int group_idx = rd_i_row_data_at(r, col)->group_idx;
+    if(!group_idx) return NULL;
+
     for(int i = col; i-- > 0;) {
-        if(_rd_is_char_skippable(vect_at(&r->cells, i))) break;
+        if(rd_i_row_data_at(r, i)->group_idx != group_idx) break;
         col--;
     }
 
     for(int i = col; i < rd_i_row_length(r); i++) {
-        if(_rd_is_char_skippable(rd_i_row_cell_at(r, i))) break;
+        if(rd_i_row_data_at(r, i)->group_idx != group_idx) break;
         rd_i_cp_push_utf8(&self->word_buf, rd_i_row_cell_at(r, i)->cp);
     }
 
@@ -99,10 +88,12 @@ void rd_i_renderer_clear(RDRenderer* self) {
     rd_i_rowvect_destroy(&self->rows_back);
     vect_clear(&self->rows_back);
     self->auto_columns = 0;
+    self->group_idx = 0;
 }
 
 void rd_i_renderer_swap(RDRenderer* self) {
     mem_swap(RDRowVect, &self->rows_back, &self->rows_front);
+    self->group_idx = 0;
 }
 
 void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m) {
@@ -124,9 +115,15 @@ void rd_i_renderer_fill_columns(RDRenderer* self) {
     vect_each(row, &self->rows_back) {
         row->content_length = rd_i_row_length(row);
 
+        // un-data fill characters
+        RDCellData olddata = row->curr_data;
+        row->curr_data = rd_i_default_cell_data();
+
         while(rd_i_row_length(row) <= ncols) {
             rd_i_row_push(row, ' ', RD_THEME_FOREGROUND, RD_THEME_BACKGROUND);
         }
+
+        row->curr_data = olddata;
     }
 }
 
@@ -244,6 +241,7 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
     assert(s && "invalid chunk string");
 
     RDRow* r = vect_last(&self->rows_back);
+    r->curr_data.group_idx = ++self->group_idx;
 
     while(*s) {
         if(self->columns && rd_i_row_length(r) >= self->columns) break;
@@ -271,6 +269,15 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                 rd_i_row_push(r, '\\', fg, bg);
                 rd_i_row_push(r, 'v', fg, bg);
                 break;
+
+            case ' ': {
+                // un-data whitespaces
+                RDCellData olddata = r->curr_data;
+                r->curr_data = rd_i_default_cell_data();
+                rd_i_row_push(r, ' ', fg, bg);
+                r->curr_data = olddata;
+                break;
+            }
 
             default: rd_i_row_push(r, cp, fg, bg); break;
         }
@@ -349,14 +356,8 @@ void rd_renderer_norm(RDRenderer* self, const char* s) {
 }
 
 void rd_renderer_ws(RDRenderer* self, int n) {
-    // un-meta whitespaces
-    RDCellData oldmeta = *rd_i_renderer_get_current_cell_data(self);
-    rd_i_renderer_set_current_cell_data(self, rd_i_default_cell_data());
-
     for(int i = 0; i < n; i++)
         rd_renderer_norm(self, " ");
-
-    rd_i_renderer_set_current_cell_data(self, oldmeta);
 }
 
 void rd_renderer_str(RDRenderer* self, const char* s, bool quoted) {
@@ -567,7 +568,7 @@ bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,
     RDRow* r = vect_at(&self->rows_front, pos->row);
     if(pos->col >= rd_i_row_length(r)) return false;
 
-    if(cd) *cd = *rd_i_row_meta_at(r, pos->col);
+    if(cd) *cd = *rd_i_row_data_at(r, pos->col);
     return true;
 }
 
@@ -607,12 +608,12 @@ RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx) {
 
 RDCellData* rd_i_renderer_get_current_cell_data(const RDRenderer* self) {
     RDRow* r = vect_last(&self->rows_back);
-    return &r->curr_meta;
+    return &r->curr_data;
 }
 
 void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m) {
     RDRow* r = vect_last(&self->rows_back);
-    r->curr_meta = m;
+    r->curr_data = m;
 }
 
 usize rd_i_renderer_get_row_count(const RDRenderer* self) {
@@ -626,21 +627,20 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
     RDRow* r = vect_at(&self->rows_front, row);
     if(col >= rd_i_row_length(r)) col = rd_i_row_length(r) - 1;
 
-    if(_rd_is_char_skippable(rd_i_row_cell_at(r, col))) return false;
+    unsigned int group_idx = rd_i_row_data_at(r, col)->group_idx;
+    if(!group_idx) return false;
 
     int startcol = 0, endcol = 0;
 
     for(int i = col; i-- > 0;) {
-        const RDCell* cell = rd_i_row_cell_at(r, i);
-        if(_rd_is_char_skippable(cell)) {
+        if(rd_i_row_data_at(r, i)->group_idx != group_idx) {
             startcol = i + 1;
             break;
         }
     }
 
     for(int i = col; i < rd_i_row_length(r); i++) {
-        const RDCell* cell = rd_i_row_cell_at(r, i);
-        if(_rd_is_char_skippable(cell)) {
+        if(rd_i_row_data_at(r, i)->group_idx != group_idx) {
             endcol = i - 1;
             break;
         }

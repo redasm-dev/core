@@ -25,7 +25,7 @@ typedef struct RDRow {
     RDAddress address;
     int content_length; // length before padding (number of valid cells)
 
-    RDCellData curr_meta;
+    RDCellData curr_data;
 } RDRow;
 
 typedef struct RDRowVect {
@@ -50,7 +50,7 @@ static inline RDCell* rd_i_row_cell_at(RDRow* self, int idx) {
     return vect_at(&self->cells, idx);
 }
 
-static inline RDCellData* rd_i_row_meta_at(RDRow* self, int idx) {
+static inline RDCellData* rd_i_row_data_at(RDRow* self, int idx) {
     return vect_at(&self->data, idx);
 }
 

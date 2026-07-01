@@ -14,6 +14,7 @@ typedef struct RDRenderer {
     RDRenderFlags flags;
     RDRenderMode mode;
     int columns, auto_columns;
+    unsigned int group_idx;
     RDAddress curr_address;
     LIndex listing_idx;
     RDRowVect rows_front, rows_back;

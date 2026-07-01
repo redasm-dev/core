@@ -53,6 +53,8 @@ typedef struct RDCellData {
         int index;
         RDOperand value;
     } operand;
+
+    unsigned int group_idx;
 } RDCellData;
 
 typedef struct RDRowSlice {
