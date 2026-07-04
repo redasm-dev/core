@@ -1,5 +1,6 @@
 #pragma once
 
+#include "support/scratch.h"
 #include "support/utils.h"
 #include "theme.h"
 #include <redasm/redasm.h>
@@ -39,6 +40,11 @@ typedef struct RDGlobalState {
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;
     RDCharVect mnem_buf;
+
+    RDScratchBuffer encode_buf;
+
+    RDContext* encode_ctx;
+    RDContext* decode_ctx;
 
     struct {
         RDTestResult** data;

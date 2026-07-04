@@ -1,8 +1,11 @@
 #pragma once
 
 #include <redasm/config.h>
+#include <redasm/support/scratch.h>
+#include <redasm/support/utils.h>
 
 RD_API const char* rd_format(const char* fmt, ...);
+RD_API const char* rd_format_to(RDScratchBuffer* buf, const char* fmt, ...);
 RD_API u64 rd_align_up(u64 val, u64 align);
 RD_API char* rd_strdup(const char* s);
 RD_API char* rd_stristr(const char* haystack, const char* needle);

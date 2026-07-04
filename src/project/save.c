@@ -3,10 +3,10 @@
 #include "plugins/analyzer.h"
 #include "project.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include "support/utils.h"
 #include <inttypes.h>
 #include <miniz.h>
+#include <redasm/support/logging.h>
 #include <tomlc17.h>
 
 static const char* _rd_project_write_manifest(const RDContext* ctx,
@@ -53,7 +53,7 @@ static void _rd_project_add_file_buf(mz_zip_archive* zip, const char* filename,
     *ok = mz_zip_writer_add_mem(zip, filename, data, n,
                                 (mz_uint)MZ_DEFAULT_COMPRESSION);
 
-    if(!(*ok)) LOG_FAIL("cannot write '%s'", filename);
+    if(!(*ok)) RD_LOG_FAIL("cannot write '%s'", filename);
 }
 
 static void _rd_project_add_file(mz_zip_archive* zip, const char* filename,
@@ -62,7 +62,7 @@ static void _rd_project_add_file(mz_zip_archive* zip, const char* filename,
     RDByteBuffer* b = rd_i_readfile(inputpath);
 
     if(!b) {
-        LOG_FAIL("cannot open '%s'", inputpath);
+        RD_LOG_FAIL("cannot open '%s'", inputpath);
         *ok = false;
         return;
     }
@@ -77,14 +77,14 @@ bool rd_export(RDContext* self, const char* filepath, RDExportFormat f) {
     switch(f) {
         case RD_EXPORT_DB: {
             if(rd_i_db_export(self, filepath)) {
-                LOG_INFO("DB exported to %s", filepath);
+                RD_LOG_INFO("DB exported to %s", filepath);
                 return true;
             }
 
             break;
         }
 
-        default: LOG_FAIL("unsupported export format %d", f); break;
+        default: RD_LOG_FAIL("unsupported export format %d", f); break;
     }
 
     return false;
@@ -111,7 +111,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
     bool ok = mz_zip_writer_init_file(&zip, filepath, 0);
 
     if(!ok) {
-        LOG_FAIL("cannot create project file '%s'", filepath);
+        RD_LOG_FAIL("cannot create project file '%s'", filepath);
         goto cleanup;
     }
 
@@ -127,7 +127,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
     tmpdbpath = rd_i_get_unique_temp_path(RD_PROJECT_DATABASE);
 
     if(!tmpdbpath) {
-        LOG_FAIL("temporary path creation failed");
+        RD_LOG_FAIL("temporary path creation failed");
         goto cleanup;
     }
 
@@ -151,7 +151,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
 cleanup:
     if(ok) {
         mz_zip_writer_finalize_archive(&zip);
-        LOG_INFO("project saved in '%s'", filepath);
+        RD_LOG_INFO("project saved in '%s'", filepath);
     }
 
     rd_free(tmpdbpath);

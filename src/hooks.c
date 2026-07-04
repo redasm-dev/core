@@ -1,7 +1,7 @@
 #include "hooks.h"
 #include "core/context.h"
 #include "support/containers.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 
 #define rd_fire_all_hooks_impl(it, ctx, name, hooks, searchcb, ...)            \
     do {                                                                       \
@@ -143,8 +143,9 @@ bool rd_register_hook(RDContext* ctx, const char* name, RDHook h) {
     while(i < vect_length(&ctx->hooks->general) &&
           vect_at(&ctx->hooks->general, i)->name == interned) {
         if(vect_at(&ctx->hooks->general, i)->hook == h) {
-            LOG_WARN("hook '%s' already registered with same handler, ignoring",
-                     name);
+            RD_LOG_WARN(
+                "hook '%s' already registered with same handler, ignoring",
+                name);
             return false;
         }
         i++;
@@ -172,9 +173,9 @@ bool rd_register_instruction_hook(RDContext* ctx, const char* name,
     while(i < vect_length(&ctx->hooks->instruction) &&
           vect_at(&ctx->hooks->instruction, i)->name == interned) {
         if(vect_at(&ctx->hooks->instruction, i)->hook == h) {
-            LOG_WARN("instruction hook '%s' already registered with same "
-                     "handler, ignoring",
-                     name);
+            RD_LOG_WARN("instruction hook '%s' already registered with same "
+                        "handler, ignoring",
+                        name);
             return false;
         }
         i++;
@@ -202,9 +203,10 @@ bool rd_register_address_hook(RDContext* ctx, const char* name,
     while(i < vect_length(&ctx->hooks->address) &&
           vect_at(&ctx->hooks->address, i)->name == interned) {
         if(vect_at(&ctx->hooks->address, i)->hook == h) {
-            LOG_WARN("address hook '%s' already registered with same handler, "
-                     "ignoring",
-                     name);
+            RD_LOG_WARN(
+                "address hook '%s' already registered with same handler, "
+                "ignoring",
+                name);
             return false;
         }
         i++;
@@ -231,9 +233,10 @@ bool rd_register_string_hook(RDContext* ctx, const char* name, RDStringHook h) {
     while(i < vect_length(&ctx->hooks->string) &&
           vect_at(&ctx->hooks->string, i)->name == interned) {
         if(vect_at(&ctx->hooks->string, i)->hook == h) {
-            LOG_WARN("string hook '%s' already registered with same handler, "
-                     "ignoring",
-                     name);
+            RD_LOG_WARN(
+                "string hook '%s' already registered with same handler, "
+                "ignoring",
+                name);
             return false;
         }
         i++;
@@ -260,7 +263,7 @@ bool rd_register_xref_hook(RDContext* ctx, const char* name, RDXRefHook h) {
     while(i < vect_length(&ctx->hooks->xref) &&
           vect_at(&ctx->hooks->xref, i)->name == interned) {
         if(vect_at(&ctx->hooks->xref, i)->hook == h) {
-            LOG_WARN(
+            RD_LOG_WARN(
                 "xref hook '%s' already registered with same handler, ignoring",
                 name);
             return false;
@@ -288,8 +291,9 @@ bool rd_register_render_mnemonic_hook(RDContext* ctx, const char* name,
     if(i < vect_length(&ctx->hooks->render) &&
        vect_at(&ctx->hooks->render, i)->name == interned) {
         if(vect_at(&ctx->hooks->render, i)->mnemonic)
-            LOG_WARN("render mnemonic hook '%s' already registered, replacing",
-                     name);
+            RD_LOG_WARN(
+                "render mnemonic hook '%s' already registered, replacing",
+                name);
         vect_at(&ctx->hooks->render, i)->mnemonic = h;
         return true;
     }
@@ -315,8 +319,8 @@ bool rd_register_render_operand_hook(RDContext* ctx, const char* name,
     if(i < vect_length(&ctx->hooks->render) &&
        vect_at(&ctx->hooks->render, i)->name == interned) {
         if(vect_at(&ctx->hooks->render, i)->operand)
-            LOG_WARN("render operand hook '%s' already registered, replacing",
-                     name);
+            RD_LOG_WARN(
+                "render operand hook '%s' already registered, replacing", name);
 
         vect_at(&ctx->hooks->render, i)->operand = h;
         return true;

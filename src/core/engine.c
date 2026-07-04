@@ -3,6 +3,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/scratch.h"
 
 static const char* _rd_engine_queue_name(RDEngineItemKind k) {
     switch(k) {
@@ -388,6 +389,23 @@ void rd_flow(RDContext* ctx, RDAddress address) {
     // address accepted, flow there
     optional_set(&ctx->engine.flow, address);
     ctx->engine.current.from = ctx->engine.current.address;
+}
+
+bool rd_encode(RDContext* ctx, RDAddress address, const char* s,
+               RDScratchBuffer* buf) {
+    if(!buf) return false;
+
+    rd_scratch_clear(buf);
+
+    const RDProcessorPlugin* plugin = ctx->processorplugin;
+
+    if(!plugin->encode) {
+        rd_i_format(&buf->impl, "processor '%s' does not support encoding",
+                    plugin->id);
+        return false;
+    }
+
+    return plugin->encode(ctx, address, s, buf, ctx->processor);
 }
 
 bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {

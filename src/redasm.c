@@ -2,9 +2,9 @@
 #include "core/state.h"
 #include "plugins/loader.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include "support/utils.h"
 #include "surface/renderer.h"
+#include <redasm/support/logging.h>
 
 static char* _rd_derive_path(const RDTestResult* tr,
                              const RDAcceptParams* params, const char* ext) {
@@ -45,19 +45,19 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     if(!tr || !params) return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
 
     if(!tr->filepath) {
-        LOG_FAIL("filepath is NULL");
+        RD_LOG_FAIL("filepath is NULL");
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
     char* workingdir = rd_i_get_file_path(tr->filepath);
     if(!workingdir) {
-        LOG_FAIL("cannot extract filepath from '%s'", tr->filepath);
+        RD_LOG_FAIL("cannot extract filepath from '%s'", tr->filepath);
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
     const char* filename = rd_i_get_file_name(tr->filepath);
     if(!filename) {
-        LOG_FAIL("cannot extract filename from '%s'", tr->filepath);
+        RD_LOG_FAIL("cannot extract filename from '%s'", tr->filepath);
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
@@ -69,8 +69,8 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
         params->processorplugin ? params->processorplugin : tr->processorplugin;
 
     if(!pplugin) {
-        LOG_FAIL("processor plugin not set for loader '%s'",
-                 tr->loaderplugin->id);
+        RD_LOG_FAIL("processor plugin not set for loader '%s'",
+                    tr->loaderplugin->id);
         goto cleanup;
     }
 
@@ -113,9 +113,9 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
 
     if(res.context->loaderplugin->load(tr->loader, res.context)) {
         res.status = RD_ACCEPT_OK;
-        LOG_INFO("selected loader '%s' and processor '%s'",
-                 res.context->loaderplugin->id,
-                 res.context->processorplugin->id);
+        RD_LOG_INFO("selected loader '%s' and processor '%s'",
+                    res.context->loaderplugin->id,
+                    res.context->processorplugin->id);
     }
     else {
         rd_destroy(res.context);
@@ -149,6 +149,42 @@ void rd_reject(void) {
     assert(inputbuf);
     rd_i_buffer_destroy((RDBuffer*)inputbuf);
     vect_clear(&rd_i_state.tests);
+}
+
+const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
+                                             const RDProcessorPlugin* p,
+                                             const char** errmsg) {
+    if(!p) return NULL;
+
+    if(!rd_i_state.encode_ctx || rd_i_state.encode_ctx->processorplugin != p) {
+        rd_destroy(rd_i_state.encode_ctx);
+
+        static const char DUMMY_DATA[] = {0x00, 0x00, 0x00, 0x00};
+
+        RDTestResultSlice slice =
+            rd_test_data(DUMMY_DATA, rd_count_of(DUMMY_DATA));
+        if(rd_slice_is_empty(slice)) return NULL;
+
+        const RDTestResult* tr = rd_slice_at(slice, 0);
+        RDAcceptResult res = rd_accept(tr, &(RDAcceptParams){
+                                               .processorplugin = p,
+                                               .addressing =
+                                                   {
+                                                       .address = address,
+                                                       .entrypoint = address,
+                                                   },
+                                           });
+
+        if(res.status != RD_ACCEPT_OK) return NULL;
+        rd_i_state.encode_ctx = res.context;
+    }
+
+    RDContext* ctx = rd_i_state.encode_ctx;
+    if(!ctx) return NULL;
+
+    bool ok = rd_encode(ctx, address, s, &rd_i_state.encode_buf);
+    if(!ok && errmsg) *errmsg = rd_i_state.encode_buf.impl.data;
+    return ok ? &rd_i_state.encode_buf : NULL;
 }
 
 bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,

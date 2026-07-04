@@ -1,9 +1,9 @@
 #include "autorename.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include "support/utils.h"
 #include <rdil/rdil.h>
+#include <redasm/support/logging.h>
 
 #define RD_AUTORENAME_DEPTH 8
 
@@ -53,7 +53,7 @@ static const char* _rd_resolve_name(RDContext* ctx, RDAddress target,
 }
 
 static void _rd_autorename_functions(RDContext* ctx) {
-    LOG_INFO("autorenaming functions");
+    RD_LOG_INFO("autorenaming functions");
     RDCharVect namebuf = {0};
     RDIL* rdil = rd_il_create(ctx, NULL);
 
@@ -99,7 +99,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
 }
 
 static void _rd_autorename_types(RDContext* ctx) {
-    LOG_INFO("autorenaming types");
+    RD_LOG_INFO("autorenaming types");
 
     RDCharVect name_buf = {0};
 

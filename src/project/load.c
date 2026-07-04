@@ -4,10 +4,10 @@
 #include "listing/builder.h"
 #include "project.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include "support/tomlschema.h"
 #include <inttypes.h>
 #include <miniz.h>
+#include <redasm/support/logging.h>
 #include <tomlc17.h>
 
 typedef struct RDProjectManifest {
@@ -83,7 +83,7 @@ static bool _rd_project_resolve_paths(const char* filepath,
         out->working_dir = rd_i_get_file_path(filepath);
 
         if(!out->working_dir) {
-            LOG_FAIL("cannot get file path for '%s'", filepath);
+            RD_LOG_FAIL("cannot get file path for '%s'", filepath);
             return false;
         }
     }
@@ -93,7 +93,7 @@ static bool _rd_project_resolve_paths(const char* filepath,
     char* stem = rd_i_get_file_stem(manifest->file_name);
 
     if(!stem) {
-        LOG_FAIL("cannot get file stem for '%s'", manifest->file_name);
+        RD_LOG_FAIL("cannot get file stem for '%s'", manifest->file_name);
         return false;
     }
 
@@ -120,7 +120,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         zip, RD_PROJECT_MANIFEST, &n, 0);
 
     if(!manifest_buf || !n) {
-        LOG_FAIL("project manifest not found");
+        RD_LOG_FAIL("project manifest not found");
         return false;
     }
 
@@ -132,7 +132,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     out->toml = toml_parse(out->raw, (int)n);
 
     if(!out->toml.ok) {
-        LOG_FAIL("invalid project manifest: %s", out->toml.errmsg);
+        RD_LOG_FAIL("invalid project manifest: %s", out->toml.errmsg);
         return false;
     }
 
@@ -142,8 +142,8 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     out->version = toml_seek(out->toml.toptab, "format.version").u.int64;
 
     if(out->version != RD_PROJECT_VERSION) {
-        LOG_FAIL("expected %d as project version, got %" PRId64,
-                 RD_PROJECT_VERSION, out->version);
+        RD_LOG_FAIL("expected %d as project version, got %" PRId64,
+                    RD_PROJECT_VERSION, out->version);
         return false;
     }
 
@@ -158,7 +158,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     out->loaderplugin = rd_loader_find(loader_id);
 
     if(!out->loaderplugin) {
-        LOG_FAIL("loader '%s' not found", loader_id);
+        RD_LOG_FAIL("loader '%s' not found", loader_id);
         return false;
     }
 
@@ -169,7 +169,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     out->processorplugin = rd_processor_find(processor_id);
 
     if(!out->processorplugin) {
-        LOG_FAIL("processor '%s' not found", processor_id);
+        RD_LOG_FAIL("processor '%s' not found", processor_id);
         return false;
     }
 
@@ -185,7 +185,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         const RDAnalyzerPlugin* plugin = rd_analyzer_find(id);
 
         if(!plugin) {
-            LOG_FAIL("analyzer '%s' not found", id);
+            RD_LOG_FAIL("analyzer '%s' not found", id);
             return false;
         }
 
@@ -203,7 +203,7 @@ static bool _rd_project_extract_db(mz_zip_archive* zip,
                                    const RDProjectPaths* paths) {
     if(!mz_zip_reader_extract_file_to_file(zip, RD_PROJECT_DATABASE,
                                            paths->db_path, 0)) {
-        LOG_FAIL("cannot extract project database to '%s'", paths->db_path);
+        RD_LOG_FAIL("cannot extract project database to '%s'", paths->db_path);
         return false;
     }
     return true;
@@ -217,7 +217,7 @@ _rd_project_extract_input(mz_zip_archive* zip,
         mz_zip_reader_extract_file_to_heap(zip, manifest->file_name, &n, 0);
 
     if(!data) {
-        LOG_FAIL("cannot read project input file '%s'", manifest->file_name);
+        RD_LOG_FAIL("cannot read project input file '%s'", manifest->file_name);
         return NULL;
     }
 
@@ -251,7 +251,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
         if(!flags ||
            n != rd_flagsbuffer_get_length((*seg)->flags) * sizeof(RDFlags)) {
-            LOG_FAIL("flags mismatch for segment '%s'", (*seg)->base.name);
+            RD_LOG_FAIL("flags mismatch for segment '%s'", (*seg)->base.name);
             mz_free(flags);
             goto fail;
         }
@@ -286,7 +286,7 @@ RDAcceptResult rd_project_load(const char* filepath, const char* workingdir) {
     mz_zip_archive zip = {0};
 
     if(!mz_zip_reader_init_file(&zip, filepath, 0)) {
-        LOG_FAIL("cannot open project '%s'", filepath);
+        RD_LOG_FAIL("cannot open project '%s'", filepath);
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
@@ -310,7 +310,7 @@ RDAcceptResult rd_project_load(const char* filepath, const char* workingdir) {
     if(!res.context) goto cleanup;
 
     res.status = RD_ACCEPT_OK;
-    LOG_INFO("loading project '%s'", filepath);
+    RD_LOG_INFO("loading project '%s'", filepath);
 
 cleanup:
     if(res.status != RD_ACCEPT_OK) {

@@ -4,7 +4,7 @@
 #include "plugins/builtin/builtin.h"
 #include "plugins/common.h"
 #include "support/containers.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 
 static bool _rd_part_loaders(const RDTestResult** tr) {
     return !((*tr)->loaderplugin->flags & RD_PF_LAST);
@@ -21,7 +21,7 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
     RDPlugin** it;
     vect_each(it, &rd_i_state.loaders) {
         const RDLoaderPlugin* loaderplugin = (*it)->loader;
-        LOG_DEBUG("testing '%s' ...", loaderplugin->id);
+        RD_LOG_DEBUG("testing '%s' ...", loaderplugin->id);
 
         RDParseResult pr = rd_i_parse(loaderplugin, inputbuf, filepath);
         if(!pr.processorplugin) continue;
@@ -97,26 +97,26 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
     if(!rd_i_validate_plugin(l->level, l->id, "loader")) return false;
 
     if(!l->get_name) {
-        LOG_FAIL("loader '%s' requires a name", l->id);
+        RD_LOG_FAIL("loader '%s' requires a name", l->id);
         return false;
     }
 
     if(!l->parse) {
-        LOG_FAIL("loader '%s' requires a parse function", l->id);
+        RD_LOG_FAIL("loader '%s' requires a parse function", l->id);
         return false;
     }
 
     if(!l->load) {
-        LOG_FAIL("loader '%s' requires a load function", l->id);
+        RD_LOG_FAIL("loader '%s' requires a load function", l->id);
         return false;
     }
 
     if(rd_loader_find(l->id)) {
-        LOG_WARN("loader '%s' already registered", l->id);
+        RD_LOG_WARN("loader '%s' already registered", l->id);
         return false;
     }
 
-    LOG_DEBUG("registering loader '%s'", l->id);
+    RD_LOG_DEBUG("registering loader '%s'", l->id);
     RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->loader = l;
     vect_push(&rd_i_state.loaders, plugin);

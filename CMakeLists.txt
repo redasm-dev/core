@@ -59,7 +59,9 @@ target_sources(${PROJECT_NAME}
         src/support/containers.c
         src/support/error.c
         src/support/hash.c
+        src/support/lexer.c
         src/support/logging.c
+        src/support/scratch.c
         src/support/utils.c
         src/support/stringpool.c
         src/support/tomlschema.c

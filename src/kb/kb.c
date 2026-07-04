@@ -5,10 +5,10 @@
 #include "kb/schema.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
 #include "support/tomlschema.h"
 #include <errno.h>
 #include <redasm/allocator.h>
+#include <redasm/support/logging.h>
 
 #define RD_KB_EXT ".toml"
 
@@ -303,19 +303,19 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
             u32 ord_val = (u32)strtoul(ord_str, NULL, 10);
 
             if(errno != 0) {
-                LOG_WARN("invalid ordinal '%s' for module '%s', skipping...",
-                         ord_str, modname);
+                RD_LOG_WARN("invalid ordinal '%s' for module '%s', skipping...",
+                            ord_str, modname);
                 continue;
             }
 
             const char* func_name = rd_kbobject_to_str(ord);
 
             if(!func_name) {
-                LOG_WARN("ordinal-name must be '%s', got '%s' for module '%s', "
-                         "skipping...",
-                         rd_i_toml_type_str(TOML_STRING),
-                         rd_i_toml_type_str(rd_i_kbobject_toml_type(ord)),
-                         modname);
+                RD_LOG_WARN(
+                    "ordinal-name must be '%s', got '%s' for module '%s', "
+                    "skipping...",
+                    rd_i_toml_type_str(TOML_STRING),
+                    rd_i_toml_type_str(rd_i_kbobject_toml_type(ord)), modname);
                 continue;
             }
 
@@ -324,7 +324,7 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
 
             if(idx < vect_length(&mod->ordinals) &&
                vect_at(&mod->ordinals, idx)->ordinal == ord_val) {
-                LOG_WARN(
+                RD_LOG_WARN(
                     "duplicate ordinal '%s', ' for module '%s', skipping...",
                     ord_str, modname);
                 continue;
@@ -416,14 +416,14 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     const char* kb_path = _rd_kb_find_path(kb);
 
     if(!kb_path) {
-        LOG_FAIL("KB '%s' not found", kb);
+        RD_LOG_FAIL("KB '%s' not found", kb);
         return NULL;
     }
 
     toml_result_t toml = toml_parse_file_ex(kb_path);
 
     if(!toml.ok) {
-        LOG_FAIL("%s", toml.errmsg);
+        RD_LOG_FAIL("%s", toml.errmsg);
         return NULL;
     }
 
@@ -435,7 +435,7 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     vect_push(&ctx->kb->files, kbfile); // avoid recursion
     _rd_kb_load_dependencies(kbfile->root, ctx);
 
-    LOG_INFO("loading KB '%s'", kb);
+    RD_LOG_INFO("loading KB '%s'", kb);
     _rd_kb_load_compound(kbfile->root, ctx);
     _rd_kb_load_enums(kbfile->root, ctx);
     _rd_kb_load_functions(kbfile->root, ctx);

@@ -1,7 +1,7 @@
 #include "theme.h"
 #include "core/state.h"
-#include "support/logging.h"
 #include <ctype.h>
+#include <redasm/support/logging.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -45,24 +45,24 @@ static const RDThemeParam RD_THEME_PARAMS[] = {
 
 static bool _rd_theme_validate_color(const char* color) {
     if(!color) {
-        LOG_FAIL("color is NULL");
+        RD_LOG_FAIL("color is NULL");
         return false;
     }
 
     if(strlen(color) != sizeof(RDColor) - 1) {
-        LOG_FAIL("invalid color length: expected %zu, got %zu",
-                 sizeof(RDColor) - 1, strlen(color));
+        RD_LOG_FAIL("invalid color length: expected %zu, got %zu",
+                    sizeof(RDColor) - 1, strlen(color));
         return false;
     }
 
     if(color[0] != '#') {
-        LOG_FAIL("color must start with '#'");
+        RD_LOG_FAIL("color must start with '#'");
         return false;
     }
 
     for(unsigned int i = 1; i < sizeof(RDColor) - 1; i++) {
         if(!isxdigit((unsigned char)color[i])) {
-            LOG_FAIL("invalid character '%c' at position %d", color[i], i);
+            RD_LOG_FAIL("invalid character '%c' at position %d", color[i], i);
             return false;
         }
     }
@@ -82,7 +82,7 @@ bool rd_i_theme_set_color(RDTheme* self, RDThemeKind kind, const char* color) {
     if(!_rd_theme_validate_color(color)) return false;
 
     if(kind >= RD_THEME_COUNT) {
-        LOG_FAIL("invalid theme kind: %d", kind);
+        RD_LOG_FAIL("invalid theme kind: %d", kind);
         return false;
     }
 
@@ -97,7 +97,7 @@ bool rd_set_theme_color(RDThemeKind kind, const char* color) {
 
 const char* rd_get_theme_color(RDThemeKind kind) {
     if(kind >= RD_THEME_COUNT) {
-        LOG_FAIL("invalid theme kind: %d", kind);
+        RD_LOG_FAIL("invalid theme kind: %d", kind);
         return NULL;
     }
 

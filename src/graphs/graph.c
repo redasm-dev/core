@@ -1,8 +1,8 @@
 #include "graph.h"
 #include "support/containers.h"
 #include "support/hash.h"
-#include "support/logging.h"
 #include <redasm/allocator.h>
+#include <redasm/support/logging.h>
 #include <redasm/support/utils.h>
 #include <redasm/theme.h>
 
@@ -52,7 +52,7 @@ RDNodeAttributes* rd_i_graph_get_node_attributes(RDGraph* self, RDGraphNode n) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         return vect_at(&self->node_attributes, rd_i_node2index(n));
 
-    LOG_WARN("node out of range");
+    RD_LOG_WARN("node out of range");
     return NULL;
 }
 
@@ -219,7 +219,7 @@ bool rd_graph_set_data(RDGraph* self, RDGraphNode n, RDNodeData d) {
         return true;
     }
 
-    LOG_WARN("node out of range");
+    RD_LOG_WARN("node out of range");
     return false;
 }
 
@@ -271,7 +271,7 @@ int rd_graph_get_node_x(const RDGraph* self, RDGraphNode n) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         return vect_at(&self->node_attributes, rd_i_node2index(n))->x;
 
-    LOG_WARN("cannot get x-coordinate, node out of range");
+    RD_LOG_WARN("cannot get x-coordinate, node out of range");
     return -1;
 }
 
@@ -281,7 +281,7 @@ int rd_graph_get_node_y(const RDGraph* self, RDGraphNode n) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         return vect_at(&self->node_attributes, rd_i_node2index(n))->y;
 
-    LOG_WARN("cannot get y-coordinate, node out of range");
+    RD_LOG_WARN("cannot get y-coordinate, node out of range");
     return -1;
 }
 
@@ -291,7 +291,7 @@ int rd_graph_get_node_width(const RDGraph* self, RDGraphNode n) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         return vect_at(&self->node_attributes, rd_i_node2index(n))->width;
 
-    LOG_WARN("cannot get width, node out of range");
+    RD_LOG_WARN("cannot get width, node out of range");
     return -1;
 }
 
@@ -301,7 +301,7 @@ int rd_graph_get_node_height(const RDGraph* self, RDGraphNode n) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         return vect_at(&self->node_attributes, rd_i_node2index(n))->height;
 
-    LOG_WARN("cannot get height, node out of range");
+    RD_LOG_WARN("cannot get height, node out of range");
     return -1;
 }
 
@@ -311,7 +311,7 @@ void rd_graph_set_node_x(RDGraph* self, RDGraphNode n, int x) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         vect_at(&self->node_attributes, rd_i_node2index(n))->x = x;
     else
-        LOG_WARN("cannot set x-coordinate, node out of range");
+        RD_LOG_WARN("cannot set x-coordinate, node out of range");
 }
 
 void rd_graph_set_node_y(RDGraph* self, RDGraphNode n, int y) {
@@ -320,7 +320,7 @@ void rd_graph_set_node_y(RDGraph* self, RDGraphNode n, int y) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         vect_at(&self->node_attributes, rd_i_node2index(n))->y = y;
     else
-        LOG_WARN("cannot set y-coordinate, node out of range");
+        RD_LOG_WARN("cannot set y-coordinate, node out of range");
 }
 
 void rd_graph_set_node_width(RDGraph* self, RDGraphNode n, int w) {
@@ -329,7 +329,7 @@ void rd_graph_set_node_width(RDGraph* self, RDGraphNode n, int w) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         vect_at(&self->node_attributes, rd_i_node2index(n))->width = w;
     else
-        LOG_WARN("cannot set width, node out of range");
+        RD_LOG_WARN("cannot set width, node out of range");
 }
 
 void rd_graph_set_node_height(RDGraph* self, RDGraphNode n, int h) {
@@ -338,7 +338,7 @@ void rd_graph_set_node_height(RDGraph* self, RDGraphNode n, int h) {
     if(rd_i_node2index(n) < vect_length(&self->node_attributes))
         vect_at(&self->node_attributes, rd_i_node2index(n))->height = h;
     else
-        LOG_WARN("cannot set height, node out of range");
+        RD_LOG_WARN("cannot set height, node out of range");
 }
 
 const char* rd_graph_get_edge_color(const RDGraph* self, const RDGraphEdge* e) {

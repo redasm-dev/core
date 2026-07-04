@@ -2,8 +2,8 @@
 #include "core/context.h"
 #include "core/state.h"
 #include "plugins/common.h"
-#include "support/logging.h"
 #include "surface/renderer.h"
+#include <redasm/support/logging.h>
 #include <stddef.h>
 
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
@@ -132,31 +132,31 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
         return false;
 
     if(!p->decode) {
-        LOG_FAIL("processor '%s' requires a decoder", p->id);
+        RD_LOG_FAIL("processor '%s' requires a decoder", p->id);
         return false;
     }
 
     if(!p->emulate) {
-        LOG_FAIL("processor '%s' requires an emulator", p->id);
+        RD_LOG_FAIL("processor '%s' requires an emulator", p->id);
         return false;
     }
 
     if(!p->ptr_size) {
-        LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
+        RD_LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
         return false;
     }
 
     if(!p->int_size) {
-        LOG_FAIL("invalid integer-size for processor '%s'", p->id);
+        RD_LOG_FAIL("invalid integer-size for processor '%s'", p->id);
         return false;
     }
 
     if(rd_processor_find(p->id)) {
-        LOG_WARN("processor '%s' already registered", p->id);
+        RD_LOG_WARN("processor '%s' already registered", p->id);
         return false;
     }
 
-    LOG_DEBUG("registering processor '%s' [%s]", p->id, p->name);
+    RD_LOG_DEBUG("registering processor '%s' [%s]", p->id, p->name);
     RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->processor = p;
     vect_push(&rd_i_state.processors, plugin);

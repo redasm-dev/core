@@ -15,7 +15,9 @@
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
+#include <redasm/support/lexer.h>
 #include <redasm/support/logging.h>
+#include <redasm/support/scratch.h>
 #include <redasm/support/utils.h>
 #include <redasm/surface/graph.h>
 #include <redasm/surface/renderer.h>
@@ -75,6 +77,7 @@ RD_API RDAcceptResult rd_project_load(const char* filepath, const char* workingd
 RD_API RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params);
 RD_API void rd_reject(void);
 RD_API const char* rd_dump_instruction(const RDInstruction* instr);
+RD_API const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address, const RDProcessorPlugin* p, const char** errmsg);
 RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr, const RDProcessorPlugin* p, RDDecodedInstruction* dec);
 
 RD_API const RDLoaderPlugin* rd_testresult_get_loader_plugin(const RDTestResult* self);

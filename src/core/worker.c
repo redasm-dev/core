@@ -7,7 +7,7 @@
 #include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 
 // clang-format off
 static const char* const RD_STEP_NAMES[] = {
@@ -33,7 +33,7 @@ static int _rd_worker_problem_cmp(const void* a, const void* b) {
 }
 
 static void _rd_worker_rebuild_functions(RDContext* ctx) {
-    LOG_INFO("generating functions");
+    RD_LOG_INFO("generating functions");
     const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDFunctionVect functions = {0};
@@ -63,7 +63,7 @@ static void _rd_worker_rebuild_functions(RDContext* ctx) {
 }
 
 static void _rd_worker_follow_pointers(RDContext* ctx) {
-    LOG_INFO("following pointers");
+    RD_LOG_INFO("following pointers");
 
     RDAddressVect addresses = {0};
     RDTypeVect types = {0};
@@ -155,7 +155,7 @@ static void _rd_worker_resolve_ordinals(RDContext* ctx) {
 
 // check if duplicate names are now free
 static void _rd_worker_dedup_names(RDContext* ctx) {
-    LOG_INFO("deduping names");
+    RD_LOG_INFO("deduping names");
 
     // duplicate vector because rd_i_set_name mutates ctx->pending_renames
     RDPendingRenameVect pending = {0};
@@ -185,7 +185,7 @@ static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
     else {
         double elapsed =
             (double)(clock() - ctx->engine.emulate_start) / CLOCKS_PER_SEC;
-        LOG_INFO("completed in %.2fs", elapsed);
+        RD_LOG_INFO("completed in %.2fs", elapsed);
         ctx->engine.emulate_start = 0;
         ctx->engine.step++;
     }
@@ -242,9 +242,10 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_db_save(ctx);
 
     // post-analysis summary
-    LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
-             vect_length(&ctx->functions), vect_length(&ctx->listing.symbols),
-             vect_length(&ctx->problems));
+    RD_LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
+                vect_length(&ctx->functions),
+                vect_length(&ctx->listing.symbols),
+                vect_length(&ctx->problems));
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {

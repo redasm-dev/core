@@ -2,7 +2,7 @@
 #include "core/context.h"
 #include "core/segment.h"
 #include "support/error.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 
 typedef struct RDFlagsReader {
     RDReader base;
@@ -66,7 +66,7 @@ void rd_i_reader_destroy(RDReader* self) {
     if(!self) return;
 
     if(!vect_is_empty(&self->stack))
-        LOG_WARN("reader stack is not empty (begin/end mismatch)");
+        RD_LOG_WARN("reader stack is not empty (begin/end mismatch)");
 
     vect_destroy(&self->stack);
     rd_free(self);

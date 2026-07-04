@@ -2,8 +2,8 @@
 #include "core/context.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
 #include "types/type.h"
+#include <redasm/support/logging.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -102,14 +102,14 @@ bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char* name,
         return true;
     }
 
-    LOG_FAIL("cannot add members to '%s'", self->name);
+    RD_LOG_FAIL("cannot add members to '%s'", self->name);
     return false;
 }
 
 bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value,
                             RDContext* ctx) {
     if(self->kind != RD_TKIND_ENUM) {
-        LOG_FAIL("cannot add enumval to '%s'", self->name);
+        RD_LOG_FAIL("cannot add enumval to '%s'", self->name);
         return false;
     }
 
@@ -125,7 +125,7 @@ bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value,
 bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
                         usize n, RDTypeModifier mod, RDContext* ctx) {
     if(self->kind != RD_TKIND_FUNC) {
-        LOG_FAIL("cannot add argument to '%s'", self->name);
+        RD_LOG_FAIL("cannot add argument to '%s'", self->name);
         return false;
     }
 
@@ -146,7 +146,7 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
 bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
                         RDTypeModifier mod, RDContext* ctx) {
     if(self->kind != RD_TKIND_FUNC) {
-        LOG_FAIL("cannot set return type to '%s'", self->name);
+        RD_LOG_FAIL("cannot set return type to '%s'", self->name);
         return false;
     }
 
@@ -161,7 +161,7 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
 
 bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
     if(self->kind != RD_TKIND_FUNC) {
-        LOG_FAIL("cannot noret to '%s'", self->name);
+        RD_LOG_FAIL("cannot noret to '%s'", self->name);
         return false;
     }
 
@@ -180,13 +180,13 @@ RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
 
 bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     if(rd_i_typedef_find(ctx, self->name)) {
-        LOG_FAIL("'%s' already registered", self->name);
+        RD_LOG_FAIL("'%s' already registered", self->name);
         goto fail;
     }
 
     if(rd_i_typedef_is_compound(self)) {
         if(vect_is_empty(&self->compound_)) {
-            LOG_FAIL("at least one member required for '%s'", self->name);
+            RD_LOG_FAIL("at least one member required for '%s'", self->name);
             goto fail;
         }
 
@@ -194,8 +194,8 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
         vect_each(m, &self->compound_) {
             const RDTypeDef* tdef = rd_i_typedef_find(ctx, m->type.name);
             if(!tdef) {
-                LOG_FAIL("type '%s' not found for '%s.%s'", m->type.name,
-                         self->name, m->name);
+                RD_LOG_FAIL("type '%s' not found for '%s.%s'", m->type.name,
+                            self->name, m->name);
                 goto fail;
             }
         }
@@ -203,29 +203,30 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     else if(self->kind == RD_TKIND_ENUM) {
         const RDTypeDef* tdef = rd_i_typedef_find(ctx, self->enum_.base_type);
         if(!tdef) {
-            LOG_FAIL("type '%s' not found in enum '%s'", self->enum_.base_type,
-                     self->name);
+            RD_LOG_FAIL("type '%s' not found in enum '%s'",
+                        self->enum_.base_type, self->name);
             goto fail;
         }
 
         if(tdef->kind != RD_TKIND_PRIM) {
-            LOG_FAIL("type '%s' is not primitive", self->enum_.base_type);
+            RD_LOG_FAIL("type '%s' is not primitive", self->enum_.base_type);
             goto fail;
         }
 
         RDEnumCase* c1;
         vect_each(c1, &self->enum_) {
             if(!_rd_typedef_enum_in_range(self->enum_.base_type, c1->value)) {
-                LOG_FAIL("value '%lld' out of range for type '%s' in enum '%s'",
-                         c1->value, self->enum_.base_type, self->name);
+                RD_LOG_FAIL(
+                    "value '%lld' out of range for type '%s' in enum '%s'",
+                    c1->value, self->enum_.base_type, self->name);
                 goto fail;
             }
 
             RDEnumCase* c2;
             vect_each(c2, &self->enum_) {
                 if(c1 != c2 && !strcmp(c1->name, c2->name)) {
-                    LOG_FAIL("duplicate case '%s' in enum '%s'", c1->name,
-                             self->enum_.base_type);
+                    RD_LOG_FAIL("duplicate case '%s' in enum '%s'", c1->name,
+                                self->enum_.base_type);
                     goto fail;
                 }
             }
@@ -236,14 +237,14 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             RDParam* arg1 = vect_at(&self->func_.args, i);
 
             if(!arg1->name) {
-                LOG_FAIL("function '%s': argument %d has no name", self->name,
-                         i + 1);
+                RD_LOG_FAIL("function '%s': argument %d has no name",
+                            self->name, i + 1);
                 goto fail;
             }
 
             if(rd_type_is_void(&arg1->type)) {
-                LOG_FAIL("function '%s': argument %d '%s' cannot be void",
-                         self->name, i + 1, arg1->name);
+                RD_LOG_FAIL("function '%s': argument %d '%s' cannot be void",
+                            self->name, i + 1, arg1->name);
                 goto fail;
             }
 
@@ -251,7 +252,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                 RDParam* arg2 = vect_at(&self->func_.args, j);
 
                 if(!strcmp(arg1->name, arg2->name)) {
-                    LOG_FAIL(
+                    RD_LOG_FAIL(
                         "function '%s': argument %d has duplicate name '%s'",
                         self->name, i + 1, arg1->name);
                     goto fail;
@@ -270,8 +271,8 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     if(self->kind != RD_TKIND_PRIM) {
         rd_i_db_set_type_def(ctx, self); // don't save primitives in DB
 
-        LOG_INFO("%s definition '%s' registered",
-                 _rd_typedef_kind_str(self->kind), self->name);
+        RD_LOG_INFO("%s definition '%s' registered",
+                    _rd_typedef_kind_str(self->kind), self->name);
     }
 
     return true;

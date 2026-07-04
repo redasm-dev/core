@@ -3,7 +3,7 @@
 #include "db/db.h"
 #include "rdil/opcodes.h"
 #include "support/error.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 
 typedef struct RDILValue {
     u64 value;
@@ -492,7 +492,7 @@ static bool _rd_il_invalid_operand(const RDInstruction* instr,
         default: op_kind = "USER"; break;
     }
 
-    LOG_FAIL(
+    RD_LOG_FAIL(
         "RDIL instruction #%d '%s' at %llx, invalid operand %d (kind = %s)",
         instr_idx, instr->mnemonic, address, op_idx, op_kind);
 
@@ -632,7 +632,7 @@ RDILInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
 
 RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s) {
     if(s >= RD_IL_COUNT) {
-        LOG_FAIL("%d is an invalid RDIL statement", (int)s);
+        RD_LOG_FAIL("%d is an invalid RDIL statement", (int)s);
         return NULL;
     }
 

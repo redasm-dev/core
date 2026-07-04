@@ -3,8 +3,8 @@
 #include "core/state.h"
 #include "plugins/common.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include <redasm/allocator.h>
+#include <redasm/support/logging.h>
 
 static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
     const RDPlugin* a1 = *(const RDPlugin**)arg1;
@@ -27,7 +27,7 @@ bool rd_analyzer_enable(RDContext* ctx, const char* id) {
     const RDAnalyzerPlugin* plugin = rd_analyzer_find(id);
 
     if(!plugin) {
-        LOG_WARN("analyzer '%s' not found, ignoring...", id ? id : "<null>");
+        RD_LOG_WARN("analyzer '%s' not found, ignoring...", id ? id : "<null>");
         return false;
     }
 
@@ -61,16 +61,16 @@ bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
         return false;
 
     if(!a->execute) {
-        LOG_FAIL("analyzer '%s' requires an executor", a->id);
+        RD_LOG_FAIL("analyzer '%s' requires an executor", a->id);
         return false;
     }
 
     if(rd_analyzer_find(a->id)) {
-        LOG_WARN("analyzer '%s' already registered", a->id);
+        RD_LOG_WARN("analyzer '%s' already registered", a->id);
         return false;
     }
 
-    LOG_DEBUG("registering analyzer '%s' [%s]", a->id, a->name);
+    RD_LOG_DEBUG("registering analyzer '%s' [%s]", a->id, a->name);
     RDPlugin* plugin = rd_alloc(sizeof(*plugin));
     plugin->analyzer = a;
     vect_push(&rd_i_state.analyzers, plugin);

@@ -4,8 +4,8 @@
 #include "db/types.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
 #include "support/utils.h"
+#include <redasm/support/logging.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
 
@@ -138,7 +138,7 @@ bool rd_i_db_export(RDContext* ctx, const char* filepath) {
     if(!filepath) return false;
 
     if(!strcmp(filepath, ctx->db->filepath)) {
-        LOG_FAIL("cannot export to the active database path '%s'", filepath);
+        RD_LOG_FAIL("cannot export to the active database path '%s'", filepath);
         return false;
     }
 
@@ -150,7 +150,7 @@ bool rd_i_db_export(RDContext* ctx, const char* filepath) {
     bool ok = false;
 
     if(sqlite3_open(filepath, &exported) != SQLITE_OK) {
-        LOG_FAIL("cannot export database at %s", filepath);
+        RD_LOG_FAIL("cannot export database at %s", filepath);
         goto done;
     }
 
@@ -162,7 +162,7 @@ bool rd_i_db_export(RDContext* ctx, const char* filepath) {
     sqlite3_backup_finish(backup);
 
     ok = sqlite3_errcode(exported) == SQLITE_OK;
-    if(!ok) LOG_FAIL("SQL: %s", sqlite3_errmsg(exported));
+    if(!ok) RD_LOG_FAIL("SQL: %s", sqlite3_errmsg(exported));
 
     sqlite3_exec(exported, "VACUUM", NULL, NULL, NULL);
 

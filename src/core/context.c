@@ -9,7 +9,6 @@
 #include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
 #include "support/utils.h"
 #include "surface/items.h"
 #include "surface/renderer.h"
@@ -17,6 +16,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <redasm/support/logging.h>
 
 #define RD_WORKER_QUEUE_SIZE 8192
 
@@ -258,8 +258,8 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
     if(!s) return false;
 
     if(rd_i_db_add_segment(self, s)) {
-        LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr,
-                 endaddr);
+        RD_LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr,
+                    endaddr);
     }
     else
         rd_i_segment_destroy(s);
@@ -281,8 +281,8 @@ bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
     };
 
     if(rd_i_db_add_mapping(self, m))
-        LOG_INFO("mapping input at offset %X (Address: [%X, %X))", off, addr,
-                 endaddr);
+        RD_LOG_INFO("mapping input at offset %X (Address: [%X, %X))", off, addr,
+                    endaddr);
 
     return true;
 }

@@ -1,7 +1,7 @@
 #include "tomlschema.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include "support/utils.h"
+#include <redasm/support/logging.h>
 #include <string.h>
 
 static bool _rd_toml_expect(const toml_datum_t* d, const RDTomlSchema* s) {
@@ -10,14 +10,14 @@ static bool _rd_toml_expect(const toml_datum_t* d, const RDTomlSchema* s) {
 
     if(d->type == TOML_UNKNOWN) {
         if(s->optional) return true;
-        LOG_FAIL("missing property '%s'", s->key);
+        RD_LOG_FAIL("missing property '%s'", s->key);
         return false;
     }
 
     if(d->type != s->type) {
-        LOG_FAIL("expected %s for '%s' property, found %s ",
-                 rd_i_toml_type_str(s->type), s->key,
-                 rd_i_toml_type_str(d->type));
+        RD_LOG_FAIL("expected %s for '%s' property, found %s ",
+                    rd_i_toml_type_str(s->type), s->key,
+                    rd_i_toml_type_str(d->type));
         return false;
     }
 
@@ -52,8 +52,8 @@ static bool _rd_toml_expect_string_values(const toml_datum_t* d,
             str_v++;
         }
 
-        LOG_FAIL("value '%s' is not valid, possible values are %s", d->u.s,
-                 values.data);
+        RD_LOG_FAIL("value '%s' is not valid, possible values are %s", d->u.s,
+                    values.data);
 
         vect_destroy(&values);
     }
@@ -103,13 +103,13 @@ const char* rd_i_toml_type_str(toml_type_t t) {
 
 bool rd_i_toml_validate_schema(toml_datum_t root, const RDTomlSchema* schema) {
     if(!schema) {
-        LOG_FAIL("invalid schema definition");
+        RD_LOG_FAIL("invalid schema definition");
         return false;
     }
 
     if(root.type != TOML_TABLE) {
-        LOG_FAIL("root is not %s, got %s", rd_i_toml_type_str(TOML_TABLE),
-                 rd_i_toml_type_str(root.type));
+        RD_LOG_FAIL("root is not %s, got %s", rd_i_toml_type_str(TOML_TABLE),
+                    rd_i_toml_type_str(root.type));
         return false;
     }
 

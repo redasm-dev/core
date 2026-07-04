@@ -2,8 +2,8 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/error.h"
-#include "support/logging.h"
 #include "types/def.h"
+#include <redasm/support/logging.h>
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
                    RDTypeModifier mod) {
@@ -11,7 +11,7 @@ usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
     RDTypeDef* tdef = rd_i_typedef_find(ctx, name);
 
     if(!tdef) {
-        LOG_FAIL("cannot get the size of '%s', type not found", name);
+        RD_LOG_FAIL("cannot get the size of '%s', type not found", name);
         return 0;
     }
 

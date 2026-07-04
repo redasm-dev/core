@@ -5,12 +5,12 @@
 #include "plugins/loader.h"
 #include "plugins/module.h"
 #include "support/containers.h"
-#include "support/logging.h"
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader.h>
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/plugins/processor/processor.h>
+#include <redasm/support/logging.h>
 #include <string.h>
 
 RDGlobalState rd_i_state = {0};
@@ -70,6 +70,10 @@ void rd_i_state_init(const RDInitParams* params) {
 }
 
 void rd_i_state_deinit(void) {
+    rd_destroy(rd_i_state.encode_ctx);
+    rd_destroy(rd_i_state.decode_ctx);
+    vect_destroy(&rd_i_state.encode_buf.impl);
+
     RDPlugin** it;
     vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }
     vect_each(it, &rd_i_state.processors) { rd_free(*it); }
@@ -145,7 +149,7 @@ bool rd_module_load(const char* filepath) {
     RDModuleFull* m = _rd_module_find(filepath);
 
     if(m) {
-        LOG_WARN("module '%s' already loaded, skipping...", filepath);
+        RD_LOG_WARN("module '%s' already loaded, skipping...", filepath);
         return true;
     }
 

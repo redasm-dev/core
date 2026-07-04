@@ -6,6 +6,7 @@
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
+#include <redasm/support/scratch.h>
 #include <redasm/surface/renderer.h>
 
 typedef struct RDProcessor RDProcessor;
@@ -28,6 +29,7 @@ typedef struct RDProcessorPlugin {
     void (*destroy)(RDProcessor*);
 
     void (*decode)(RDContext*, RDInstruction*, RDProcessor*);
+    bool (*encode)(RDContext*, RDAddress, const char*, RDScratchBuffer*, RDProcessor*);
     void (*emulate)(RDContext*, const RDInstruction*, RDProcessor*);
     void (*lift)(RDContext*, RDInstructionVect*, const RDInstruction*, RDProcessor*);
 

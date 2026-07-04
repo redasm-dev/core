@@ -3,9 +3,9 @@
 #include "io/buffer.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/scratch.h"
 #include <ctype.h>
 #include <redasm/allocator.h>
-#include <redasm/support/utils.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -546,6 +546,14 @@ const char* rd_format(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     const char* result = rd_i_vformat(&rd_i_state.fmt_buf, fmt, args);
+    va_end(args);
+    return result;
+}
+
+const char* rd_format_to(RDScratchBuffer* buf, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    const char* result = rd_i_vformat(&buf->impl, fmt, args);
     va_end(args);
     return result;
 }

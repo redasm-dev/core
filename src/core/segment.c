@@ -2,11 +2,11 @@
 #include "core/context.h"
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
-#include "support/logging.h"
 #include "support/stringpool.h"
 #include <assert.h>
 #include <redasm/allocator.h>
 #include <redasm/segment.h>
+#include <redasm/support/logging.h>
 
 usize rd_i_address2index(const RDSegmentFull* self, RDAddress addr) {
     assert(addr >= self->base.start_address && addr < self->base.end_address &&
@@ -31,7 +31,7 @@ RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
     assert(name);
 
     if(addr >= endaddr) {
-        LOG_FAIL("invalid address range for segment '%s'", name);
+        RD_LOG_FAIL("invalid address range for segment '%s'", name);
         return NULL;
     }
 

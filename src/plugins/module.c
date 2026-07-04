@@ -1,9 +1,8 @@
 #include "plugins/module.h"
 #include "core/state.h"
-#include "support/logging.h"
-#include "support/stringpool.h"
 #include <assert.h>
 #include <redasm/allocator.h>
+#include <redasm/support/logging.h>
 #include <redasm/support/utils.h>
 #include <string.h>
 
@@ -42,17 +41,17 @@ static void _rd_module_errmsg(void) {
                   NULL, error, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
                   (LPTSTR)(LPVOID)&buffer, 0, NULL);
 
-    LOG_FAIL("%s", buffer);
+    RD_LOG_FAIL("%s", buffer);
     LocalFree(buffer);
 #else
-    LOG_FAIL("%s", dlerror());
+    RD_LOG_FAIL("%s", dlerror());
 #endif
 }
 
 RDModuleFull* rd_i_module_create(const char* filepath) {
     if(!filepath) return NULL;
 
-    LOG_INFO("Loading module '%s'", filepath);
+    RD_LOG_INFO("Loading module '%s'", filepath);
     RDModuleFull* self = rd_alloc0(1, sizeof(*self));
 
 #if defined(_WIN32)
@@ -64,7 +63,7 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
     self->base.path = rd_strdup(filepath);
 
     if(!self->handle) {
-        LOG_FAIL("failed to load '%s'", filepath);
+        RD_LOG_FAIL("failed to load '%s'", filepath);
         _rd_module_errmsg();
         goto fail;
     }
@@ -72,7 +71,7 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
     _rd_module_sym(self, RD_PLUGIN_CREATE, (void*)&self->create);
 
     if(!self->create) {
-        LOG_FAIL("'%s' is not a valid plugin", filepath);
+        RD_LOG_FAIL("'%s' is not a valid plugin", filepath);
         goto fail;
     }
 
@@ -94,7 +93,7 @@ fail:
 }
 
 void rd_i_module_destroy(RDModuleFull* self) {
-    LOG_INFO("Unloading module '%s'", self->base.path);
+    RD_LOG_INFO("Unloading module '%s'", self->base.path);
 
     if(self->handle) {
 #if defined(_WIN32)

@@ -4,7 +4,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/logging.h"
+#include <redasm/support/logging.h>
 #include <string.h>
 
 typedef struct RDListingBuilder {
@@ -231,7 +231,7 @@ static void _rd_listing_process_code(RDListingBuilder* b) {
 }
 
 void rd_i_listing_build(RDContext* ctx) {
-    LOG_INFO("generating listing...");
+    RD_LOG_INFO("generating listing...");
     RDListingBuilder b = {.context = ctx};
     rd_i_listing_init(&b.listing, &ctx->listing);
 
@@ -255,7 +255,7 @@ void rd_i_listing_build(RDContext* ctx) {
             panic_if(rd_flagsbuffer_has_tail(b.flags, i), "tail detected");
 
             if(rd_i_flagsbuffer_has_queued(b.flags, i))
-                LOG_WARN("leak at %llx", b.address);
+                RD_LOG_WARN("leak at %llx", b.address);
 
             rd_i_listing_push_indent(&b.listing, 2);
 
@@ -274,5 +274,5 @@ void rd_i_listing_build(RDContext* ctx) {
 
     mem_swap(RDListing, &ctx->listing, &b.listing);
     rd_i_listing_deinit(&b.listing);
-    LOG_INFO("listing generated with %d items", ctx->listing.length);
+    RD_LOG_INFO("listing generated with %d items", ctx->listing.length);
 }
