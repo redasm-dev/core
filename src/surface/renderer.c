@@ -212,7 +212,7 @@ void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
 
 void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
     _rd_renderer_calc_auto_column(self);
-    rd_i_rowvect_push(&self->rows_back, self->listing_idx, item->address);
+    rd_i_rowvect_push(&self->rows_back, self->listing_idx, item);
 
     if(self->columns)
         rd_i_row_reserve(vect_last(&self->rows_back), self->columns);

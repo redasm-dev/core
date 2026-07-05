@@ -387,6 +387,15 @@ bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx) {
     return false;
 }
 
+bool rd_i_flagsbuffer_undefine_func(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_undefine_func(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
 bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
         rd_i_flags_undefine_comment(&self->data[idx]);

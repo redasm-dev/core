@@ -54,6 +54,7 @@ typedef struct RDCellData {
         RDOperand value;
     } operand;
 
+    bool is_instruction;
     unsigned int group_idx;
 } RDCellData;
 

@@ -194,8 +194,14 @@ const RDScratchBuffer* rd_encode_instruction_to(const char* s,
     if(!ctx) return NULL;
 
     bool ok = rd_encode(ctx, address, s, buf);
-    if(!ok && errmsg) *errmsg = rd_scratch_data(buf);
-    return ok ? buf : NULL;
+
+    if(!ok) {
+        if(errmsg) *errmsg = rd_scratch_data(buf);
+        RD_LOG_FAIL("%s", rd_scratch_data(buf));
+        return NULL;
+    }
+
+    return buf;
 }
 
 const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,

@@ -58,7 +58,11 @@ void rd_scratch_push(RDScratchBuffer* self, char c) {
     vect_push(&self->impl, c);
 }
 
-bool rd_scratch_get(RDScratchBuffer* self, usize idx, char* c) {
+bool rd_scratch_is_empty(const RDScratchBuffer* self) {
+    return vect_is_empty(&self->impl);
+}
+
+bool rd_scratch_get(const RDScratchBuffer* self, usize idx, char* c) {
     if(idx >= self->impl.length) return false;
 
     if(c) *c = self->impl.data[idx];

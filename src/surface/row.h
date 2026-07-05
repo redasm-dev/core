@@ -41,7 +41,8 @@ static inline RDCellData rd_i_default_cell_data(void) {
 }
 
 void rd_i_rowvect_destroy(RDRowVect* self);
-void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address);
+void rd_i_rowvect_push(RDRowVect* self, LIndex index,
+                       const RDListingItem* item);
 
 void rd_i_row_reserve(RDRow* self, int n);
 void rd_i_row_push(RDRow* self, u32 ch, RDThemeKind fg, RDThemeKind bg);

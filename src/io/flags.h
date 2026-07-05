@@ -46,6 +46,7 @@ void rd_i_flags_set_imported(RDFlags* self);
 void rd_i_flags_set_exported(RDFlags* self);
 void rd_i_flags_undefine(RDFlags* self);
 void rd_i_flags_undefine_name(RDFlags* self);
+void rd_i_flags_undefine_func(RDFlags* self);
 void rd_i_flags_undefine_comment(RDFlags* self);
 void rd_i_flags_undefine_xref_out(RDFlags* self);
 void rd_i_flags_undefine_xref_in(RDFlags* self);

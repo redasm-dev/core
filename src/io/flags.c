@@ -211,6 +211,11 @@ void rd_i_flags_undefine_name(RDFlags* self) {
     *self &= ~FL_NAME;
 }
 
+void rd_i_flags_undefine_func(RDFlags* self) {
+    assert(!rd_i_flags_has_tail(*self));
+    *self &= ~FL_FUNC;
+}
+
 void rd_i_flags_undefine_comment(RDFlags* self) {
     assert(!rd_i_flags_has_tail(*self));
     *self &= ~FL_COMMENT;

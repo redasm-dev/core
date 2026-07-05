@@ -8,12 +8,17 @@ void rd_i_rowvect_destroy(RDRowVect* self) {
     }
 }
 
-void rd_i_rowvect_push(RDRowVect* self, LIndex index, RDAddress address) {
-    vect_push(self, (RDRow){
-                        .index = index,
-                        .address = address,
-                        .curr_data = rd_i_default_cell_data(),
-                    });
+void rd_i_rowvect_push(RDRowVect* self, LIndex index,
+                       const RDListingItem* item) {
+    RDRow r = {
+        .index = index,
+        .address = item->address,
+        .curr_data = rd_i_default_cell_data(),
+    };
+
+    r.curr_data.is_instruction = item->kind == RD_LK_INSTRUCTION;
+
+    vect_push(self, r);
 }
 
 void rd_i_row_reserve(RDRow* self, int n) {

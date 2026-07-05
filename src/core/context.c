@@ -9,6 +9,7 @@
 #include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "support/scratch.h"
 #include "support/utils.h"
 #include "surface/items.h"
 #include "surface/renderer.h"
@@ -303,12 +304,7 @@ RDFunction* rd_i_find_function(const RDContext* self, RDAddress address) {
     if(idx == vect_length(chunks)) return NULL;
 
     const RDFunctionChunk* chunk = *vect_at(chunks, idx);
-
-    idx = vect_bsearch(&self->functions, &chunk->func_address,
-                       rd_i_function_kcmp_pred);
-    if(idx == vect_length(&self->functions)) return NULL;
-
-    return *vect_at(&self->functions, idx);
+    return (RDFunction*)chunk->func;
 }
 
 const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
@@ -1396,6 +1392,126 @@ bool rd_operand_as_immediate(RDContext* self, RDAddress address, int index) {
         rd_i_flagsbuffer_undefine_op_over(seg->flags, flag_idx);
 
     return true;
+}
+
+bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
+                          bool fill_nops) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+
+    if(!seg || !(seg->base.perm & RD_SP_X)) {
+        RD_LOG_FAIL("cannot patch non-executable address %" PRIx64, address);
+        return false;
+    }
+
+    usize idx = rd_i_address2index(seg, address), start = idx, end = idx + 1;
+
+    rd_i_flagsbuffer_expand_range(seg->flags, &start, &end);
+    address = rd_i_index2address(seg, start);
+
+    RDAddress startaddress = address; // remember start address
+    usize maxlen = end - start, len = 0, remaining = 0;
+    RDScratchBuffer* buf = rd_scratch_create();
+
+    if(!rd_encode(self, address, instr, buf)) {
+        RD_LOG_FAIL("%s", rd_scratch_data(buf));
+        goto fail;
+    }
+
+    if(rd_scratch_is_empty(buf)) {
+        RD_LOG_FAIL("buffer is empty");
+        goto fail;
+    }
+
+    len = rd_scratch_length(buf);
+
+    if(len > maxlen) { // new instruction is bigger than the previous one
+        usize needed_end = start + len;
+
+        while(end < needed_end) {
+            end = needed_end;
+            rd_i_flagsbuffer_expand_range(seg->flags, &start, &end);
+        }
+
+        maxlen = end - start;
+    }
+
+    if(!rd_user_undefine_n(self, address, maxlen)) {
+        RD_LOG_FAIL("failed to undefine range [%" PRIx64 ", %" PRIx64 ")",
+                    address, address + maxlen);
+        goto fail;
+    }
+
+    if(!rd_write(self, address, rd_scratch_data(buf), len)) {
+        RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIx64, len, address);
+        goto fail;
+    }
+
+    if(!rd_i_flagsbuffer_set_code(seg->flags, rd_i_address2index(seg, address),
+                                  len)) {
+        RD_LOG_WARN("failed to flag %zu byte(s) at %" PRIx64 " as code", len,
+                    address);
+    }
+
+    address += len;
+    remaining = maxlen - len;
+
+    if(fill_nops && remaining) {
+        if(!rd_encode(self, address, NULL, buf)) {
+            RD_LOG_FAIL("%s", rd_scratch_data(buf));
+            goto fail;
+        }
+
+        usize noplen = rd_scratch_length(buf);
+
+        if(!noplen) {
+            RD_LOG_FAIL("processor produced an empty NOP");
+            goto fail;
+        }
+
+        while(remaining >= noplen) {
+            if(!rd_write(self, address, rd_scratch_data(buf), noplen)) {
+                RD_LOG_FAIL("failed to write NOP at %" PRIx64, address);
+                goto fail;
+            }
+
+            if(!rd_i_flagsbuffer_set_code(
+                   seg->flags, rd_i_address2index(seg, address), len)) {
+                RD_LOG_WARN("failed to flag %zu byte(s) at %" PRIx64 " as code",
+                            len, address);
+            }
+
+            address += noplen;
+            remaining -= noplen;
+        }
+
+        if(remaining) {
+            RD_LOG_WARN("%zu byte(s) at %" PRIx64
+                        " left unfilled (smaller than one NOP unit)",
+                        remaining, address);
+        }
+    }
+
+    RDFunction* f = rd_i_find_function(self, address);
+    if(f) rd_i_function_rebuild(f);
+
+    for(idx = rd_i_address2index(seg, startaddress);
+        idx < rd_i_address2index(seg, address); idx++) {
+        if(!rd_flagsbuffer_has_func(seg->flags, idx)) continue;
+
+        RDFunction* curr_f =
+            rd_i_find_function(self, rd_i_index2address(seg, idx));
+        if(curr_f == f) continue;
+
+        rd_i_function_destroy(curr_f);
+        rd_i_flagsbuffer_undefine_func(seg->flags, idx);
+    }
+
+    rd_scratch_destroy(buf);
+    return true;
+
+fail:
+    rd_scratch_destroy(buf);
+    return false;
 }
 
 void rd_set_scan_char16(RDContext* self, bool b) { self->scan_char16 = b; }

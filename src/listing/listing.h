@@ -35,8 +35,6 @@ typedef enum {
     RD_LMOD_IMPORTED,
 } RDListingModifier;
 
-#define RD_LISTING_STACK_SIZE 256
-
 typedef struct RDListingFillByte {
     u8 value;
     bool has_value;

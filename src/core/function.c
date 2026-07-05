@@ -28,9 +28,9 @@ static int _rd_functionchunk_cmp_pred(const void* arg1, const void* arg2) {
 }
 
 static bool _rd_functionchunks_del_if_pred(const void* key, const void* item) {
-    RDAddress func_addr = *(const RDAddress*)key;
+    const RDFunction* func = (const RDFunction*)key;
     RDFunctionChunk* chunk = *(RDFunctionChunk**)item;
-    if(chunk->func_address != func_addr) return false;
+    if(chunk->func != func) return false;
 
     rd_free(chunk);
     return true;
@@ -48,7 +48,8 @@ static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
 }
 
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
-                                                 RDAddress start, RDAddress ep,
+                                                 RDAddress start,
+                                                 const RDFunction* func,
                                                  RDFunctionWorkVect* w,
                                                  RDFunctionChunkVect* chunks) {
     // don't create phantom blocks to invalid or non-executable segments
@@ -65,7 +66,7 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
     }
 
     RDFunctionChunk* b = rd_alloc0(1, sizeof(*b));
-    b->func_address = ep;
+    b->func = func;
     b->start = start;
     vect_push(chunks, b);
 
@@ -87,8 +88,8 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     self->n_norets = 0;
 
     // set function entry
-    RDGraphNode root = _rd_function_get_or_add_block(ctx, g, self->address,
-                                                     self->address, &w, chunks);
+    RDGraphNode root =
+        _rd_function_get_or_add_block(ctx, g, self->address, self, &w, chunks);
     if(root) rd_graph_set_root(g, root);
 
     while(!vect_is_empty(&w)) {
@@ -142,7 +143,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     const RDXRef* r;
                     vect_each(r, &refs) {
                         RDGraphNode dst = _rd_function_get_or_add_block(
-                            ctx, g, r->address, self->address, &w, chunks);
+                            ctx, g, r->address, self, &w, chunks);
 
                         if(dst) {
                             RDGraphEdge e = rd_graph_add_edge(g, src, dst);
@@ -154,7 +155,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
 
                     // false edge: fall-through
                     RDGraphNode dst = _rd_function_get_or_add_block(
-                        ctx, g, nextaddr, self->address, &w, chunks);
+                        ctx, g, nextaddr, self, &w, chunks);
 
                     if(dst) {
                         RDGraphEdge e = rd_graph_add_edge(g, src, dst);
@@ -166,7 +167,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     const RDXRef* r;
                     vect_each(r, &refs) {
                         RDGraphNode dst = _rd_function_get_or_add_block(
-                            ctx, g, r->address, self->address, &w, chunks);
+                            ctx, g, r->address, self, &w, chunks);
 
                         if(dst) rd_graph_add_edge(g, src, dst);
                     }
@@ -198,7 +199,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             // someone references here: forced split, add flow edge
             if(rd_i_flags_has_xref_in(nextflags)) {
                 RDGraphNode dst = _rd_function_get_or_add_block(
-                    ctx, g, nextaddr, self->address, &w, chunks);
+                    ctx, g, nextaddr, self, &w, chunks);
                 if(dst) rd_graph_add_edge(g, src, dst);
                 addr = nextaddr;
                 break;
@@ -286,6 +287,11 @@ RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
 void rd_i_function_destroy(RDFunction* self) {
     if(!self) return;
 
+    if(self->graph && !rd_graph_is_empty(self->graph)) {
+        vect_del_if(&self->context->functions.chunks, self,
+                    _rd_functionchunks_del_if_pred);
+    }
+
     vect_destroy(&self->fmt_buf);
     rd_graph_destroy(self->graph);
     rd_free(self);
@@ -346,14 +352,9 @@ usize rd_function_get_n_instructions(const RDFunction* self) {
     return self->n_instructions;
 }
 
-bool rd_function_get_chunk(const RDFunction* self, RDGraphNode n,
-                           RDFunctionChunk* chunk) {
-    if(!self->graph) return false;
-
-    const RDFunctionChunk* c = rd_i_function_get_chunk(self, n);
-    if(!c) return false;
-    if(chunk) *chunk = *c;
-    return true;
+const RDFunctionChunk* rd_function_get_chunk(const RDFunction* self,
+                                             RDGraphNode n) {
+    return rd_i_function_get_chunk(self, n);
 }
 
 const char* rd_function_generate_dot(const RDFunction* self) {
@@ -394,7 +395,7 @@ void rd_i_function_rebuild(RDFunction* self) {
     RDFunctionChunkVect* tmp_chunks = &self->context->chunk_buf;
 
     if(self->graph && !rd_graph_is_empty(self->graph))
-        vect_del_if(chunks, &self->address, _rd_functionchunks_del_if_pred);
+        vect_del_if(chunks, self, _rd_functionchunks_del_if_pred);
 
     assert(vect_is_empty(tmp_chunks));
     rd_i_function_rebuild_graph(self, tmp_chunks);

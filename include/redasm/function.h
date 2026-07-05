@@ -11,7 +11,7 @@ typedef struct RDFunctionSlice {
 } RDFunctionSlice;
 
 typedef struct RDFunctionChunk {
-    RDAddress func_address;
+    const RDFunction* func;
     RDAddress start;
     RDAddress end;
     usize n_instructions;
@@ -26,5 +26,5 @@ RD_API u32 rd_function_get_hash(const RDFunction* self);
 RD_API bool rd_function_is_noret(const RDFunction* self);
 RD_API bool rd_function_contains_address(const RDFunction* self,
                                          RDAddress address);
-RD_API bool rd_function_get_chunk(const RDFunction* self, RDGraphNode n,
-                                  RDFunctionChunk* chunk);
+RD_API const RDFunctionChunk* rd_function_get_chunk(const RDFunction* self,
+                                                    RDGraphNode n);
