@@ -156,7 +156,8 @@ const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
                                              const char** errmsg) {
     if(!p) return NULL;
 
-    if(!rd_i_state.encode_ctx || rd_i_state.encode_ctx->processorplugin != p) {
+    if(!rd_i_state.encode_ctx || rd_i_state.encode_ctx->processorplugin != p ||
+       rd_i_state.encode_ctx->addressing.address != address) {
         rd_destroy(rd_i_state.encode_ctx);
         rd_i_state.encode_ctx = NULL;
 
