@@ -71,7 +71,6 @@ void rd_i_state_init(const RDInitParams* params) {
 
 void rd_i_state_deinit(void) {
     rd_destroy(rd_i_state.encode_ctx);
-    rd_destroy(rd_i_state.decode_ctx);
     vect_destroy(&rd_i_state.encode_buf.impl);
 
     RDPlugin** it;

@@ -44,7 +44,6 @@ typedef struct RDGlobalState {
     RDScratchBuffer encode_buf;
 
     RDContext* encode_ctx;
-    RDContext* decode_ctx;
 
     struct {
         RDTestResult** data;
