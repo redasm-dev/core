@@ -151,9 +151,11 @@ void rd_reject(void) {
     vect_clear(&rd_i_state.tests);
 }
 
-const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
-                                             const RDProcessorPlugin* p,
-                                             const char** errmsg) {
+const RDScratchBuffer* rd_encode_instruction_to(const char* s,
+                                                RDAddress address,
+                                                const RDProcessorPlugin* p,
+                                                RDScratchBuffer* buf,
+                                                const char** errmsg) {
     if(!p) return NULL;
 
     if(!rd_i_state.encode_ctx || rd_i_state.encode_ctx->processorplugin != p ||
@@ -167,10 +169,10 @@ const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
             rd_test_data(DUMMY_DATA, rd_count_of(DUMMY_DATA));
 
         if(rd_slice_is_empty(slice)) {
-            rd_scratch_clear(&rd_i_state.encode_buf);
-            RD_LOG_FAIL_TO(&rd_i_state.encode_buf,
-                           "failed to create encoding context for '%s'", p->id);
-            if(errmsg) *errmsg = rd_scratch_data(&rd_i_state.encode_buf);
+            rd_scratch_clear(buf);
+            RD_LOG_FAIL_TO(buf, "failed to create encoding context for '%s'",
+                           p->id);
+            if(errmsg) *errmsg = rd_scratch_data(buf);
             return NULL;
         }
 
@@ -191,9 +193,16 @@ const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
     RDContext* ctx = rd_i_state.encode_ctx;
     if(!ctx) return NULL;
 
-    bool ok = rd_encode(ctx, address, s, &rd_i_state.encode_buf);
-    if(!ok && errmsg) *errmsg = rd_scratch_data(&rd_i_state.encode_buf);
-    return ok ? &rd_i_state.encode_buf : NULL;
+    bool ok = rd_encode(ctx, address, s, buf);
+    if(!ok && errmsg) *errmsg = rd_scratch_data(buf);
+    return ok ? buf : NULL;
+}
+
+const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
+                                             const RDProcessorPlugin* p,
+                                             const char** errmsg) {
+    return rd_encode_instruction_to(s, address, p, &rd_i_state.encode_buf,
+                                    errmsg);
 }
 
 bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,

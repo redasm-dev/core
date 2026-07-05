@@ -77,6 +77,7 @@ RD_API RDAcceptResult rd_project_load(const char* filepath, const char* workingd
 RD_API RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params);
 RD_API void rd_reject(void);
 RD_API const char* rd_dump_instruction(const RDInstruction* instr);
+RD_API const RDScratchBuffer* rd_encode_instruction_to(const char* s, RDAddress address, const RDProcessorPlugin* p, RDScratchBuffer* buf, const char** errmsg);
 RD_API const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address, const RDProcessorPlugin* p, const char** errmsg);
 RD_API bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr, const RDProcessorPlugin* p, RDDecodedInstruction* dec);
 
