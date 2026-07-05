@@ -393,15 +393,15 @@ void rd_flow(RDContext* ctx, RDAddress address) {
 
 bool rd_encode(RDContext* ctx, RDAddress address, const char* s,
                RDScratchBuffer* buf) {
-    if(!buf) return false;
+    if(!ctx || !buf) return false;
 
     rd_scratch_clear(buf);
 
     const RDProcessorPlugin* plugin = ctx->processorplugin;
 
     if(!plugin->encode) {
-        rd_i_format(&buf->impl, "processor '%s' does not support encoding",
-                    plugin->id);
+        rd_format_to(buf, "processor '%s' does not support encoding",
+                     plugin->id);
         return false;
     }
 
@@ -409,6 +409,8 @@ bool rd_encode(RDContext* ctx, RDAddress address, const char* s,
 }
 
 bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {
+    if(!ctx) return false;
+
     const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 

@@ -158,12 +158,20 @@ const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
 
     if(!rd_i_state.encode_ctx || rd_i_state.encode_ctx->processorplugin != p) {
         rd_destroy(rd_i_state.encode_ctx);
+        rd_i_state.encode_ctx = NULL;
 
         static const char DUMMY_DATA[] = {0x00, 0x00, 0x00, 0x00};
 
         RDTestResultSlice slice =
             rd_test_data(DUMMY_DATA, rd_count_of(DUMMY_DATA));
-        if(rd_slice_is_empty(slice)) return NULL;
+
+        if(rd_slice_is_empty(slice)) {
+            rd_scratch_clear(&rd_i_state.encode_buf);
+            RD_LOG_FAIL_TO(&rd_i_state.encode_buf,
+                           "failed to create encoding context for '%s'", p->id);
+            if(errmsg) *errmsg = rd_scratch_data(&rd_i_state.encode_buf);
+            return NULL;
+        }
 
         const RDTestResult* tr = rd_slice_at(slice, 0);
         RDAcceptResult res = rd_accept(tr, &(RDAcceptParams){
@@ -183,7 +191,7 @@ const RDScratchBuffer* rd_encode_instruction(const char* s, RDAddress address,
     if(!ctx) return NULL;
 
     bool ok = rd_encode(ctx, address, s, &rd_i_state.encode_buf);
-    if(!ok && errmsg) *errmsg = rd_i_state.encode_buf.impl.data;
+    if(!ok && errmsg) *errmsg = rd_scratch_data(&rd_i_state.encode_buf);
     return ok ? &rd_i_state.encode_buf : NULL;
 }
 
