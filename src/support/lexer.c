@@ -17,7 +17,22 @@
         t->length = (usize)(self->curr - t->value);                            \
     } while(0)
 
-static bool _rd_lexer_is_number_or_real(char c, RDToken* t) {
+static bool _rd_lexer_is_digit_for_base(char c, int base) {
+    int v;
+
+    if(c >= '0' && c <= '9')
+        v = c - '0';
+    else if(c >= 'a' && c <= 'z')
+        v = c - 'a' + 10;
+    else if(c >= 'A' && c <= 'Z')
+        v = c - 'A' + 10;
+    else
+        return false;
+
+    return v < base;
+}
+
+static bool _rd_lexer_is_number_or_real(char c, int base, RDToken* t) {
     if(c == '.') {
         if(t->type == RD_TOK_NUMBER_REAL) return false;
 
@@ -25,7 +40,7 @@ static bool _rd_lexer_is_number_or_real(char c, RDToken* t) {
         return true;
     }
 
-    return isdigit(c);
+    return _rd_lexer_is_digit_for_base(c, base);
 }
 
 static char _rd_lexer_get(RDLexer* self) {
@@ -40,6 +55,43 @@ static char _rd_lexer_get(RDLexer* self) {
         self->col++;
 
     return c;
+}
+
+static bool _rd_lexer_prefixed_number(RDLexer* self, RDToken* t, int base) {
+    const char* p = self->curr;
+    usize line = self->line, col = self->col, pos = self->pos;
+    _rd_lexer_get(self); // eat '0'
+    _rd_lexer_get(self); // eat prefix letter
+
+    t->type = RD_TOK_NUMBER;
+    t->value = self->curr;
+    while(_rd_lexer_is_digit_for_base(*self->curr, base))
+        _rd_lexer_get(self);
+    t->length = (usize)(self->curr - t->value);
+
+    t->value = p;
+    t->length += 2;
+    t->line = line;
+    t->col = col;
+    t->pos = pos;
+
+    if(t->length == 2) { // "0x" alone, no digits at all
+        t->type = RD_TOK_UNEXPECTED;
+        return false;
+    }
+
+    if(isalnum(*self->curr) ||
+       *self->curr == '_') { // "0x1g", "0b12" trailing garbage
+        const char* extra = self->curr;
+        while(isalnum(*self->curr) || *self->curr == '_')
+            _rd_lexer_get(self);
+        t->length += (usize)(self->curr - extra);
+        t->type = RD_TOK_UNEXPECTED;
+        return false;
+    }
+
+    t->u_value = (u64)strtoull(t->value + 2, NULL, base);
+    return true;
 }
 
 static void _rd_lexer_atomize(RDLexer* self, RDTokenType type, RDToken* t) {
@@ -67,38 +119,10 @@ static bool _rd_lexer_identifier(RDLexer* self, RDToken* t) {
     return true;
 }
 
-static bool _rd_lexer_hexnumber(RDLexer* self, RDToken* t) {
-    // save pointer & position information
-    const char* p = self->curr;
-    usize line = self->line, col = self->col, pos = self->pos;
-    _rd_lexer_get(self); // eat '0'
-    _rd_lexer_get(self); // eat 'x'
-
-    _rd_lexer_tokenize(self, RD_TOK_NUMBER, (isxdigit(*self->curr)), t);
-
-    t->value = p;
-    t->length += 2;
-    t->line = line;
-    t->col = col;
-    t->pos = pos;
-
-    if(isalpha(*self->curr) || *self->curr == '_') {
-        const char* extra = self->curr;
-        while(isalnum(*self->curr) || *self->curr == '_')
-            _rd_lexer_get(self);
-        t->length += (usize)(self->curr - extra);
-        t->type = RD_TOK_UNEXPECTED;
-        return false;
-    }
-
-    // "0x" prefix in t->value is handled by base 16 automatically
-    t->u_value = (u64)strtoull(t->value, NULL, 16);
-    return true;
-}
-
 static bool _rd_lexer_number(RDLexer* self, RDToken* t) {
-    _rd_lexer_tokenize(self, RD_TOK_NUMBER,
-                       (_rd_lexer_is_number_or_real(*self->curr, t)), t);
+    _rd_lexer_tokenize(
+        self, RD_TOK_NUMBER,
+        (_rd_lexer_is_number_or_real(*self->curr, self->base, t)), t);
 
     // malformed: digits/real running directly into more literal-like
     // characters with no separator "3eax", "12.34.56"
@@ -119,7 +143,7 @@ static bool _rd_lexer_number(RDLexer* self, RDToken* t) {
     if(t->type == RD_TOK_NUMBER_REAL)
         t->r_value = strtod(t->value, NULL);
     else
-        t->u_value = (u64)strtoull(t->value, NULL, 10);
+        t->u_value = (u64)strtoull(t->value, NULL, self->base);
 
     return true;
 }
@@ -170,6 +194,7 @@ RDLexer* rd_lexer_create(const char* s) {
     *self = (RDLexer){
         .input = s,
         .curr = s,
+        .base = 10,
     };
 
     return self;
@@ -196,12 +221,25 @@ bool rd_lexer_next(RDLexer* self, RDToken* t) {
     }
 
     if(isdigit(*self->curr)) {
-        switch(*(self->curr + 1)) {
-            case 'x':
-            case 'X': return _rd_lexer_hexnumber(self, t);
+        if(*self->curr == '0') {
+            switch(*(self->curr + 1)) {
+                case 'x':
+                case 'X': return _rd_lexer_prefixed_number(self, t, 16);
 
-            default: return _rd_lexer_number(self, t);
+                case 'n':
+                case 'N': return _rd_lexer_prefixed_number(self, t, 10);
+
+                case 'o':
+                case 'O': return _rd_lexer_prefixed_number(self, t, 8);
+
+                case 'b':
+                case 'B': return _rd_lexer_prefixed_number(self, t, 2);
+
+                default: return _rd_lexer_number(self, t);
+            }
         }
+
+        return _rd_lexer_number(self, t);
     }
 
     if(ispunct(*self->curr)) return _rd_lexer_punct(self, t);
@@ -213,6 +251,16 @@ bool rd_lexer_next_expect(RDLexer* self, RDTokenType type, RDToken* t) {
     if(!t) return false;
     rd_lexer_next(self, t);
     return t->type == type;
+}
+
+void rd_lexer_set_default_base(RDLexer* self, int base) {
+    if(base < 2 || base > 36) {
+        RD_LOG_FAIL(
+            "rd_lexer_set_default_base: base must be in [2, 36], got %d", base);
+        return;
+    }
+
+    self->base = base;
 }
 
 void rd_lexer_reset(RDLexer* self, const char* s) {
@@ -263,6 +311,12 @@ bool rd_lexer_peek_expect(RDLexer* self, RDTokenType type, RDToken* t) {
 bool rd_lexer_consume(RDLexer* self) {
     RDToken t;
     return rd_lexer_next(self, &t);
+}
+
+bool rd_lexer_try_consume(RDLexer* self, RDTokenType type, RDToken* t) {
+    if(!rd_lexer_peek_expect(self, type, t)) return false;
+    rd_lexer_consume(self);
+    return true;
 }
 
 bool rd_lexer_at_end(RDLexer* self) {

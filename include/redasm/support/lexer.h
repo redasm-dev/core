@@ -48,13 +48,15 @@ typedef struct RDToken {
 RD_API RDLexer* rd_lexer_create(const char* s);
 RD_API void rd_lexer_destroy(RDLexer* self);
 RD_API void rd_lexer_reset(RDLexer* self, const char* s);
+RD_API void rd_lexer_set_default_base(RDLexer* self, int base);
 RD_API bool rd_lexer_next(RDLexer* self, RDToken* t);
 RD_API bool rd_lexer_next_expect(RDLexer* self, RDTokenType type, RDToken* t);
 RD_API bool rd_lexer_peek(RDLexer* self, RDToken* t);
 RD_API bool rd_lexer_peek_expect(RDLexer* self, RDTokenType type, RDToken* t);
 RD_API bool rd_lexer_consume(RDLexer* self);
-RD_API bool rd_lexer_at_end(RDLexer* self);
+RD_API bool rd_lexer_try_consume(RDLexer* self, RDTokenType type, RDToken* t);
 RD_API bool rd_lexer_try_any(RDLexer* self, const RDLexerTryFn* fns, void* userdata);
+RD_API bool rd_lexer_at_end(RDLexer* self);
 RD_API RDLexerMark rd_lexer_save(const RDLexer* self);
 RD_API void rd_lexer_restore(RDLexer* self, RDLexerMark mark);
 RD_API const char* rd_lexer_token_value(RDLexer* self, const RDToken* t);

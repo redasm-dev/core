@@ -7,6 +7,8 @@ typedef struct RDLexer {
     const char* input;
     const char* curr;
 
+    int base;
+
     usize line;
     usize col;
     usize pos;
