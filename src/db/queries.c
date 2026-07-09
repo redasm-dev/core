@@ -662,8 +662,8 @@ RDTypeVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
-        usize count = (usize)sqlite3_column_int64(stmt, 1);
-        const char* name = (const char*)sqlite3_column_text(stmt, 2);
+        const char* name = (const char*)sqlite3_column_text(stmt, 1);
+        usize count = (usize)sqlite3_column_int64(stmt, 2);
         RDTypeModifier mod = (RDTypeModifier)sqlite3_column_int(stmt, 3);
 
         vect_push(av, address);
