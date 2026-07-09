@@ -239,8 +239,6 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 
-    rd_i_db_save(ctx);
-
     // post-analysis summary
     RD_LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
                 vect_length(&ctx->functions),
