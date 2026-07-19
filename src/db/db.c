@@ -102,6 +102,11 @@ void rd_i_db_rollback(RDContext* ctx) {
     sqlite3_exec(ctx->db->handle, "ROLLBACK", NULL, NULL, NULL);
 }
 
+void rd_i_db_load_segments(RDContext* ctx) {
+    _rd_i_db_query_get_all_segments(ctx, &ctx->db->segments);
+    _rd_i_db_query_get_all_mappings(ctx, &ctx->db->mappings);
+}
+
 void rd_i_db_save(RDContext* ctx) {
     rd_i_db_begin(ctx);
 
@@ -111,7 +116,7 @@ void rd_i_db_save(RDContext* ctx) {
     // clang-format on
 
     RDFunction** f;
-    vect_each(f, &ctx->functions) _rd_i_db_query_add_function(ctx, *f);
+    vect_each(f, &ctx->functions) _rd_i_db_query_set_function(ctx, *f);
 
     RDSegmentRegVect* sreg_vect;
     vect_each(sreg_vect, &ctx->db->segment_regs) {
@@ -122,13 +127,16 @@ void rd_i_db_save(RDContext* ctx) {
     rd_i_db_commit(ctx);
 }
 
-void rd_i_db_load_segments(RDContext* ctx) {
-    _rd_i_db_query_get_all_segments(ctx, &ctx->db->segments);
-    _rd_i_db_query_get_all_mappings(ctx, &ctx->db->mappings);
-}
-
 void rd_i_db_load(RDContext* ctx) {
     _rd_i_db_query_get_all_type_defs(ctx, &ctx->typedefs);
+
+    // restore NORET status in KB
+    RDTypeDef** it;
+    vect_each(it, &ctx->typedefs) {
+        if((*it)->kind == RD_TKIND_FUNC && (*it)->func_.is_noret)
+            rd_i_kb_add_noret(ctx, (*it)->name);
+    }
+
     _rd_i_db_query_get_all_functions(ctx, &ctx->functions);
     _rd_i_db_query_get_all_sregval(ctx, &ctx->db->segment_regs,
                                    &ctx->db->segment_reg_names);
@@ -193,6 +201,19 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
     vect_sort(&ctx->db->segments, _rd_i_db_segment_cmp_pred);
     _rd_i_db_query_add_segment(ctx, seg);
     return true;
+}
+
+bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
+                                usize* index) {
+    usize seg_idx =
+        vect_bsearch(&ctx->db->segments, &address, _rd_i_db_segment_find_pred);
+
+    if(seg_idx < vect_length(&ctx->db->segments)) {
+        if(index) *index = seg_idx;
+        return true;
+    }
+
+    return false;
 }
 
 const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
@@ -353,21 +374,39 @@ bool rd_i_db_del_name(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_del_name(ctx, address);
 }
 
+RDNameVect* rd_i_db_get_all_names(RDContext* ctx, RDAddressVect* av,
+                                  RDNameVect* v) {
+    return _rd_i_db_query_get_all_names(ctx, av, v);
+}
+
+RDAddressVect* rd_i_db_get_all_name_addresses(RDContext* ctx,
+                                              RDAddressVect* v) {
+    return _rd_i_db_query_get_all_name_addresses(ctx, v);
+}
+
 void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     _rd_i_db_query_set_type_def(ctx, tdef);
 }
 
-void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
-                      usize count, RDTypeModifier mod, RDConfidence c) {
-    _rd_i_db_query_set_type(ctx, address, name, count, mod, c);
+void rd_i_db_set_type(RDContext* ctx, RDAddress address, const RDType* t,
+                      RDConfidence c) {
+    _rd_i_db_query_set_type(ctx, address, t, c);
 }
 
 bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
     return _rd_i_db_query_get_type(ctx, address, t);
 }
 
+bool rd_i_db_get_root_type(RDContext* ctx, RDAddress* address, RDType* t) {
+    return _rd_i_db_query_get_root_type(ctx, address, t);
+}
+
 bool rd_i_db_del_type(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_del_type(ctx, address);
+}
+
+void rd_i_db_set_function(RDContext* ctx, const RDFunction* f) {
+    _rd_i_db_query_set_function(ctx, f);
 }
 
 RDAddressVect* rd_i_db_get_all_address_by_type(RDContext* ctx, RDAddressVect* v,

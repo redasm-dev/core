@@ -83,6 +83,12 @@ typedef struct RDTypeVect {
     usize capacity;
 } RDTypeVect;
 
+typedef struct RDNameVect {
+    RDName* data;
+    usize length;
+    usize capacity;
+} RDNameVect;
+
 int _rd_i_db_segment_cmp_pred(const void* a, const void* b);
 int _rd_i_db_segment_find_pred(const void* key, const void* item);
 

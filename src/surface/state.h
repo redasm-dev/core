@@ -1,10 +1,10 @@
 #pragma once
 
-#include "listing/listing.h"
 #include <redasm/surface/common.h>
 
 typedef struct RDHistoryItem {
-    LIndex start;
+    RDAddress start;
+    usize start_sub_line;
     RDSurfacePos pos;
 } RDHistoryItem;
 
@@ -16,7 +16,8 @@ typedef struct RDHistoryVect {
 
 typedef struct RDSurfaceState {
     RDSurfacePos pos, sel_pos;
-    LIndex start;
+    RDAddress start;
+    usize start_sub_line;
     RDHistoryVect back_history, fwd_history;
     bool lock_history;
 } RDSurfaceState;

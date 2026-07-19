@@ -1,7 +1,6 @@
 #pragma once
 
 #include <redasm/function.h>
-#include <redasm/listing.h>
 #include <redasm/segment.h>
 #include <redasm/surface/common.h>
 
@@ -24,12 +23,15 @@ RD_API RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags);
 RD_API void rd_surface_destroy(RDSurface* self);
 RD_API void rd_surface_clear_history(RDSurface* self);
 RD_API void rd_surface_clear_selection(RDSurface* self);
-RD_API void rd_surface_render(RDSurface* self, usize n);
+RD_API bool rd_surface_render(RDSurface* self, RDAddress address);
+RD_API bool rd_surface_repaint(RDSurface* self);
+RD_API bool rd_surface_scroll(RDSurface* self, int n);
+RD_API bool rd_surface_jump_to(RDSurface* self, RDAddress address);
 RD_API void rd_surface_set_mode(RDSurface* self, RDRenderMode m);
 RD_API void rd_surface_set_cursor_visible(RDSurface* self, bool b);
 RD_API void rd_surface_set_columns(RDSurface* self, int cols);
-RD_API void rd_surface_seek(RDSurface* self, usize index);
 RD_API void rd_surface_set_highlight_word(RDSurface* self, const char* word);
+RD_API void rd_surface_set_max_rows(RDSurface* self, usize rows);
 RD_API RDRenderMode rd_surface_get_mode(const RDSurface* self);
 RD_API bool rd_surface_has_selection(const RDSurface* self);
 RD_API bool rd_surface_can_go_back(const RDSurface* self);
@@ -39,8 +41,6 @@ RD_API bool rd_surface_select(RDSurface* self, int row, int col);
 RD_API bool rd_surface_select_word(RDSurface* self, int row, int col);
 RD_API bool rd_surface_go_back(RDSurface* self);
 RD_API bool rd_surface_go_forward(RDSurface* self);
-RD_API bool rd_surface_jump_to_ep(RDSurface* self);
-RD_API bool rd_surface_jump_to(RDSurface* self, RDAddress address);
 RD_API bool rd_surface_get_current_address(const RDSurface* self, RDAddress* address);
 RD_API bool rd_surface_get_address_under_pos(const RDSurface* self, const RDSurfacePos* pos, RDAddress* address);
 RD_API bool rd_surface_get_address_under_cursor(const RDSurface* self, RDAddress* address);
@@ -48,9 +48,9 @@ RD_API bool rd_surface_get_cell_data_under_cursor(const RDSurface* self, RDCellD
 RD_API bool rd_surface_get_cell_data_under_pos(const RDSurface* self, const RDSurfacePos* pos, RDCellData* cd);
 RD_API int rd_surface_index_of(const RDSurface* self, RDAddress address);
 RD_API int rd_surface_last_index_of(const RDSurface* self, RDAddress address);
-RD_API usize rd_surface_get_row_start(const RDSurface* self);
+RD_API bool rd_surface_get_first_address(const RDSurface* self, RDAddress* address);
 RD_API usize rd_surface_get_row_count(const RDSurface* self);
-RD_API usize rd_surface_get_length(const RDSurface* self);
+RD_API usize rd_surface_get_byte_span(const RDSurface* self);
 RD_API RDRowSlice rd_surface_get_row(const RDSurface* self, usize idx);
 RD_API RDSurfacePathSlice rd_surface_get_path(RDSurface* self);
 RD_API RDSurfacePos rd_surface_get_pos(const RDSurface* self);

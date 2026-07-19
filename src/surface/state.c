@@ -3,8 +3,8 @@
 
 static inline bool _rd_history_item_equals(const RDHistoryItem* a,
                                            const RDHistoryItem* b) {
-    return a->start == b->start && a->pos.row == b->pos.row &&
-           a->pos.col == b->pos.col;
+    return a->start == b->start && a->start_sub_line == b->start_sub_line &&
+           a->pos.row == b->pos.row && a->pos.col == b->pos.col;
 }
 
 void rd_i_surfacestate_push_history(RDSurfaceState* self,
@@ -13,6 +13,7 @@ void rd_i_surfacestate_push_history(RDSurfaceState* self,
 
     RDHistoryItem item = {
         .start = self->start,
+        .start_sub_line = self->start_sub_line,
         .pos = self->pos,
     };
 
@@ -43,6 +44,7 @@ bool rd_i_surfacestate_go_back(RDSurfaceState* self) {
 
     rd_i_surfacestate_with_locked_history(self, {
         self->start = item.start;
+        self->start_sub_line = item.start_sub_line,
         rd_i_surfacestate_set_pos(self, item.pos.row, item.pos.col);
     });
 
@@ -57,6 +59,7 @@ bool rd_i_surfacestate_go_forward(RDSurfaceState* self) {
 
     rd_i_surfacestate_with_locked_history(self, {
         self->start = item.start;
+        self->start_sub_line = item.start_sub_line,
         rd_i_surfacestate_set_pos(self, item.pos.row, item.pos.col);
     });
 

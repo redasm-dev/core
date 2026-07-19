@@ -110,19 +110,19 @@ const char* rd_get_reg_name(const RDContext* ctx, RDReg r) {
     return NULL;
 }
 
-usize rd_get_ptr_size(const RDContext* ctx) {
+unsigned int rd_get_ptr_size(const RDContext* ctx) {
     assert(ctx->processorplugin);
     return ctx->processorplugin->ptr_size;
 }
 
-usize rd_get_code_ptr_size(const RDContext* ctx) {
+unsigned int rd_get_code_ptr_size(const RDContext* ctx) {
     assert(ctx->processorplugin);
     return ctx->processorplugin->code_ptr_size
                ? ctx->processorplugin->code_ptr_size
                : ctx->processorplugin->ptr_size;
 }
 
-usize rd_get_int_size(const RDContext* ctx) {
+unsigned int rd_get_int_size(const RDContext* ctx) {
     assert(ctx->processorplugin);
     return ctx->processorplugin->int_size;
 }

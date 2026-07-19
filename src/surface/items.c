@@ -4,30 +4,30 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include <ctype.h>
-#include <stddef.h>
+#include <inttypes.h>
 
 #define RD_SURFACE_WS_COMMENT 8
 #define RD_SURFACE_WS_REFS 8
 
-static void _rd_render_modifiers(RDRenderer* r, const RDListingItem* item,
+static void _rd_render_modifiers(RDRenderer* r, RDAddress address,
                                  RDThemeKind fg, RDThemeKind bg) {
-    if(item->mod == RD_LMOD_IMPORTED)
+    const RDSegmentFull* seg = rd_i_renderer_find_segment(r, address);
+    usize idx = rd_i_address2index(seg, address);
+
+    if(rd_flagsbuffer_has_imported(seg->flags, idx))
         rd_renderer_text(r, "imported ", fg, bg);
-    else if(item->mod == RD_LMOD_EXPORTED)
+    else if(rd_flagsbuffer_has_exported(seg->flags, idx))
         rd_renderer_text(r, "exported ", fg, bg);
 }
 
 static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                              bool term) {
     const RDSegmentFull* seg = rd_i_db_find_segment(r->context, address);
-    panic_if(!seg, "_rd_surface_render_value: invalid segment");
+    panic_if(!seg, "_rd_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
-    const RDProcessorPlugin* p = r->context->processorplugin;
-
-    const unsigned int PTR_SIZE = p->ptr_size;
-    const unsigned int CPTR_SIZE =
-        p->code_ptr_size ? p->code_ptr_size : PTR_SIZE;
+    const unsigned int PTR_SIZE = rd_get_ptr_size(r->context);
+    const unsigned int CPTR_SIZE = rd_get_code_ptr_size(r->context);
 
     bool is_be = r->context->processorplugin->flags & RD_PF_BE;
     usize idx = rd_i_address2index(seg, address);
@@ -58,7 +58,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     }
 
     // char array - render as string
-    if(!strcmp(t->name, "char") && t->count > 0) {
+    if(!strcmp(t->def->name, "char") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
         usize i = 0;
         for(; i < t->count - 1; i++) {
@@ -95,7 +95,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     }
 
     // char16 array - render as string
-    if(!strcmp(t->name, "char16") && t->count > 0) {
+    if(!strcmp(t->def->name, "char16") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
         for(usize i = 0; i < t->count; i++) {
             bool ok = false;
@@ -125,7 +125,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     }
 
     // single char
-    if(!strcmp(t->name, "char")) {
+    if(!strcmp(t->def->name, "char")) {
         u8 v;
         rd_renderer_norm(r, "'");
         if(rd_i_buffer_read_byte(flags, idx, &v))
@@ -138,7 +138,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     }
 
     // single char16
-    if(!strcmp(t->name, "char16")) {
+    if(!strcmp(t->def->name, "char16")) {
         u16 v;
         rd_renderer_norm(r, "'");
 
@@ -155,12 +155,14 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         return;
     }
 
+    if(t->count > 0) return; // non-string array, ignore
+
     // numeric primitive
     u64 v;
-    if(rd_i_buffer_read_primitive(flags, idx, t->name, is_be, &v)) {
+    if(rd_i_buffer_read_primitive(flags, idx, t->def->name, is_be, &v)) {
         unsigned int sz =
-            (unsigned int)rd_i_size_of(r->context, t->name, 0, t->mod);
-        panic_if(!sz, "type '%s' has unresolved size", t->name);
+            (unsigned int)rd_i_size_of(r->context, t->def->name, 0, t->mod);
+        panic_if(!sz, "type '%s' has unresolved size", t->def->name);
 
         if(sz == PTR_SIZE)
             rd_renderer_loc(r, (RDAddress)v, sz * 2, RD_NUM_DEFAULT);
@@ -171,12 +173,11 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         rd_renderer_muted(r, "?");
 }
 
-static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
+static void _rd_render_refs(RDRenderer* r, RDAddress address) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_REFS)) return;
 
     RDContext* ctx = r->context;
-    if(!rd_i_get_xrefs_from_ex(ctx, item->address, RD_XR_NONE, &r->xrefs))
-        return;
+    if(!rd_i_get_xrefs_from_ex(ctx, address, RD_XR_NONE, &r->xrefs)) return;
 
     const RDXRef* xref;
     vect_each(xref, &r->xrefs) {
@@ -187,7 +188,7 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
         if(!rd_i_get_type(ctx, xref->address, &t)) continue;
 
         bool is_ptr = rd_type_is_ptr(&t.base);
-        RDAddress ptr_address = 0, address = xref->address;
+        RDAddress ptr_address = 0, xref_address = xref->address;
 
         // try to follow the pointer location
         if(is_ptr && xref->type == RD_DR_READ &&
@@ -199,27 +200,27 @@ static void _rd_render_refs(RDRenderer* r, const RDListingItem* item) {
                            seg->flags, rd_i_address2index(seg, ptr_address));
 
             if(has_xrefs_in && rd_i_get_type(ctx, ptr_address, &t))
-                address = ptr_address;
+                xref_address = ptr_address;
             else
                 is_ptr = false;
         }
 
         // render strings only
-        if((strcmp(t.base.name, "char") != 0 &&
-            strcmp(t.base.name, "char16") != 0) ||
+        if((strcmp(t.base.def->name, "char") != 0 &&
+            strcmp(t.base.def->name, "char16") != 0) ||
            !t.base.count)
             continue;
 
         rd_renderer_ws(r, RD_SURFACE_WS_REFS);
         if(is_ptr) rd_renderer_norm(r, " => ");
-        _rd_render_value(r, address, &t.base, false);
+        _rd_render_value(r, xref_address, &t.base, false);
     }
 }
 
-static void _rd_render_comment(RDRenderer* r, const RDListingItem* item) {
+static void _rd_render_comment(RDRenderer* r, RDAddress address) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
-    const char* cmt = rd_get_comment(r->context, item->address);
+    const char* cmt = rd_get_comment(r->context, address);
     if(!cmt) return;
 
     vect_clear(&r->comment_buf);
@@ -249,74 +250,316 @@ static void _rd_render_comment(RDRenderer* r, const RDListingItem* item) {
     }
 }
 
-static void _rd_render_comment_item(RDRenderer* r, const RDListingItem* item) {
+static void _rd_render_comment_item(RDRenderer* r, const RDSegmentFull* seg,
+                                    usize idx, usize sub_line,
+                                    const char* comment) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
-    rd_i_renderer_new_row(r, item);
+    rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
     rd_renderer_text(r, "<", RD_THEME_MUTED, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, item->comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
     rd_renderer_text(r, ">", RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
-static void _rd_render_hex_dump_item(RDRenderer* r, const RDListingItem* item) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(r->context, item->address);
-    panic_if(!seg, "_rd_surface_render_hex_dump: invalid segment");
+static void _rd_render_label_item(RDRenderer* r, const RDSegmentFull* seg,
+                                  usize idx, usize sub_line) {
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 6);
 
-    int c = 0;
-    rd_i_renderer_new_row(r, item);
+    RDName n;
+    bool hasname = rd_i_get_name(r->context, address, true, &n);
+    assert(hasname && "cannot get label name");
 
-    for(RDAddress addr = item->start_address; addr < item->end_address;
-        addr++, c += 3) {
-        u8 v;
-        usize idx = rd_i_address2index(seg, addr);
+    rd_renderer_text(r, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, ":", RD_THEME_LOCATION, RD_THEME_BACKGROUND);
+}
 
-        if(rd_flagsbuffer_get_value(seg->flags, idx, &v))
-            rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
-        else
-            rd_renderer_muted(r, "??");
+static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
+                                     usize idx, usize sub_line) {
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
 
+    const RDProcessorPlugin* p = r->context->processorplugin;
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 4);
+
+    const RDFunction* f = rd_i_find_function(r->context, address);
+    panic_if(!f, "function not found @ %x", address);
+
+    if(p->render_function) {
+        p->render_function(r, f, r->context->processor);
+        return;
+    }
+
+    _rd_render_modifiers(r, address, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    const char* func_str = rd_i_function_to_str(f, r->context);
+
+    if(func_str) {
+        rd_renderer_text(r, func_str, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+        return;
+    }
+
+    RDName n;
+    bool hasname = rd_i_get_name(r->context, address, true, &n);
+    assert(hasname);
+
+    rd_renderer_text(r, "function ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+
+    if(rd_function_is_noret(f)) {
+        rd_renderer_text(r, " noreturn", RD_THEME_FUNCTION,
+                         RD_THEME_BACKGROUND);
+    }
+}
+
+static void _rd_render_instruction_item(RDRenderer* r, const RDSegmentFull* seg,
+                                        usize idx, usize sub_line) {
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+
+    switch(r->mode) {
+        case RD_RM_RDIL: rd_i_renderer_rdil(r, address); break;
+        case RD_RM_FLAGS: rd_i_renderer_flags(r, address); break;
+        default: rd_i_renderer_instr(r, address); break;
+    }
+
+    _rd_render_refs(r, address);
+    _rd_render_comment(r, address);
+}
+
+static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
+                                usize idx, usize sub_line, bool is_banner,
+                                const RDResolveResult* res) {
+    // indentation is a schema property (depth), not a row ordinal: the
+    // same field indents identically whether reached from its root's
+    // address or its own (first.x under the root, first.y at its own
+    // head - both depth 1, both at the same column). The banner sits
+    // one level above depth 0
+    usize indent = is_banner ? 8 : 8 + ((res->depth + 1) * 2);
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
+
+    if(r->mode == RD_RM_FLAGS) {
+        rd_i_renderer_flags(r, address);
+        return;
+    }
+
+    _rd_render_modifiers(r, address, RD_THEME_TYPE, RD_THEME_BACKGROUND);
+
+    RDType t = res->field.type;
+    const char* name = res->field.name;
+    const RDTypeDef* tdef = t.def;
+    assert(tdef);
+
+    // an unnamed result that crossed an array IS the element: show [n].
+    // Named members never show the index - the index belongs to the
+    // element's own row, wherever that renders
+    bool is_element = res->item_idx.has_value && !name;
+    bool skip_type_name = is_element && tdef->kind == RD_TKIND_PRIM;
+
+    // 1. struct/union keyword for compound heads
+    if(t.mod == RD_TYPE_NONE && t.count == 0) {
+        if(tdef->kind == RD_TKIND_STRUCT)
+            rd_renderer_text(r, "struct ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
+        else if(tdef->kind == RD_TKIND_UNION)
+            rd_renderer_text(r, "union ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
+    }
+
+    if(!skip_type_name) {
+        // 2. type name
+        rd_renderer_text(r, tdef->name, RD_THEME_TYPE, RD_THEME_BACKGROUND);
+
+        // 3. pointer modifier
+        if(rd_type_is_ptr(&res->field.type)) rd_renderer_norm(r, "*");
         rd_renderer_ws(r, 1);
     }
 
-    if(c < RD_LISTING_HEX_LINE * 3)
-        rd_renderer_ws(r, (RD_LISTING_HEX_LINE * 3) - c);
+    // 4. member name or address name
+    if(is_banner) {
+        RDName n;
+        bool hasname = rd_i_get_name(r->context, address, true, &n);
+        assert(hasname && "cannot get type name");
+        rd_renderer_norm(r, n.value);
+    }
+    else {
+        if(is_element) {
+            rd_renderer_norm(r, "[");
+            rd_renderer_text(r, rd_i_to_dec((i64)res->item_idx.value),
+                             RD_THEME_NUMBER, RD_THEME_BACKGROUND);
+            rd_renderer_norm(r, "]");
+        }
 
-    c = 0;
-
-    for(RDAddress addr = item->start_address; addr < item->end_address;
-        addr++, c++) {
-        char ptr[2] = {0};
-        usize idx = rd_i_address2index(seg, addr);
-
-        if(rd_flagsbuffer_get_value(seg->flags, idx, (u8*)&ptr))
-            rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
-        else
-            rd_renderer_muted(r, "?");
+        if(name) rd_renderer_norm(r, name);
     }
 
-    if(c < RD_LISTING_HEX_LINE) rd_renderer_ws(r, RD_LISTING_HEX_LINE - c);
+    // 5. array size
+    if(t.count > 0) {
+        rd_renderer_norm(r, "[");
+        rd_renderer_text(r, rd_i_to_dec((i64)t.count), RD_THEME_NUMBER,
+                         RD_THEME_BACKGROUND);
+        rd_renderer_norm(r, "]");
+    }
+
+    // 6. value (only for primitives and pointers, not compound heads)
+    if(tdef->kind == RD_TKIND_PRIM || rd_type_is_ptr(&res->field.type)) {
+        rd_renderer_ws(r, 1);
+        rd_renderer_norm(r, "=");
+        rd_renderer_ws(r, 1);
+        _rd_render_value(r, address, &t, true);
+    }
+
+    _rd_render_comment(r, address);
 }
 
-static void _rd_render_fill_item(RDRenderer* r, const RDListingItem* item) {
-    usize count = item->end_address - item->start_address;
+static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
+                                                  const RDSegmentFull* seg,
+                                                  usize idx, usize sub_line) {
+    usize slot = 0, curridx = idx;
 
-    rd_i_renderer_new_row(r, item);
-    rd_renderer_text(r, ".fill ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    rd_renderer_num(r, (i64)count, 16, 0, RD_NUM_DEFAULT);
-    rd_renderer_norm(r, ",");
+    if(rd_i_flagsbuffer_has_info(seg->flags, idx)) {
+        if(sub_line == slot) {
+            _rd_render_label_item(r, seg, idx, sub_line);
+            return (RDRenderItemResult){.status = RD_ROW_OK};
+        }
+        slot++;
+    }
 
-    if(item->fill.has_value)
-        rd_renderer_num(r, item->fill.value, 16, 2, RD_NUM_DEFAULT);
-    else
-        rd_renderer_muted(r, "??");
+    if(sub_line == slot) {
+        rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+
+        while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
+            if((curridx - idx) == RD_SURFACE_HEX_LINE) break;
+            if(!rd_flagsbuffer_has_unknown(seg->flags, curridx)) break;
+
+            u8 v;
+            if(rd_flagsbuffer_get_value(seg->flags, curridx, &v))
+                rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
+            else
+                rd_renderer_muted(r, "??");
+
+            rd_renderer_ws(r, 1);
+            curridx++;
+        }
+
+        usize n = curridx - idx;
+
+        if(n < RD_SURFACE_HEX_LINE)
+            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - n) * 3);
+
+        curridx = idx;
+
+        for(usize i = 0; i < n; i++, curridx++) {
+            char ptr[2] = {0};
+            if(rd_flagsbuffer_get_value(seg->flags, curridx, (u8*)&ptr))
+                rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
+            else
+                rd_renderer_muted(r, "?");
+        }
+
+        if(n < RD_SURFACE_HEX_LINE) rd_renderer_ws(r, RD_SURFACE_HEX_LINE - n);
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = curridx - idx,
+        };
+    }
+
+    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
 }
 
-static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return;
+static RDRenderItemResult _rd_render_item_data(RDRenderer* r,
+                                               const RDSegmentFull* seg,
+                                               usize idx, usize sub_line) {
+    RDDataHead head;
+    rd_i_data_head_get(r->context, seg, idx, &head);
+
+    RDResolveResult res = {0};
+    bool is_head = head.has_banner && sub_line == 0;
+    bool ok;
+
+    if(is_head) {
+        res.field = (RDParam){.type = head.root, .name = NULL};
+        ok = true;
+    }
+    else if(head.has_banner && !rd_i_type_has_more(&head.root)) {
+        ok = false; // solid root: the banner was the whole rendering
+    }
+    else {
+        usize link = head.has_banner ? sub_line - 1 : sub_line;
+        ok = rd_i_data_chain_row(r->context, &head, link, &res);
+    }
+
+    if(!ok) return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+
+    // string-like types (aka char[n], char16[n] ...) are not expanded
+    // but rendered as a single line + terminator
+    if(!is_head && sub_line > 0 && rd_type_is_string(&head.root))
+        return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+
+    _rd_render_data_row(r, seg, idx, sub_line, is_head, &res);
+
+    // the deepest chain entity is the narrowest:
+    // on EXHAUSTED the fill loop advances by the LAST OK row's length, which is
+    // exactly the step from this head to the next one
+    return (RDRenderItemResult){
+        .status = RD_ROW_OK,
+        .length = rd_type_size(&res.field.type, r->context),
+    };
+}
+
+static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
+                                               const RDSegmentFull* seg,
+                                               usize idx, usize sub_line) {
+    usize slot = 0;
+
+    if(rd_flagsbuffer_has_func(seg->flags, idx)) {
+        if(sub_line == slot) {
+            _rd_render_function_item(r, seg, idx, sub_line);
+
+            return (RDRenderItemResult){
+                .status = RD_ROW_OK,
+                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+            };
+        }
+        slot++;
+    }
+    else if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx)) {
+        if(sub_line == slot) {
+            _rd_render_label_item(r, seg, idx, sub_line);
+            return (RDRenderItemResult){
+                .status = RD_ROW_OK,
+                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+            };
+        }
+        slot++;
+    }
+
+    if(sub_line == slot) {
+        _rd_render_instruction_item(r, seg, idx, sub_line);
+
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+        };
+    }
+
+    slot++;
+
+    if(rd_flagsbuffer_has_noret(seg->flags, idx)) {
+        if(sub_line == slot) {
+            _rd_render_comment_item(r, seg, idx, sub_line, "does not return");
+
+            return (RDRenderItemResult){
+                .status = RD_ROW_OK,
+                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+            };
+        }
+        slot++;
+    }
+
+    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+}
+
+bool rd_i_render_segment_item(RDRenderer* r, const RDSegmentFull* seg) {
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return false;
 
     const RDProcessorPlugin* p = r->context->processorplugin;
-    const RDSegmentFull* seg = item->segment;
-    rd_i_renderer_new_row(r, item);
+    rd_i_renderer_new_row(r, seg, 0, RD_SUB_LINE_NONE, 0);
 
     if(p->render_segment) {
         p->render_segment(r, (const RDSegment*)seg, r->context->processor);
@@ -335,149 +578,69 @@ static void _rd_render_segment_item(RDRenderer* r, const RDListingItem* item) {
         rd_renderer_num(r, (i64)seg->base.end_address, 16, F, RD_NUM_NOADDR);
         rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
     }
+
+    return true;
 }
 
-static void _rd_render_function_item(RDRenderer* r, const RDListingItem* item) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
+void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
+                        RDDataHead* out) {
+    RDAddress address = seg->base.start_address + idx;
 
-    const RDProcessorPlugin* p = r->context->processorplugin;
-    rd_i_renderer_new_row(r, item);
+    if(rd_flagsbuffer_has_type(seg->flags, idx)) {
+        RDTypeFull t;
+        bool got = rd_i_db_get_type(ctx, address, &t);
+        panic_if(!got, "type not found @ %s:%x", seg->base.name, address);
 
-    if(p->render_function) {
-        p->render_function(r, item->func, r->context->processor);
+        *out = (RDDataHead){.root = t.base, .offset = 0, .has_banner = true};
         return;
     }
 
-    _rd_render_modifiers(r, item, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    const char* func_str = rd_i_function_to_str(item->func, r->context);
+    if(rd_flagsbuffer_has_field(seg->flags, idx) ||
+       rd_flagsbuffer_has_item(seg->flags, idx)) {
+        RDAddress root_address = address;
+        RDType root;
+        bool got = rd_i_db_get_root_type(ctx, &root_address, &root);
+        panic_if(!got, "root type not found @ %s:%x", seg->base.name, address);
 
-    if(func_str) {
-        rd_renderer_text(r, func_str, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+        *out = (RDDataHead){.root = root, .offset = address - root_address};
         return;
     }
 
-    RDName n;
-    bool hasname = rd_i_get_name(r->context, item->address, true, &n);
-    assert(hasname);
-
-    rd_renderer_text(r, "function ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-
-    if(rd_function_is_noret(item->func)) {
-        rd_renderer_text(r, " noreturn", RD_THEME_FUNCTION,
-                         RD_THEME_BACKGROUND);
-    }
+    unreachable();
 }
 
-static void _rd_render_label_item(RDRenderer* r, const RDListingItem* item) {
-    RDName n;
-    bool hasname = rd_i_get_name(r->context, item->address, true, &n);
-    assert(hasname && "cannot get label name");
+bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
+                         RDResolveResult* out) {
+    RDResolveResult probe;
+    if(!rd_type_resolve_offset(ctx, &head->root, head->offset, 0, &probe))
+        return false;
 
-    rd_i_renderer_new_row(r, item);
-    rd_renderer_text(r, n.value, RD_THEME_LOCATION, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, ":", RD_THEME_LOCATION, RD_THEME_BACKGROUND);
+    if(link == 0) {
+        *out = probe;
+        return true;
+    }
+
+    usize want = probe.depth + link;
+    if(!rd_type_resolve_offset(ctx, &head->root, head->offset, want, out))
+        return false;
+
+    return out->depth == want; // shallower: the chain ended before this link
 }
 
-static void _rd_render_instruction_item(RDRenderer* r,
-                                        const RDListingItem* item) {
-    rd_i_renderer_new_row(r, item);
+RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
+                                    usize idx, usize sub_line) {
+    panic_if(rd_flagsbuffer_has_tail(seg->flags, idx),
+             "tail detected @ %" PRIx64 ", sub_line %zu",
+             seg->base.start_address + idx, sub_line);
 
-    switch(r->mode) {
-        case RD_RM_RDIL: rd_i_renderer_rdil(r, item); break;
-        case RD_RM_FLAGS: rd_i_renderer_flags(r, item); break;
-        default: rd_i_renderer_instr(r, item); break;
-    }
+    if(rd_flagsbuffer_has_unknown(seg->flags, idx))
+        return _rd_render_item_unknown(r, seg, idx, sub_line);
 
-    _rd_render_refs(r, item);
-    _rd_render_comment(r, item);
-}
+    if(rd_flagsbuffer_has_data(seg->flags, idx))
+        return _rd_render_item_data(r, seg, idx, sub_line);
 
-static void _rd_render_type_item(RDRenderer* r, const RDListingItem* item) {
-    assert(item->type.name && "_rd_surface_render_type: invalid type");
+    if(rd_flagsbuffer_has_code(seg->flags, idx))
+        return _rd_render_item_code(r, seg, idx, sub_line);
 
-    RDContext* ctx = r->context;
-    const RDTypeDef* tdef = rd_i_typedef_find(ctx, item->type.name);
-    panic_if(!tdef, "type '%s' not found in registry", item->type.name);
-
-    rd_i_renderer_new_row(r, item);
-    _rd_render_modifiers(r, item, RD_THEME_TYPE, RD_THEME_BACKGROUND);
-
-    // 1. struct/union keyword for compound heads
-    if(tdef->kind == RD_TKIND_STRUCT && !item->parent_tdef)
-        rd_renderer_text(r, "struct ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
-    else if(tdef->kind == RD_TKIND_UNION && !item->parent_tdef)
-        rd_renderer_text(r, "union ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
-
-    // 2. type name
-    rd_renderer_text(r, item->type.name, RD_THEME_TYPE, RD_THEME_BACKGROUND);
-
-    // 3. pointer modifier
-    if(rd_type_is_ptr(&item->type)) rd_renderer_norm(r, "*");
-
-    rd_renderer_ws(r, 1);
-
-    // 4. member name or address name
-    if(item->member_index != RD_LISTING_NO_INDEX) {
-        const RDTypeDef* parent_tdef = item->parent_tdef;
-        assert(parent_tdef && "member_index without parent");
-
-        const char* member_name =
-            vect_at(&parent_tdef->compound_, item->member_index)->name;
-
-        rd_renderer_norm(r, member_name);
-    }
-    else {
-        RDName n;
-        bool hasname = rd_i_get_name(ctx, item->address, true, &n);
-        assert(hasname && "cannot get type name");
-        rd_renderer_norm(r, n.value);
-    }
-
-    if(item->array_index != RD_LISTING_NO_INDEX) {
-        rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec((i64)item->array_index),
-                         RD_THEME_NUMBER, RD_THEME_BACKGROUND);
-        rd_renderer_norm(r, "]");
-    }
-
-    // 5. array size
-    if(item->type.count > 0) {
-        rd_renderer_norm(r, "[");
-        rd_renderer_text(r, rd_i_to_dec((i64)item->type.count), RD_THEME_NUMBER,
-                         RD_THEME_BACKGROUND);
-        rd_renderer_norm(r, "]");
-    }
-
-    // 6. value (only for primitives and pointers, not compound heads)
-    if(tdef->kind == RD_TKIND_PRIM || rd_type_is_ptr(&item->type)) {
-        rd_renderer_ws(r, 1);
-        rd_renderer_norm(r, "=");
-        rd_renderer_ws(r, 1);
-        _rd_render_value(r, item->address, &item->type, true);
-    }
-
-    _rd_render_comment(r, item);
-}
-
-void rd_i_render_item_at(RDRenderer* r, LIndex idx) {
-    const RDListing* listing = &r->context->listing;
-    const RDListingItem* item = vect_at(listing, idx);
-    rd_i_renderer_set_current_item(r, idx, item);
-
-    // clang-format off
-    switch(item->kind) {
-        case RD_LK_EMPTY:       rd_i_renderer_new_row(r, item);       break;
-        case RD_LK_COMMENT:     _rd_render_comment_item(r, item);     break;
-        case RD_LK_HEX_DUMP:    _rd_render_hex_dump_item(r, item);    break;
-        case RD_LK_FILL:        _rd_render_fill_item(r, item);        break;
-        case RD_LK_SEGMENT:     _rd_render_segment_item(r, item);     break;
-        case RD_LK_FUNCTION:    _rd_render_function_item(r, item);    break;
-        case RD_LK_LABEL:       _rd_render_label_item(r, item);       break;
-        case RD_LK_INSTRUCTION: _rd_render_instruction_item(r, item); break;
-        case RD_LK_TYPE:        _rd_render_type_item(r, item);        break;
-        default:                unreachable();
-    }
-    // clang-format on
+    unreachable();
 }

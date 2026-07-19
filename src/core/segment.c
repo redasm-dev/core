@@ -8,15 +8,15 @@
 #include <redasm/segment.h>
 #include <redasm/support/logging.h>
 
-usize rd_i_address2index(const RDSegmentFull* self, RDAddress addr) {
-    assert(addr >= self->base.start_address && addr < self->base.end_address &&
+usize rd_i_address2index(const RDSegmentFull* seg, RDAddress addr) {
+    assert(addr >= seg->base.start_address && addr < seg->base.end_address &&
            "address out of range");
-    return addr - self->base.start_address;
+    return addr - seg->base.start_address;
 }
 
-RDAddress rd_i_index2address(const RDSegmentFull* self, usize idx) {
-    RDAddress addr = self->base.start_address + idx;
-    assert(addr >= self->base.start_address && addr < self->base.end_address &&
+RDAddress rd_i_index2address(const RDSegmentFull* seg, usize idx) {
+    RDAddress addr = seg->base.start_address + idx;
+    assert(addr >= seg->base.start_address && addr < seg->base.end_address &&
            "index out of range");
     return addr;
 }

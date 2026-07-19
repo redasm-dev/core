@@ -11,6 +11,8 @@ enum {
     RD_QUERY_SET_NAME = 0,
     RD_QUERY_GET_NAME,
     RD_QUERY_DEL_NAME,
+    RD_QUERY_GET_ALL_NAMES,
+    RD_QUERY_GET_ALL_NAME_ADDRESSES,
     RD_QUERY_GET_ADDRESS,
 
     RD_QUERY_ADD_XREF,
@@ -41,8 +43,9 @@ enum {
     RD_QUERY_DEL_TYPE,
     RD_QUERY_GET_ALL_ADDRESS_BY_TYPE,
     RD_QUERY_GET_ALL_TYPES,
+    RD_QUERY_GET_ROOT_TYPE,
 
-    RD_QUERY_ADD_FUNCTION,
+    RD_QUERY_SET_FUNCTION,
     RD_QUERY_GET_ALL_FUNCTIONS,
 
     RD_QUERY_ADD_SEGMENT,
@@ -114,9 +117,12 @@ bool _rd_i_db_query_get_name(RDContext* ctx, RDAddress address, RDName* n);
 void _rd_i_db_query_set_name(RDContext* ctx, RDAddress address,
                              const char* name, RDConfidence c);
 bool _rd_i_db_query_del_name(RDContext* ctx, RDAddress address);
+RDNameVect* _rd_i_db_query_get_all_names(RDContext* ctx, RDAddressVect* av,
+                                         RDNameVect* v);
+RDAddressVect* _rd_i_db_query_get_all_name_addresses(RDContext* ctx,
+                                                     RDAddressVect* v);
 
-void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address,
-                             const char* name, usize count, RDTypeModifier mod,
+void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address, const RDType* t,
                              RDConfidence c);
 bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
@@ -125,8 +131,10 @@ RDAddressVect* _rd_i_db_query_get_address_by_type(RDContext* ctx,
                                                   const char* filter);
 RDTypeVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
                                          RDTypeVect* v);
+bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
+                                  RDType* t);
 
-void _rd_i_db_query_add_function(RDContext* ctx, const RDFunction* f);
+void _rd_i_db_query_set_function(RDContext* ctx, const RDFunction* f);
 RDFunctionVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
                                                  RDFunctionVect* v);
 

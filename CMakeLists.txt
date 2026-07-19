@@ -24,6 +24,7 @@ target_sources(${PROJECT_NAME}
         src/core/segment.c
         src/core/state.c
         src/core/stringfinder.c
+        src/core/symbol.c
         src/core/worker.c
         src/db/db.c
         src/db/queries.c
@@ -39,8 +40,6 @@ target_sources(${PROJECT_NAME}
         src/kb/kb.c
         src/kb/object.c
         src/kb/schema.c
-        src/listing/builder.c
-        src/listing/listing.c
         src/plugins/builtin/loaders.c
         src/plugins/builtin/processors.c
         src/plugins/processor/instruction.c

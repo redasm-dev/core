@@ -65,7 +65,6 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
 
     rd_i_registermap_init(&self->engine.current.registers);
     rd_i_strpool_init(&self->strings);
-    rd_i_listing_init(&self->listing, NULL);
     rd_i_register_primitives(self);
 
     queue_reserve(&self->engine.qcall, RD_WORKER_QUEUE_SIZE);
@@ -127,17 +126,17 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
     }
 
     if(!s) {
-        if(rd_i_flagsbuffer_has_type(seg->flags, idx)) {
+        if(rd_flagsbuffer_has_type(seg->flags, idx)) {
             RDTypeFull t;
             bool ok = rd_i_db_get_type(self, address, &t);
             assert(ok && "type not found in database");
 
-            if(!strcmp(t.base.name, "char") && t.base.count > 0)
+            if(!strcmp(t.base.def->name, "char") && t.base.count > 0)
                 s = "str";
-            else if(!strcmp(t.base.name, "char16") && t.base.count > 0)
+            else if(!strcmp(t.base.def->name, "char16") && t.base.count > 0)
                 s = "str16";
             else
-                s = t.base.name;
+                s = t.base.def->name;
         }
         else if(rd_flagsbuffer_has_func(seg->flags, idx))
             s = "sub";
@@ -404,32 +403,19 @@ const char* rd_to_hexaddr(const RDContext* self, usize v) {
 }
 
 const char* rd_render_text(RDContext* self, RDAddress address) {
-    LIndex idx = rd_i_listing_lower_bound(&self->listing, address);
-
-    if(idx < vect_length(&self->listing)) {
-        // find first code item
-        while(idx < vect_length(&self->listing) &&
-              vect_at(&self->listing, idx)->address == address) {
-
-            const RDListingItem* item = vect_at(&self->listing, idx);
-            if(item->kind == RD_LK_INSTRUCTION || item->kind == RD_LK_TYPE)
-                break;
-
-            idx++;
-        }
-
-        if(idx < vect_length(&self->listing) &&
-           vect_at(&self->listing, idx)->address == address) {
-            RDRenderer* r = rd_i_renderer_create(self, RD_RF_TEXT);
-            rd_i_render_item_at(r, idx);
-            rd_i_renderer_swap(r);
-            rd_i_renderer_write_text(r, &self->str_buf);
-            rd_i_renderer_destroy(r);
-            return self->str_buf.data;
-        }
-    }
-
     vect_clear(&self->str_buf);
+
+    RDRenderer* r = NULL;
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) goto done;
+
+    r = rd_i_renderer_create(self, RD_RF_TEXT);
+    rd_i_render_item(r, seg, rd_i_address2index(seg, address), 0);
+    rd_i_renderer_swap(r);
+    rd_i_renderer_write_text(r, &self->str_buf);
+    rd_i_renderer_destroy(r);
+
+done:
     vect_push(&self->str_buf, 0);
     return self->str_buf.data;
 }
@@ -555,7 +541,7 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
     RDAddress curr = startaddr;
 
     for(usize i = startidx; i < endidx; i++, curr++) {
-        if(rd_i_flagsbuffer_has_type(seg->flags, i)) {
+        if(rd_flagsbuffer_has_type(seg->flags, i)) {
             rd_i_db_del_type(self, curr);
             // FL_TYPE cleared by rd_i_flagsbuffer_undefine below
         }
@@ -607,6 +593,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->tdef_buf);
     vect_destroy(&self->type_buf);
     vect_destroy(&self->addr_type_buf);
+    vect_destroy(&self->symbols);
     vect_destroy(&self->problems);
     vect_destroy(&self->pending_renames);
     vect_destroy(&self->xrefs_to);
@@ -618,7 +605,6 @@ void rd_destroy(RDContext* self) {
     hmap_destroy(&self->engine.current.registers);
     rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
     rd_i_functionvect_destroy(&self->functions);
-    rd_i_listing_deinit(&self->listing);
     rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
     rd_i_kb_destroy(self->kb);
@@ -941,7 +927,70 @@ RDExternalSlice rd_get_all_externals(const RDContext* self,
 }
 
 RDSymbolSlice rd_get_all_symbols(const RDContext* self) {
-    return vect_to_slice(RDSymbolSlice, &self->listing.symbols);
+    RDContext* ctx = (RDContext*)self;
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDFunctionVect* functions = &ctx->functions;
+
+    RDAddressVect addresses = {0};
+    RDTypeVect types = {0};
+    rd_i_db_get_all_types(ctx, &addresses, &types);
+
+    vect_clear(&ctx->symbols);
+    vect_reserve(&ctx->symbols, vect_length(segments) + vect_length(functions) +
+                                    vect_length(&addresses));
+
+    RDSegmentFull** seg;
+    vect_each(seg, segments) {
+        vect_push(&ctx->symbols, (RDSymbol){
+                                     .kind = RD_SYMBOL_SEGMENT,
+                                     .address = (*seg)->base.start_address,
+                                     .segment = (const RDSegment*)(*seg),
+                                 });
+    }
+
+    RDFunction** func;
+    vect_each(func, functions) {
+        vect_push(&ctx->symbols, (RDSymbol){
+                                     .kind = RD_SYMBOL_FUNCTION,
+                                     .address = (*func)->address,
+                                     .func = *func,
+                                 });
+    }
+
+    for(usize i = 0; i < vect_length(&addresses); i++) {
+        const RDType* t = vect_at(&types, i);
+
+        vect_push(&ctx->symbols, (RDSymbol){
+                                     .kind = RD_SYMBOL_TYPE,
+                                     .address = *vect_at(&addresses, i),
+                                     .type = *t,
+                                 });
+    }
+
+    vect_clear(&addresses);
+    rd_i_db_get_all_name_addresses(ctx, &addresses);
+
+    for(usize i = 0; i < vect_length(&addresses); i++) {
+        RDAddress address = *vect_at(&addresses, i);
+
+        const RDSegmentFull* s = rd_i_db_find_segment(ctx, address);
+        if(!s) continue;
+
+        usize idx = rd_i_address2index(s, address);
+        if(rd_flagsbuffer_has_func(s->flags, idx)) continue;
+        if(rd_flagsbuffer_has_type(s->flags, idx)) continue;
+
+        vect_push(&ctx->symbols, (RDSymbol){
+                                     .kind = RD_SYMBOL_NAME,
+                                     .address = address,
+                                 });
+    }
+
+    vect_destroy(&types);
+    vect_destroy(&addresses);
+
+    vect_sort(&ctx->symbols, rd_i_symbol_sort_pred);
+    return vect_to_slice(RDSymbolSlice, &ctx->symbols);
 }
 
 const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
@@ -980,74 +1029,6 @@ const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
 const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr,
                                     RDXRefType type) {
     return rd_i_get_xrefs_to_ex(self, toaddr, type, &self->xrefs_to);
-}
-
-const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
-    switch(self->kind) {
-        case RD_SYMBOL_SEGMENT: {
-            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
-            return seg ? seg->base.name : NULL;
-        }
-
-        case RD_SYMBOL_STRING: {
-            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
-            assert(seg &&
-                   "cannot convert symbol to string, type outside of segments");
-
-            RDTypeFull t;
-            bool ok = rd_i_get_type(ctx, self->address, &t);
-            assert(ok && "cannot convert symbol to string, type not found");
-
-            usize idx = rd_i_address2index(seg, self->address);
-            // reserve at least these bytes, +2 for quoting, +1 null terminator
-            vect_reserve(&ctx->sym_buf, t.base.count + 3);
-            vect_clear(&ctx->sym_buf);
-            vect_push(&ctx->sym_buf, '\"');
-
-            if(!strcmp(t.base.name, "char16")) {
-                for(usize i = 0; i < t.base.count; i++) {
-                    u8 lo = 0, hi = 0;
-                    ok = rd_flagsbuffer_get_value(seg->flags, idx + (i * 2),
-                                                  &lo) &&
-                         rd_flagsbuffer_get_value(seg->flags, idx + (i * 2) + 1,
-                                                  &hi);
-                    assert(
-                        ok &&
-                        "cannot convert symbol to string, missing character");
-
-                    u16 v = (u16)(lo | ((u16)hi << 8));
-                    if(!v) break;
-
-                    const char* s = rd_i_escape_char16(v, true);
-                    while(*s)
-                        vect_push(&ctx->sym_buf, *s++);
-                }
-            }
-            else {
-                for(usize i = 0; i < t.base.count; i++) {
-                    u8 v = 0;
-                    ok = rd_flagsbuffer_get_value(seg->flags, idx + i, &v);
-                    assert(
-                        ok &&
-                        "cannot convert symbol to string, missing character");
-
-                    if(!v) break;
-
-                    const char* s = rd_i_escape_char((char)v, true);
-                    while(*s)
-                        vect_push(&ctx->sym_buf, *s++);
-                }
-            }
-
-            vect_push(&ctx->sym_buf, '\"');
-            vect_push(&ctx->sym_buf, 0);
-            return ctx->sym_buf.data;
-        }
-
-        default: break;
-    }
-
-    return rd_get_name(ctx, self->address);
 }
 
 bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
@@ -1524,4 +1505,18 @@ const char* rd_get_file_name(const RDContext* self) { return self->file_name; }
 
 const char* rd_str_intern(RDContext* self, const char* s) {
     return rd_i_strpool_intern(&self->strings, s);
+}
+
+RDAddressSpace rd_get_address_space(const RDContext* ctx) {
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    if(vect_is_empty(segments)) return (RDAddressSpace){0};
+
+    const RDSegmentFull* first = *vect_first(segments);
+    const RDSegmentFull* last = *vect_last(segments);
+
+    return (RDAddressSpace){
+        .start = first->base.start_address,
+        .end = last->base.end_address,
+        .size = last->base.end_address - first->base.start_address,
+    };
 }

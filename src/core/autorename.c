@@ -102,17 +102,18 @@ static void _rd_autorename_types(RDContext* ctx) {
     RD_LOG_INFO("autorenaming types");
 
     RDCharVect name_buf = {0};
+    RDAddressVect addresses = {0};
+    RDTypeVect types = {0};
+    rd_i_db_get_all_types(ctx, &addresses, &types);
 
-    const RDSymbol* sym;
-    vect_each(sym, &ctx->listing.symbols) {
-        if(sym->kind != RD_SYMBOL_TYPE) continue;
+    for(usize i = 0; i < vect_length(&addresses); i++) {
+        const RDType* t = vect_at(&types, i);
+        if(!rd_type_is_ptr(t)) continue;
 
-        RDTypeFull t;
-        if(!rd_i_get_type(ctx, sym->address, &t) || !rd_type_is_ptr(&t.base))
-            continue;
+        RDAddress address = *vect_at(&addresses, i);
 
         RDAddress dst;
-        if(!rd_follow_ptr(ctx, sym->address, &dst)) continue;
+        if(!rd_follow_ptr(ctx, address, &dst)) continue;
 
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, dst);
         if(!seg) continue;
@@ -125,9 +126,11 @@ static void _rd_autorename_types(RDContext* ctx) {
         if(!rd_i_get_name(ctx, dst, true, &target)) continue;
 
         const char* new_name = rd_i_format(&name_buf, "p_%s", target.value);
-        rd_auto_name(ctx, sym->address, new_name);
+        rd_auto_name(ctx, address, new_name);
     }
 
+    vect_destroy(&types);
+    vect_destroy(&addresses);
     vect_destroy(&name_buf);
 }
 

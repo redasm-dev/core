@@ -7,6 +7,7 @@
 #include "rdil/renderer.h"
 #include "support/containers.h"
 #include "support/utils.h"
+#include <inttypes.h>
 
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
 
@@ -54,6 +55,13 @@ static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
     };
 
     rd_renderer_text(self, rd_i_to_base(c, &p), fg, RD_THEME_BACKGROUND);
+}
+
+const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
+                                                RDAddress address) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self->context, address);
+    assert(seg);
+    return seg;
 }
 
 RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags) {
@@ -210,30 +218,32 @@ void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
     }
 }
 
-void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item) {
+RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
+                                usize idx, usize sub_line, usize indent) {
+    RDAddress address = seg->base.start_address + idx;
+
     _rd_renderer_calc_auto_column(self);
-    rd_i_rowvect_push(&self->rows_back, self->listing_idx, item);
+    rd_i_rowvect_push(self->context, &self->rows_back, sub_line, address);
 
     if(self->columns)
         rd_i_row_reserve(vect_last(&self->rows_back), self->columns);
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
-        rd_renderer_norm(self, item->segment->base.name);
+        rd_renderer_norm(self, seg->base.name);
         rd_renderer_norm(self, ":");
 
-        const unsigned int INT_SIZE = self->context->processorplugin->int_size;
+        const unsigned int INT_SIZE = rd_get_int_size(self->context);
+        const char* address_str = rd_i_to_hex((i64)address, INT_SIZE);
 
-        const unsigned int SIZE =
-            item->segment->base.unit ? item->segment->base.unit : INT_SIZE;
+        rd_renderer_norm(self, address_str);
 
-        const char* address = rd_i_to_hex((i64)item->address, SIZE);
-
-        rd_renderer_norm(self, address);
         rd_renderer_ws(self, 2);
     }
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_INDENT))
-        rd_renderer_ws(self, item->indent);
+        rd_renderer_ws(self, indent);
+
+    return address;
 }
 
 void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
@@ -291,14 +301,14 @@ void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
     rd_renderer_ws(self, 1);
 }
 
-void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item) {
+void rd_i_renderer_rdil(RDRenderer* self, RDAddress address) {
     const RDInstructionVect* v =
-        rd_il_lift(self->context, item->address, &self->instr_buf);
+        rd_il_lift(self->context, address, &self->instr_buf);
 
     rd_i_il_render(self, v);
 }
 
-void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
+void rd_i_renderer_flags(RDRenderer* self, RDAddress address) {
     static const struct {
         bool (*pred)(const RDFlagsBuffer*, usize);
         const char* name;
@@ -307,6 +317,7 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         {rd_flagsbuffer_has_code, "CODE", RD_THEME_FLAG_CODE},
         {rd_flagsbuffer_has_data, "DATA", RD_THEME_FLAG_DATA},
         {rd_flagsbuffer_has_func, "FUNC", RD_THEME_FUNCTION},
+        {rd_flagsbuffer_has_type, "TYPE", RD_THEME_TYPE},
         {rd_flagsbuffer_has_call, "CALL", RD_THEME_CALL},
         {rd_flagsbuffer_has_jump, "JUMP", RD_THEME_JUMP},
         {rd_flagsbuffer_has_cond, "COND", RD_THEME_JUMP_COND},
@@ -314,17 +325,20 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
         {rd_flagsbuffer_has_dslot, "DSLOT", RD_THEME_MUTED},
         {rd_flagsbuffer_has_flow, "FLOW", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_tail, "TAIL", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_field, "FIELD", RD_THEME_FOREGROUND},
+        {rd_flagsbuffer_has_item, "ITEM", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_name, "NAME", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_exported, "EXPORTED", RD_THEME_FOREGROUND},
         {rd_flagsbuffer_has_imported, "IMPORTED", RD_THEME_FOREGROUND},
     };
 
     const int N_PREDS = sizeof(PREDS) / sizeof(*PREDS);
-    usize idx = rd_i_address2index(item->segment, item->address);
+    const RDSegmentFull* seg = rd_i_renderer_find_segment(self, address);
+    usize idx = rd_i_address2index(seg, address);
 
     bool first = true;
     for(int i = 0; i < N_PREDS; i++) {
-        if(!PREDS[i].pred(item->segment->flags, idx)) continue;
+        if(!PREDS[i].pred(seg->flags, idx)) continue;
         if(!first) rd_renderer_norm(self, " | ");
         rd_renderer_text(self, PREDS[i].name, PREDS[i].fg, RD_THEME_BACKGROUND);
         first = false;
@@ -333,30 +347,25 @@ void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item) {
     if(first) rd_renderer_unkn(self);
 }
 
-void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item) {
-    RDInstruction instr = {0};
-    usize idx = rd_i_address2index(item->segment, item->address);
+void rd_i_renderer_instr(RDRenderer* self, RDAddress address) {
+    const RDSegmentFull* seg = rd_i_renderer_find_segment(self, address);
+    usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_engine_decode(self->context, item->address, item->segment, idx,
-                          &instr)) {
+    RDInstruction instr = {0};
+
+    if(rd_i_engine_decode(self->context, address, seg, idx, &instr)) {
         rd_i_processor_render_instruction(self, &instr);
     }
     else
         rd_renderer_unkn(self);
 }
 
-void rd_i_renderer_set_current_item(RDRenderer* self, LIndex idx,
-                                    const RDListingItem* item) {
-    self->curr_address = item->address;
-    self->listing_idx = idx;
-}
-
 void rd_renderer_norm(RDRenderer* self, const char* s) {
     rd_renderer_text(self, s, RD_THEME_FOREGROUND, RD_THEME_BACKGROUND);
 }
 
-void rd_renderer_ws(RDRenderer* self, int n) {
-    for(int i = 0; i < n; i++)
+void rd_renderer_ws(RDRenderer* self, usize n) {
+    for(usize i = 0; i < n; i++)
         rd_renderer_norm(self, " ");
 }
 
@@ -453,7 +462,7 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
 
                 // auto-generated name with inbound refs/types/functions
                 if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
-                   rd_i_flagsbuffer_has_type(seg->flags, idx) ||
+                   rd_flagsbuffer_has_type(seg->flags, idx) ||
                    rd_flagsbuffer_has_func(seg->flags, idx))
                     hasname = rd_i_get_name(self->context, address, true, &n);
             }
@@ -552,14 +561,6 @@ void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col) {
         *col = 0;
     else if(*col >= ncols)
         *col = ncols - 1;
-}
-
-bool rd_i_renderer_is_index_visible(const RDRenderer* self, LIndex index) {
-    if(vect_is_empty(&self->rows_front)) return false;
-
-    const RDRow* first = vect_first(&self->rows_front);
-    const RDRow* last = vect_last(&self->rows_front);
-    return index >= first->index && index < last->index;
 }
 
 bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,

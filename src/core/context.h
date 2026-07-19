@@ -2,10 +2,10 @@
 
 #include "core/engine.h"
 #include "core/segment.h"
+#include "core/symbol.h"
 #include "db/db.h"
 #include "io/buffer.h"
 #include "kb/kb.h"
-#include "listing/listing.h"
 #include "plugins/analyzer.h"
 #include "plugins/processor/processor.h"
 #include "support/stringpool.h"
@@ -57,6 +57,7 @@ typedef struct RDContext {
     RDFunctionChunkVect chunk_buf;
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
+    RDSymbolVect symbols;
 
     char* working_dir;
     char* file_name;
@@ -71,7 +72,6 @@ typedef struct RDContext {
 
     RDDB* db;
     RDKB* kb;
-    RDListing listing;
     RDFunctionVect functions;
     RDExternalVect externals;
     RDHooks* hooks;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "db/types.h"
-#include "listing/listing.h"
 #include "surface/row.h"
 #include <redasm/surface/surface.h>
 
@@ -18,5 +17,5 @@ typedef struct RDSurfacePath {
 
 void rd_i_surfacepath_deinit(RDSurfacePath* self);
 const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
-                                                LIndex start, RDRowVect* rows,
+                                                const RDRowVect* rows,
                                                 RDContext* ctx);

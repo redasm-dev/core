@@ -12,11 +12,6 @@ typedef enum {
     RD_TKIND_COUNT,
 } RDTypeKind;
 
-typedef struct RDParam {
-    RDType type;
-    const char* name;
-} RDParam;
-
 typedef struct RDParamVect {
     RDParam* data;
     usize length;
@@ -29,7 +24,7 @@ typedef struct RDEnumCase {
 } RDEnumCase;
 
 typedef struct RDEnumType {
-    const char* base_type;
+    const RDTypeDef* base_type;
     RDEnumCase* data;
     usize length;
     usize capacity;
@@ -59,9 +54,9 @@ typedef struct RDTypeDefVect {
     usize capacity;
 } RDTypeDefVect;
 
-RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
-void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef);
 void rd_i_register_primitives(RDContext* ctx);
+
+RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 
 static inline bool rd_i_typedef_is_compound(const RDTypeDef* self) {
     return self->kind == RD_TKIND_STRUCT || self->kind == RD_TKIND_UNION;

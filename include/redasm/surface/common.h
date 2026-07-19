@@ -24,7 +24,7 @@ typedef enum {
                      RD_RF_NO_FUNCTION | RD_RF_NO_COMMENTS))
 
 #define RD_RF_POPUP                                                            \
-    ((RDRenderFlags)(RD_RF_NO_ADDRESS | RD_RF_NO_CURSOR | RD_RF_NO_SELECTION | \
+    ((RDRenderFlags)(RD_RF_NO_CURSOR | RD_RF_NO_SELECTION |                    \
                      RD_RF_NO_CURSOR_LINE))
 
 #define RD_RF_TEXT ((RDRenderFlags)~0U & (RDRenderFlags)~RD_RF_NO_NAMES)

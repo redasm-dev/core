@@ -97,17 +97,28 @@ static RDKBOrdinalModule* _rd_kb_check_ordinal_module(RDContext* ctx,
 }
 
 static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
-                                    const RDContext* ctx) {
-    const RDProcessorPlugin* plugin = ctx->processorplugin;
+                                    const RDContext* ctx, bool is_ret) {
+    *t = (RDType){.mod = RD_TYPE_NONE};
+
     i64 count = 0;
+    const char* tname = rd_kbobject_get_str(obj, "type");
+    assert(tname);
 
-    t->mod = RD_TYPE_NONE;
+    if(!strcmp(tname, "void")) {
+        if(!is_ret) {
+            RD_LOG_FAIL("void type unallowed");
+            return NULL;
+        }
 
-    t->name = rd_kbobject_get_str(obj, "type");
-    assert(t->name);
-    bool is_type_size = !strcmp(t->name, "size");
-    bool is_type_cptr = !strcmp(t->name, "cptr");
-    bool is_type_ptr = !strcmp(t->name, "ptr");
+        rd_type_init_void(t);
+
+        // return type is nameless, prefer empty string instead of NULL
+        return "";
+    }
+
+    bool is_type_size = !strcmp(tname, "size");
+    bool is_type_cptr = !strcmp(tname, "cptr");
+    bool is_type_ptr = !strcmp(tname, "ptr");
 
     rd_kbobject_get_int(obj, "count", &count);
     t->count = (usize)count;
@@ -117,9 +128,12 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
     bool is_mod_str_ptr = mod_str && !strcmp(mod_str, "ptr");
 
     if(is_type_cptr) {
+        const RDProcessorPlugin* plugin = ctx->processorplugin;
+
         if(plugin->code_ptr_size) {
-            t->name = rd_integral_from_size(plugin->code_ptr_size);
-            panic_if(!t->name, "cannot get code-pointer size");
+            t->def =
+                rd_integral_typedef_from_size(rd_get_code_ptr_size(ctx), ctx);
+            panic_if(!t->def, "cannot get code-pointer size");
             t->mod = RD_TYPE_CPTR;
         }
         else
@@ -127,14 +141,14 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
     }
 
     if(is_type_ptr) {
-        t->name = rd_integral_from_size(plugin->ptr_size);
-        panic_if(!t->name, "cannot get pointer size");
+        t->def = rd_integral_typedef_from_size(rd_get_ptr_size(ctx), ctx);
+        panic_if(!t->def, "cannot get pointer size");
         t->mod = RD_TYPE_PTR;
     }
 
     if(is_type_size) {
-        t->name = rd_integral_from_size(plugin->int_size);
-        panic_if(!t->name, "cannot get integer size");
+        t->def = rd_integral_typedef_from_size(rd_get_int_size(ctx), ctx);
+        panic_if(!t->def, "cannot get integer size");
     }
 
     if(t->mod == RD_TYPE_NONE) {
@@ -142,6 +156,13 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
             t->mod = RD_TYPE_CPTR;
         else if(is_mod_str_ptr)
             t->mod = RD_TYPE_PTR;
+    }
+
+    if(!t->def) t->def = rd_i_typedef_find(ctx, tname);
+
+    if(!t->def) {
+        RD_LOG_FAIL("cannot find type '%s'", tname);
+        return NULL;
     }
 
     return rd_kbobject_get_str(obj, "name");
@@ -181,6 +202,7 @@ static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx) {
         if(!rd_i_kb_validate_compound(def)) continue;
 
         RDTypeDef* tdef = rd_typedef_create_struct(name, ctx);
+        assert(tdef);
 
         const RDKBObject* members = rd_kbobject_get_array(def, "members");
         assert(members);
@@ -188,14 +210,14 @@ static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx) {
         const RDKBObject* m;
         rd_kbobject_each(m, members) {
             RDType t;
-            const char* param_name = _rd_kb_get_param(m, &t, ctx);
+            const char* param_name = _rd_kb_get_param(m, &t, ctx, false);
 
             if(!param_name) {
                 rd_typedef_destroy(tdef);
                 return false;
             }
 
-            rd_typedef_add_member(tdef, t.name, param_name, t.count, t.mod,
+            rd_typedef_add_member(tdef, t.def->name, param_name, t.count, t.mod,
                                   ctx);
         }
 
@@ -260,9 +282,15 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
         assert(ret);
 
         RDType ret_type;
-        _rd_kb_get_param(ret, &ret_type, ctx);
-        rd_typedef_set_ret(tdef, ret_type.name, ret_type.count, ret_type.mod,
-                           ctx);
+        _rd_kb_get_param(ret, &ret_type, ctx, true);
+
+        if(rd_type_is_void(&ret_type)) {
+            rd_typedef_set_ret(tdef, NULL, 0, RD_TYPE_NONE, ctx);
+        }
+        else {
+            rd_typedef_set_ret(tdef, ret_type.def->name, ret_type.count,
+                               ret_type.mod, ctx);
+        }
 
         const RDKBObject* args = rd_kbobject_get_array(f, "args");
         assert(args);
@@ -270,14 +298,15 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
         const RDKBObject* a;
         rd_kbobject_each(a, args) {
             RDType t;
-            const char* arg_name = _rd_kb_get_param(a, &t, ctx);
+            const char* arg_name = _rd_kb_get_param(a, &t, ctx, false);
 
             if(!arg_name) {
                 rd_typedef_destroy(tdef);
                 return false;
             }
 
-            rd_typedef_add_arg(tdef, t.name, arg_name, t.count, t.mod, ctx);
+            rd_typedef_add_arg(tdef, t.def->name, arg_name, t.count, t.mod,
+                               ctx);
         }
 
         rd_typedef_register(tdef, ctx);

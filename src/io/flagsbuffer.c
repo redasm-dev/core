@@ -28,11 +28,6 @@ static void _rd_flagsbuffer_destroy(RDBuffer* self) {
     rd_free(self);
 }
 
-static void _rd_flagsbuffer_set_tails(RDFlagsBuffer* self, usize idx, usize n) {
-    for(usize i = 0; i < n; i++)
-        rd_i_flags_set_tail(&self->data[idx + i]);
-}
-
 RDFlagsBuffer* rd_i_flagsbuffer_create(usize n) {
     RDFlagsBuffer* self = rd_alloc0(1, sizeof(*self));
     self->base.get_byte = _rd_flagsbuffer_get_byte;
@@ -111,8 +106,16 @@ bool rd_i_flagsbuffer_has_op_over(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_op_over(self->data[idx]);
 }
 
-bool rd_i_flagsbuffer_has_type(const RDFlagsBuffer* self, usize idx) {
+bool rd_flagsbuffer_has_type(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_type(self->data[idx]);
+}
+
+bool rd_flagsbuffer_has_field(const RDFlagsBuffer* self, usize idx) {
+    return idx < self->base.length && rd_i_flags_has_field(self->data[idx]);
+}
+
+bool rd_flagsbuffer_has_item(const RDFlagsBuffer* self, usize idx) {
+    return idx < self->base.length && rd_i_flags_has_item(self->data[idx]);
 }
 
 bool rd_i_flagsbuffer_has_xref_out(const RDFlagsBuffer* self, usize idx) {
@@ -133,6 +136,17 @@ bool rd_flagsbuffer_has_exported(const RDFlagsBuffer* self, usize idx) {
 
 bool rd_flagsbuffer_get_value(const RDFlagsBuffer* self, usize idx, u8* v) {
     return idx < self->base.length && rd_i_flags_get_value(self->data[idx], v);
+}
+
+bool rd_i_flagsbuffer_set_tail(RDFlagsBuffer* self, usize idx, usize n) {
+    if(idx + n <= self->base.length) {
+        for(usize i = 0; i < n; i++)
+            rd_i_flags_set_tail(&self->data[idx + i]);
+
+        return true;
+    }
+
+    return false;
 }
 
 bool rd_i_flagsbuffer_set_value(RDFlagsBuffer* self, usize idx, u8 v) {
@@ -183,7 +197,7 @@ bool rd_i_flagsbuffer_has_data_n(const RDFlagsBuffer* self, usize startidx,
 bool rd_i_flagsbuffer_set_data(RDFlagsBuffer* self, usize idx, usize n) {
     if(n && (idx + n <= self->base.length)) {
         rd_i_flags_set_data(&self->data[idx]);
-        _rd_flagsbuffer_set_tails(self, idx + 1, n - 1);
+        rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
         return true;
     }
 
@@ -193,7 +207,7 @@ bool rd_i_flagsbuffer_set_data(RDFlagsBuffer* self, usize idx, usize n) {
 bool rd_i_flagsbuffer_set_code(RDFlagsBuffer* self, usize idx, usize n) {
     if(n && (idx + n <= self->base.length)) {
         rd_i_flags_set_code(&self->data[idx]);
-        _rd_flagsbuffer_set_tails(self, idx + 1, n - 1);
+        rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
         return true;
     }
 
@@ -285,7 +299,29 @@ bool rd_i_flagsbuffer_set_type(RDFlagsBuffer* self, usize idx, usize n) {
     if(idx + n <= self->base.length) {
         rd_i_flags_set_data(&self->data[idx]);
         rd_i_flags_set_type(&self->data[idx]);
-        _rd_flagsbuffer_set_tails(self, idx + 1, n - 1);
+        rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_set_field(RDFlagsBuffer* self, usize idx, usize n) {
+    if(idx + n <= self->base.length) {
+        rd_i_flags_set_data(&self->data[idx]);
+        rd_i_flags_set_field(&self->data[idx]);
+        rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_set_item(RDFlagsBuffer* self, usize idx, usize n) {
+    if(idx + n <= self->base.length) {
+        rd_i_flags_set_data(&self->data[idx]);
+        rd_i_flags_set_item(&self->data[idx]);
+        rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
         return true;
     }
 
@@ -348,13 +384,15 @@ bool rd_i_flagsbuffer_set_exported(RDFlagsBuffer* self, usize idx) {
 
 void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
                                    usize* end) {
-    while(*start > 0 && rd_i_flags_has_tail(self->data[*start]))
-        (*start)--;
+    if(start) {
+        while(*start > 0 && rd_i_flags_has_tail(self->data[*start]))
+            (*start)--;
+    }
 
-    while(*end < self->base.length && rd_i_flags_has_tail(self->data[*end]))
-        (*end)++;
-
-    assert(*start < *end);
+    if(end) {
+        while(*end < self->base.length && rd_i_flags_has_tail(self->data[*end]))
+            (*end)++;
+    }
 }
 
 RDFlags rd_i_flagsbuffer_get(const RDFlagsBuffer* self, usize idx) {

@@ -16,7 +16,7 @@ static const RDFlags FL_XREFIN = 1U << 13;
 static const RDFlags FL_EXPORTED = 1U << 14;
 static const RDFlags FL_IMPORTED = 1U << 15;
 
-// covers bits 0-13 (NOTE: always add the last flag above)
+// covers bits 0-15 (NOTE: always add the last flag above)
 #define FL_PRESERVE_MASK ((RDFlags)((FL_IMPORTED << 1) - 1))
 #define FL_HAS_INFO ((RDFlags)(FL_PRESERVE_MASK & ~(FL_VALUE | 0xFF)))
 
@@ -36,6 +36,8 @@ static const RDFlags FL_OPOVER = 1U << 26;
 
 // [DATA] bits
 static const RDFlags FL_TYPE = 1U << 19;
+static const RDFlags FL_FIELD = 1U << 20;
+static const RDFlags FL_ITEM = 1U << 21;
 
 // transient bits
 static const RDFlags FL_QUEUED = 1U << 31; // address is pending in a queue
@@ -91,6 +93,14 @@ bool rd_i_flags_has_op_over(RDFlags self) {
 
 bool rd_i_flags_has_type(RDFlags self) {
     return (self & FL_DATA) && (self & FL_TYPE);
+}
+
+bool rd_i_flags_has_field(RDFlags self) {
+    return (self & FL_DATA) && (self & FL_FIELD);
+}
+
+bool rd_i_flags_has_item(RDFlags self) {
+    return (self & FL_DATA) && (self & FL_ITEM);
 }
 
 bool rd_i_flags_get_value(RDFlags self, u8* b) {
@@ -171,7 +181,20 @@ void rd_i_flags_set_op_over(RDFlags* self) {
 
 void rd_i_flags_set_type(RDFlags* self) {
     assert(rd_i_flags_has_data(*self));
+    assert(!rd_i_flags_has_field(*self));
     *self |= FL_TYPE;
+}
+
+void rd_i_flags_set_field(RDFlags* self) {
+    assert(rd_i_flags_has_data(*self));
+    assert(!rd_i_flags_has_type(*self));
+    *self |= FL_FIELD;
+}
+
+void rd_i_flags_set_item(RDFlags* self) {
+    assert(rd_i_flags_has_data(*self));
+    assert(!rd_i_flags_has_type(*self));
+    *self |= FL_ITEM;
 }
 
 void rd_i_flags_set_name(RDFlags* self) {

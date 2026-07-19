@@ -92,6 +92,8 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
             u8 v = 0;
             bool skip = rd_flagsbuffer_has_code(flags, idx) ||
                         rd_flagsbuffer_has_tail(flags, idx) ||
+                        rd_flagsbuffer_has_field(flags, idx) ||
+                        rd_flagsbuffer_has_item(flags, idx) ||
                         !rd_flagsbuffer_get_value(flags, idx, &v);
 
             if(skip) {
@@ -142,9 +144,13 @@ static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
 
             bool skip = rd_flagsbuffer_has_code(flags, idx) ||
                         rd_flagsbuffer_has_tail(flags, idx) ||
+                        rd_flagsbuffer_has_field(flags, idx) ||
+                        rd_flagsbuffer_has_item(flags, idx) ||
                         !rd_flagsbuffer_get_value(flags, idx, &lo) ||
                         rd_flagsbuffer_has_code(flags, idx + 1) ||
                         rd_flagsbuffer_has_tail(flags, idx + 1) ||
+                        rd_flagsbuffer_has_field(flags, idx + 1) ||
+                        rd_flagsbuffer_has_item(flags, idx) ||
                         !rd_flagsbuffer_get_value(flags, idx + 1, &hi);
 
             if(skip) {

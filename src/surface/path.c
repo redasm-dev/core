@@ -3,55 +3,95 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 
+/*
+ * Jump-arrow polylines for the current viewport, computed directly from
+ * the rendered rows + flags + xrefs.
+ * Row indices are the GUI coordinate system; two sentinels are part of the
+ * contract with the drawing code:
+ *
+ *   -1              the endpoint sits above the viewport
+ *   row_count + 1   the endpoint sits below the viewport
+ *
+ * so partial arrows enter/exit at the edges.
+ */
+
 static bool _rd_surfacepath_exists(const RDSurfacePath* self, int fromrow,
                                    int torow) {
     const RDSurfacePathItem* item;
+
     vect_each(item, &self->path) {
         if(item->from_row == fromrow && item->to_row == torow) return true;
     }
+
     return false;
 }
 
-static int _rd_surfacepath_calculate_index(LIndex start, RDRowVect* rows,
-                                           RDContext* ctx, RDAddress address) {
-    const RDListing* listing = &ctx->listing;
+/*
+ * Is this row the INSTRUCTION row of a CODE head?
+ * A code head can also carry label and noret-comment rows, arrows attach to the
+ * instruction.
+ * Which sub_line that is comes from the single slot-layout source
+ * in row.c (rd_i_code_instr_sub_line).
+ */
+static bool _rd_row_is_instruction(RDContext* ctx, const RDRow* row,
+                                   const RDSegmentFull** out_seg,
+                                   usize* out_idx) {
+    if(row->sub_line == RD_SUB_LINE_NONE) return false; // segment banner
 
-    const RDListingItem* first = vect_at(listing, start);
-    if(address < first->address) return -1;
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
+    if(!seg) return false;
 
-    const RDListingItem* last = vect_at(listing, start + vect_length(rows) - 1);
-    if(address > last->address) return (int)vect_length(rows) + 1;
+    usize idx = rd_i_address2index(seg, row->address);
+    if(!rd_flagsbuffer_has_code(seg->flags, idx)) return false;
+    if(row->sub_line != rd_i_row_code_instr_sub_line(seg, idx)) return false;
+
+    if(out_seg) *out_seg = seg;
+    if(out_idx) *out_idx = idx;
+    return true;
+}
+
+/*
+ * Map an address to its row in the viewport, preferring the instruction
+ * row among the rows at that address (label rows share the address).
+ * Relies on row addresses being monotonically nondecreasing, which holds
+ * because segments are stored in ascending address order.
+ */
+static int _rd_surfacepath_calculate_row(const RDRowVect* rows, RDContext* ctx,
+                                         RDAddress address) {
+    if(vect_is_empty(rows)) return -1;
+
+    if(address < vect_first(rows)->address) return -1;
+    if(address > vect_last(rows)->address) return (int)vect_length(rows) + 1;
 
     int residx = -1;
 
     for(usize i = vect_length(rows); i-- > 0;) {
-        const RDListingItem* item = vect_at(listing, start + i);
+        const RDRow* row = vect_at(rows, i);
 
-        if(item->address == address) {
+        if(row->address == address) {
             residx = (int)i;
-            if(item->kind == RD_LK_INSTRUCTION) break;
+            if(_rd_row_is_instruction(ctx, row, NULL, NULL)) break;
         }
 
-        if(item->address < address) break;
+        if(row->address < address) break;
     }
 
     return residx;
 }
 
 static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
-                                   LIndex start, int fromrow, int torow) {
+                                   const RDRowVect* rows, int fromrow,
+                                   int torow) {
     if(fromrow == torow || _rd_surfacepath_exists(self, fromrow, torow)) return;
 
     bool is_dst_cond = false;
-    const RDListing* listing = &ctx->listing;
-    LIndex src_lidx = start + (LIndex)fromrow;
 
-    if(fromrow >= 0 && src_lidx < vect_length(listing)) {
-        const RDListingItem* src_item = vect_at(listing, src_lidx);
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, src_item->address);
+    if(fromrow >= 0 && (usize)fromrow < vect_length(rows)) {
+        const RDRow* src = vect_at(rows, (usize)fromrow);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, src->address);
 
         if(seg) {
-            usize idx = rd_i_address2index(seg, src_item->address);
+            usize idx = rd_i_address2index(seg, src->address);
             is_dst_cond = rd_flagsbuffer_has_cond(seg->flags, idx);
         }
     }
@@ -78,27 +118,20 @@ void rd_i_surfacepath_deinit(RDSurfacePath* self) {
 }
 
 const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
-                                                LIndex start, RDRowVect* rows,
+                                                const RDRowVect* rows,
                                                 RDContext* ctx) {
-    const RDListing* listing = &ctx->listing;
     vect_clear(&self->path);
 
     for(usize i = 0; i < vect_length(rows); i++) {
-        LIndex lidx = start + i;
-        if(lidx >= vect_length(listing)) break;
+        const RDRow* row = vect_at(rows, i);
 
-        const RDListingItem* item = vect_at(listing, lidx);
-        if(item->kind != RD_LK_INSTRUCTION) continue;
+        const RDSegmentFull* seg;
+        usize idx;
+        if(!_rd_row_is_instruction(ctx, row, &seg, &idx)) continue;
 
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, item->address);
-        assert(seg);
-
-        usize idx = rd_i_address2index(seg, item->address);
-        bool b = rd_i_flagsbuffer_has_jmpdst(seg->flags, idx);
-
-        if(b) {
+        if(rd_i_flagsbuffer_has_jmpdst(seg->flags, idx)) {
             const RDXRefVect* xrefs = rd_i_get_xrefs_to_ex(
-                ctx, item->address, RD_CR_JUMP, &self->xrefs);
+                ctx, row->address, RD_CR_JUMP, &self->xrefs);
 
             const RDXRef* r;
             vect_each(r, xrefs) {
@@ -109,15 +142,15 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
                 usize ridx = rd_i_address2index(rseg, r->address);
                 if(!rd_flagsbuffer_has_code(rseg->flags, ridx)) continue;
 
-                int fromrow = _rd_surfacepath_calculate_index(start, rows, ctx,
-                                                              r->address);
-                _rd_surfacepath_insert(self, ctx, start, fromrow, (int)i);
+                int fromrow =
+                    _rd_surfacepath_calculate_row(rows, ctx, r->address);
+                _rd_surfacepath_insert(self, ctx, rows, fromrow, (int)i);
             }
         }
 
         if(rd_flagsbuffer_has_jump(seg->flags, idx)) {
             const RDXRefVect* xrefs = rd_i_get_xrefs_from_ex(
-                ctx, item->address, RD_CR_JUMP, &self->xrefs);
+                ctx, row->address, RD_CR_JUMP, &self->xrefs);
 
             const RDXRef* r;
             vect_each(r, xrefs) {
@@ -125,9 +158,9 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
                     rd_i_db_find_segment(ctx, r->address);
                 if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
 
-                int torow = _rd_surfacepath_calculate_index(start, rows, ctx,
-                                                            r->address);
-                _rd_surfacepath_insert(self, ctx, start, (int)i, torow);
+                int torow =
+                    _rd_surfacepath_calculate_row(rows, ctx, r->address);
+                _rd_surfacepath_insert(self, ctx, rows, (int)i, torow);
             }
         }
     }

@@ -2,7 +2,6 @@
 #include "core/context.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "types/type.h"
 #include <redasm/support/logging.h>
 #include <stdint.h>
 #include <string.h>
@@ -14,6 +13,7 @@
         .size = s,                                                             \
     }
 
+static RDTypeDef t_prim_bool = RD_PRIMITIVE("bool", sizeof(bool));
 static RDTypeDef t_prim_u8 = RD_PRIMITIVE("u8", sizeof(u8));
 static RDTypeDef t_prim_u16 = RD_PRIMITIVE("u16", sizeof(u16));
 static RDTypeDef t_prim_u32 = RD_PRIMITIVE("u32", sizeof(u32));
@@ -25,15 +25,16 @@ static RDTypeDef t_prim_i64 = RD_PRIMITIVE("i64", sizeof(i64));
 static RDTypeDef t_prim_char = RD_PRIMITIVE("char", sizeof(i8));
 static RDTypeDef t_prim_char16 = RD_PRIMITIVE("char16", sizeof(i16));
 
-static bool _rd_typedef_enum_in_range(const char* type, i64 val) {
-    if(!strcmp(type, "u8")) return val >= 0 && val <= UINT8_MAX;
-    if(!strcmp(type, "u16")) return val >= 0 && val <= UINT16_MAX;
-    if(!strcmp(type, "u32")) return val >= 0 && val <= UINT32_MAX;
-    if(!strcmp(type, "u64")) return val >= 0; // i64 can't hold full u64 range
-    if(!strcmp(type, "i8")) return val >= INT8_MIN && val <= INT8_MAX;
-    if(!strcmp(type, "i16")) return val >= INT16_MIN && val <= INT16_MAX;
-    if(!strcmp(type, "i32")) return val >= INT32_MIN && val <= INT32_MAX;
-    if(!strcmp(type, "i64")) return true;
+static bool _rd_typedef_enum_in_range(const RDTypeDef* tdef, i64 val) {
+    if(!strcmp(tdef->name, "u8")) return val >= 0 && val <= UINT8_MAX;
+    if(!strcmp(tdef->name, "u16")) return val >= 0 && val <= UINT16_MAX;
+    if(!strcmp(tdef->name, "u32")) return val >= 0 && val <= UINT32_MAX;
+    if(!strcmp(tdef->name, "u64"))
+        return val >= 0; // i64 can't hold full u64 range
+    if(!strcmp(tdef->name, "i8")) return val >= INT8_MIN && val <= INT8_MAX;
+    if(!strcmp(tdef->name, "i16")) return val >= INT16_MIN && val <= INT16_MAX;
+    if(!strcmp(tdef->name, "i32")) return val >= INT32_MIN && val <= INT32_MAX;
+    if(!strcmp(tdef->name, "i64")) return true;
     return false;
 }
 
@@ -66,6 +67,39 @@ static RDTypeDef* _rd_typedef_create(const char* name, RDTypeKind kind,
     return self;
 }
 
+static void _rd_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
+    if(tdef->size > 0) return;
+
+    switch(tdef->kind) {
+        case RD_TKIND_STRUCT: {
+            RDParam* m;
+            vect_each(m, &tdef->compound_) {
+                usize member_sz = rd_type_size(&m->type, ctx);
+                m->field_offset = tdef->size;
+                tdef->size += member_sz;
+            }
+
+            break;
+        }
+
+        case RD_TKIND_UNION: {
+            RDParam* m;
+            vect_each(m, &tdef->compound_) {
+                usize member_sz = rd_type_size(&m->type, ctx);
+                m->field_offset = 0; // union members shares the same offset
+                if(member_sz > tdef->size) tdef->size = member_sz;
+            }
+
+            break;
+        }
+
+        case RD_TKIND_ENUM: tdef->size = tdef->enum_.base_type->size; break;
+        case RD_TKIND_FUNC: tdef->size = rd_get_code_ptr_size(ctx); break;
+        case RD_TKIND_PRIM: break;
+        default: panic("unsupported type kind '%lld'", tdef->kind); break;
+    }
+}
+
 RDTypeDef* rd_typedef_create_func(const char* name, RDContext* ctx) {
     return _rd_typedef_create(name, RD_TKIND_FUNC, ctx);
 }
@@ -80,30 +114,71 @@ RDTypeDef* rd_typedef_create_union(const char* name, RDContext* ctx) {
 
 RDTypeDef* rd_typedef_create_enum(const char* name, const char* type,
                                   RDContext* ctx) {
+    if(!type) return NULL;
+
+    const RDTypeDef* tdef = rd_i_typedef_find(ctx, type);
+
+    if(!tdef) {
+        RD_LOG_FAIL("enum base-type '%s' not found", type);
+        return NULL;
+    }
+
+    if(tdef->kind != RD_TKIND_PRIM) {
+        RD_LOG_FAIL("enum base-type '%s' is not primitive", type);
+        return NULL;
+    }
+
     RDTypeDef* self = _rd_typedef_create(name, RD_TKIND_ENUM, ctx);
-    self->enum_.base_type = rd_i_strpool_intern(&ctx->strings, type);
+    self->enum_.base_type = tdef;
     return self;
+}
+
+RDParamSlice rd_typedef_get_members(const RDTypeDef* self) {
+    if(rd_i_typedef_is_compound(self))
+        return vect_to_slice(RDParamSlice, &self->compound_);
+
+    return (RDParamSlice){0};
+}
+
+RDParamSlice rd_typedef_get_args(const RDTypeDef* self) {
+    if(self->kind == RD_TKIND_FUNC)
+        return vect_to_slice(RDParamSlice, &self->func_.args);
+
+    return (RDParamSlice){0};
+}
+
+RDType rd_typedef_get_ret(const RDTypeDef* self) {
+    if(self->kind == RD_TKIND_FUNC) return self->func_.ret;
+    return (RDType){0};
+}
+
+const RDTypeDef* rd_typedef_get_base_type(const RDTypeDef* self) {
+    if(self->kind == RD_TKIND_ENUM) return self->enum_.base_type;
+    return NULL;
 }
 
 bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char* name,
                            usize n, RDTypeModifier mod, RDContext* ctx) {
-    RDParam m = {
-        .type =
-            {
-                .name = rd_i_strpool_intern(&ctx->strings, type),
-                .mod = mod,
-                .count = n,
-            },
-        .name = rd_i_strpool_intern(&ctx->strings, name),
-    };
-
-    if(rd_i_typedef_is_compound(self)) {
-        vect_push(&self->compound_, m);
-        return true;
+    if(!rd_i_typedef_is_compound(self)) {
+        RD_LOG_FAIL("cannot add members to '%s'", self->name);
+        return false;
     }
 
-    RD_LOG_FAIL("cannot add members to '%s'", self->name);
-    return false;
+    if(!type) {
+        RD_LOG_FAIL("member type is NULL for '%s' type", self->name);
+        return false;
+    }
+
+    if(!name) {
+        RD_LOG_FAIL("member name is NULL for '%s' type", self->name);
+        return false;
+    }
+
+    RDParam m = {0};
+    if(!rd_type_init(&m.type, type, n, mod, ctx)) return false;
+    m.name = rd_i_strpool_intern(&ctx->strings, name);
+    vect_push(&self->compound_, m);
+    return true;
 }
 
 bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value,
@@ -129,14 +204,12 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
         return false;
     }
 
+    RDType t;
+    if(!rd_type_init(&t, type, n, mod, ctx)) return false;
+
     vect_push(&self->func_.args,
               (RDParam){
-                  .type =
-                      {
-                          .name = rd_i_strpool_intern(&ctx->strings, type),
-                          .mod = mod,
-                          .count = n,
-                      },
+                  .type = t,
                   .name = rd_i_strpool_intern(&ctx->strings, name),
               });
 
@@ -150,11 +223,11 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
         return false;
     }
 
-    self->func_.ret = (RDType){
-        .name = rd_i_strpool_intern(&ctx->strings, type),
-        .mod = mod,
-        .count = n,
-    };
+    if(type) {
+        if(!rd_type_init(&self->func_.ret, type, n, mod, ctx)) return false;
+    }
+    else
+        rd_type_init_void(&self->func_.ret);
 
     return true;
 }
@@ -172,7 +245,7 @@ bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
     RDTypeDef** it;
     vect_each(it, &ctx->typedefs) {
-        if(strcmp((*it)->name, name) == 0) return *it;
+        if(!strcmp((*it)->name, name)) return *it;
     }
 
     return NULL;
@@ -189,30 +262,8 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             RD_LOG_FAIL("at least one member required for '%s'", self->name);
             goto fail;
         }
-
-        RDParam* m;
-        vect_each(m, &self->compound_) {
-            const RDTypeDef* tdef = rd_i_typedef_find(ctx, m->type.name);
-            if(!tdef) {
-                RD_LOG_FAIL("type '%s' not found for '%s.%s'", m->type.name,
-                            self->name, m->name);
-                goto fail;
-            }
-        }
     }
     else if(self->kind == RD_TKIND_ENUM) {
-        const RDTypeDef* tdef = rd_i_typedef_find(ctx, self->enum_.base_type);
-        if(!tdef) {
-            RD_LOG_FAIL("type '%s' not found in enum '%s'",
-                        self->enum_.base_type, self->name);
-            goto fail;
-        }
-
-        if(tdef->kind != RD_TKIND_PRIM) {
-            RD_LOG_FAIL("type '%s' is not primitive", self->enum_.base_type);
-            goto fail;
-        }
-
         RDEnumCase* c1;
         vect_each(c1, &self->enum_) {
             if(!_rd_typedef_enum_in_range(self->enum_.base_type, c1->value)) {
@@ -263,8 +314,6 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     else if(self->kind != RD_TKIND_PRIM)
         unreachable();
 
-    vect_push(&ctx->typedefs, self);
-
     if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
         rd_i_kb_add_noret(ctx, self->name);
 
@@ -275,12 +324,23 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                     _rd_typedef_kind_str(self->kind), self->name);
     }
 
+    _rd_typedef_resolve_size(ctx, self);
+
+    if(!self->size) {
+        RD_LOG_FAIL("type '%s' has unresolved size", self->name);
+        goto fail;
+    }
+
+    vect_push(&ctx->typedefs, self);
     return true;
 
 fail:
     rd_typedef_destroy(self);
     return false;
 }
+
+const char* rd_typedef_name(const RDTypeDef* self) { return self->name; }
+usize rd_typedef_size(const RDTypeDef* self) { return self->size; }
 
 void rd_typedef_destroy(RDTypeDef* self) {
     if(rd_i_typedef_is_compound(self))
@@ -297,48 +357,25 @@ void rd_typedef_destroy(RDTypeDef* self) {
     rd_free(self);
 }
 
-void rd_i_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
-    if(tdef->size > 0) return;
+bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef,
+                               usize offset, const RDParam** m) {
+    if(tdef->kind != RD_TKIND_STRUCT) return false;
 
-    if(tdef->kind == RD_TKIND_STRUCT) {
-        RDParam* m;
-        vect_each(m, &tdef->compound_) {
-            usize member_sz =
-                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.mod);
+    const RDParam* p;
+    vect_each(p, &tdef->compound_) {
+        usize span = rd_type_size(&p->type, ctx);
 
-            panic_if(!member_sz,
-                     "struct member '%s.%s' has unresolved size, ensure "
-                     "'%s' is registered before '%s'",
-                     tdef->name, m->name, m->type.name, tdef->name);
-
-            tdef->size += member_sz;
+        if(offset >= p->field_offset && offset < p->field_offset + span) {
+            if(m) *m = p;
+            return true;
         }
     }
-    else if(tdef->kind == RD_TKIND_UNION) {
-        RDParam* m;
-        vect_each(m, &tdef->compound_) {
-            usize member_sz =
-                rd_i_size_of(ctx, m->type.name, m->type.count, m->type.mod);
 
-            panic_if(!member_sz,
-                     "union member '%s.%s' has unresolved size, ensure "
-                     "'%s' is registered before '%s'",
-                     tdef->name, m->name, m->type.name, tdef->name);
-
-            if(member_sz > tdef->size) tdef->size = member_sz;
-        }
-    }
-    else if(tdef->kind == RD_TKIND_ENUM) {
-        usize sz = rd_i_size_of(ctx, tdef->enum_.base_type, 0, RD_TYPE_NONE);
-        panic_if(!sz, "enum '%s' base type '%s' has unresolved size",
-                 tdef->name, tdef->enum_.base_type);
-        tdef->size = sz;
-    }
-    else
-        panic("unsupported type kind '%lld'", tdef->kind);
+    return false;
 }
 
 void rd_i_register_primitives(RDContext* ctx) {
+    rd_typedef_register(&t_prim_bool, ctx);
     rd_typedef_register(&t_prim_u8, ctx);
     rd_typedef_register(&t_prim_u16, ctx);
     rd_typedef_register(&t_prim_u32, ctx);

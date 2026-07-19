@@ -3,7 +3,6 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
-#include "listing/builder.h"
 #include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
@@ -170,7 +169,7 @@ static void _rd_worker_dedup_names(RDContext* ctx) {
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
-    rd_i_listing_build(ctx); // Show pre-analysis listing
+    // rd_i_listing_build(ctx); // Show pre-analysis listing
     if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 }
@@ -232,7 +231,7 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_autorename(ctx);
     _rd_worker_apply_function_types(ctx);
     _rd_worker_apply_noret(ctx);
-    rd_i_listing_build(ctx);
+    // rd_i_listing_build(ctx);
     rd_fire_hook(ctx, "redasm.finalized");
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
 
@@ -240,10 +239,8 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     ctx->engine.step++;
 
     // post-analysis summary
-    RD_LOG_INFO("terminated with functions: %zu, symbols: %zu, problems: %zu",
-                vect_length(&ctx->functions),
-                vect_length(&ctx->listing.symbols),
-                vect_length(&ctx->problems));
+    RD_LOG_INFO("terminated with functions: %zu, problems: %zu",
+                vect_length(&ctx->functions), vect_length(&ctx->problems));
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {

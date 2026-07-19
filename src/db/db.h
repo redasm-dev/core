@@ -32,6 +32,8 @@ void rd_i_db_load(RDContext* ctx);
 bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg);
+bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
+                                usize* index);
 const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
                                           RDAddress address);
 const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx);
@@ -67,13 +69,20 @@ bool rd_i_db_get_name(RDContext* ctx, RDAddress address, RDName* n);
 void rd_i_db_set_name(RDContext* ctx, RDAddress address, const char* name,
                       RDConfidence c);
 bool rd_i_db_del_name(RDContext* ctx, RDAddress address);
+RDNameVect* rd_i_db_get_all_names(RDContext* ctx, RDAddressVect* av,
+                                  RDNameVect* v);
+RDAddressVect* rd_i_db_get_all_name_addresses(RDContext* ctx, RDAddressVect* v);
 
 void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 
-void rd_i_db_set_type(RDContext* ctx, RDAddress address, const char* name,
-                      usize count, RDTypeModifier mod, RDConfidence c);
+void rd_i_db_set_type(RDContext* ctx, RDAddress address, const RDType* t,
+                      RDConfidence c);
 bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
+bool rd_i_db_get_root_type(RDContext* ctx, RDAddress* address, RDType* t);
 bool rd_i_db_del_type(RDContext* ctx, RDAddress address);
+
+void rd_i_db_set_function(RDContext* ctx, const RDFunction* f);
+
 RDAddressVect* rd_i_db_get_all_address_by_type(RDContext* ctx, RDAddressVect* v,
                                                const char* filter);
 RDTypeVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "db/types.h"
-#include "listing/listing.h"
 #include "plugins/processor/processor.h"
 #include "support/utils.h"
 #include "surface/row.h"
@@ -16,7 +15,6 @@ typedef struct RDRenderer {
     int columns, auto_columns;
     unsigned int group_idx;
     RDAddress curr_address;
-    LIndex listing_idx;
     RDRowVect rows_front, rows_back;
     RDCharVect comment_buf;
     RDCharVect word_buf;
@@ -36,6 +34,8 @@ static inline RDRenderMode rd_i_renderer_get_mode(const RDRenderer* self) {
 
 RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags);
 void rd_i_renderer_destroy(RDRenderer* self);
+const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
+                                                RDAddress address);
 void rd_i_renderer_clear(RDRenderer* self);
 void rd_i_renderer_swap(RDRenderer* self);
 void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m);
@@ -46,13 +46,10 @@ void rd_i_renderer_highlight_cursor(RDRenderer* self, int row, int col);
 void rd_i_renderer_highlight_words(RDRenderer* self, int row, int col);
 void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
                                        int startcol, int endrow, int endcol);
-void rd_i_renderer_new_row(RDRenderer* self, const RDListingItem* item);
-void rd_i_renderer_instr(RDRenderer* self, const RDListingItem* item);
-void rd_i_renderer_rdil(RDRenderer* self, const RDListingItem* item);
-void rd_i_renderer_flags(RDRenderer* self, const RDListingItem* item);
+void rd_i_renderer_instr(RDRenderer* self, RDAddress address);
+void rd_i_renderer_rdil(RDRenderer* self, RDAddress address);
+void rd_i_renderer_flags(RDRenderer* self, RDAddress address);
 void rd_i_renderer_write_text(RDRenderer* self, RDCharVect* v);
-void rd_i_renderer_set_current_item(RDRenderer* self, LIndex idx,
-                                    const RDListingItem* item);
 
 const char* rd_i_renderer_get_text(RDRenderer* self, RDSurfacePos startpos,
                                    RDSurfacePos endpos);
@@ -60,7 +57,6 @@ int rd_i_renderer_index_of(const RDRenderer* self, RDAddress address);
 int rd_i_renderer_last_index_of(const RDRenderer* self, RDAddress address);
 void rd_i_renderer_set_highlight_word(RDRenderer* self, const char* w);
 void rd_i_renderer_fit(const RDRenderer* self, int* row, int* col);
-bool rd_i_renderer_is_index_visible(const RDRenderer* self, LIndex index);
 bool rd_i_renderer_get_cell_data_under_pos(const RDRenderer* self,
                                            const RDSurfacePos* pos,
                                            RDCellData* cd);
@@ -77,3 +73,7 @@ void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);
+
+// vvv NEW vvv
+RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
+                                usize idx, usize sub_line, usize indent);

@@ -1,10 +1,13 @@
 #include "graphs/graph.h"
 #include "core/context.h"
+#include "io/flagsbuffer.h"
 #include "redasm/context.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "surface/items.h"
 #include "surface/renderer.h"
 #include "surface/state.h"
+#include <inttypes.h>
 #include <redasm/surface/graph.h>
 
 typedef struct RDSurfaceGraph {
@@ -45,12 +48,54 @@ void rd_surfacegraph_destroy(RDSurfaceGraph* self) {
     rd_free(self);
 }
 
+/*
+ * Render one chunk's address range [start, end):
+ * the flat surface's fill loop with an end bound instead of a row budget, same
+ * dispatch, same contract (see _rd_surface_render in surface.c), no segment
+ * banner.
+ *
+ * Graph nodes render whole: basic blocks bound the work naturally.
+ */
+static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
+                                          RDAddress end) {
+    RDContext* ctx = self->renderer->context;
+
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
+    panic_if(!seg, "chunk start outside any segment @ %" PRIx64, start);
+
+    usize idx = rd_i_address2index(seg, start);
+    usize endidx = rd_i_address2index(seg, end);
+    usize len = rd_flagsbuffer_get_length(seg->flags);
+    if(endidx > len) endidx = len; // chunks never cross segments
+
+    // fixup to head
+    if(rd_flagsbuffer_has_tail(seg->flags, idx))
+        rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+
+    usize sub_line = 0, last_len = 0;
+
+    while(idx < endidx) {
+        RDRenderItemResult r =
+            rd_i_render_item(self->renderer, seg, idx, sub_line);
+
+        if(r.status == RD_ROW_OK) {
+            last_len = r.length;
+            sub_line++;
+        }
+        else {
+            panic_if(sub_line == 0,
+                     "render stuck: head yields no rows @ %s+%zx",
+                     seg->base.name, idx);
+            sub_line = 0;
+            idx += last_len;
+        }
+    }
+}
+
 void rd_surfacegraph_render(RDSurfaceGraph* self) {
     rd_i_renderer_clear(self->renderer);
     if(!self->function || !self->function->graph) return;
 
-    const RDContext* ctx = self->renderer->context;
-    const RDListing* listing = &ctx->listing;
     const RDNodeVect* nodes = rd_i_graph_get_nodes(self->function->graph);
 
     RDFunctionChunkVect chunks = {0};
@@ -66,14 +111,8 @@ void rd_surfacegraph_render(RDSurfaceGraph* self) {
     rd_i_functionchunk_sort(&chunks);
 
     RDFunctionChunk** chunk;
-    vect_each(chunk, &chunks) {
-        LIndex idx = rd_i_listing_lower_bound(listing, (*chunk)->start);
-        for(; idx < vect_length(listing); idx++) {
-            const RDListingItem* item = vect_at(listing, idx);
-            if(item->address >= (*chunk)->end) break;
-            rd_i_render_item_at(self->renderer, idx);
-        }
-    }
+    vect_each(chunk, &chunks)
+        _rd_surfacegraph_render_range(self, (*chunk)->start, (*chunk)->end);
 
     vect_destroy(&chunks);
     _rd_surfacegraph_render_finalize(self);
@@ -101,13 +140,9 @@ bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     if(f != self->function) {
         self->function = f;
 
-        // anchor start to function entry
-        LIndex startidx = rd_i_listing_lower_bound(&ctx->listing, f->address);
-        if(startidx == vect_length(&ctx->listing)) return false;
-
         rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
         vect_clear(&self->state.fwd_history);
-        self->state.start = startidx;
+        self->state.start = f->address; // the anchor IS the entry address
     }
 
     // render then set pos: rows_front must be populated first
@@ -140,15 +175,9 @@ bool rd_surfacegraph_select_word(RDSurfaceGraph* self, int row, int col) {
 bool rd_surfacegraph_go_back(RDSurfaceGraph* self) {
     if(!rd_i_surfacestate_go_back(&self->state)) return false;
 
+    // start is the function's entry address: recover it directly
     const RDContext* ctx = self->renderer->context;
-    const RDListing* listing = &ctx->listing;
-
-    // use start to find the function.
-    // start is the listing index of function
-    if(self->state.start < vect_length(listing)) {
-        RDAddress addr = vect_at(listing, self->state.start)->address;
-        self->function = rd_i_find_function(ctx, addr);
-    }
+    self->function = rd_i_find_function(ctx, self->state.start);
 
     rd_surfacegraph_render(self);
     return true;
@@ -157,15 +186,9 @@ bool rd_surfacegraph_go_back(RDSurfaceGraph* self) {
 bool rd_surfacegraph_go_forward(RDSurfaceGraph* self) {
     if(!rd_i_surfacestate_go_forward(&self->state)) return false;
 
+    // start is the function's entry address: recover it directly
     const RDContext* ctx = self->renderer->context;
-    const RDListing* listing = &ctx->listing;
-
-    // use start to find the function.
-    // start is the listing index of function
-    if(self->state.start < vect_length(listing)) {
-        RDAddress addr = vect_at(listing, self->state.start)->address;
-        self->function = rd_i_find_function(ctx, addr);
-    }
+    self->function = rd_i_find_function(ctx, self->state.start);
 
     rd_surfacegraph_render(self);
     return true;

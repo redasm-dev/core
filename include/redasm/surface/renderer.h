@@ -9,7 +9,7 @@
 typedef struct RDRenderer RDRenderer;
 
 RD_API RDContext* rd_renderer_get_context(RDRenderer* self);
-RD_API void rd_renderer_ws(RDRenderer* self, int n);
+RD_API void rd_renderer_ws(RDRenderer* self, usize n);
 RD_API void rd_renderer_norm(RDRenderer* self, const char* s);
 RD_API void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                              RDThemeKind bg);

@@ -1,7 +1,6 @@
 #include "core/context.h"
 #include "core/worker.h"
 #include "io/flagsbuffer.h"
-#include "listing/builder.h"
 #include "project.h"
 #include "support/containers.h"
 #include "support/tomlschema.h"
@@ -270,7 +269,6 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
     ctx->engine.step = RD_WS_DONE;
     rd_i_db_load(ctx);
-    rd_i_listing_build(ctx);
 
     return ctx;
 

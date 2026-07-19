@@ -1,5 +1,5 @@
 #include "core/context.h"
-#include "listing/listing.h"
+#include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "surface/items.h"
 #include "surface/path.h"
@@ -11,6 +11,7 @@ typedef struct RDSurface {
     RDRenderer* renderer;
     RDSurfaceState state;
     RDSurfacePath path_builder;
+    usize max_rows;
 } RDSurface;
 
 static void _rd_surface_render_finalize(RDSurface* self) {
@@ -34,11 +35,124 @@ static void _rd_surface_render_finalize(RDSurface* self) {
     rd_i_renderer_swap(self->renderer);
 }
 
-static void _rd_surface_render_range(RDSurface* self, LIndex idx, usize n) {
-    const RDListing* listing = &self->renderer->context->listing;
+static bool _rd_surface_render(RDSurface* self, usize seg_idx, usize idx,
+                               usize sub_line) {
+    const RDSegmentFullVect* segments =
+        rd_i_db_get_segments(self->renderer->context);
 
-    for(usize i = 0; idx < vect_length(listing) && i < n; idx++, i++)
-        rd_i_render_item_at(self->renderer, idx);
+    if(seg_idx == vect_length(segments)) return false;
+
+    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+
+    while(seg_idx < vect_length(segments)) {
+        usize nrows = vect_length(&self->renderer->rows_back);
+        if(nrows >= self->max_rows) break;
+
+        seg = *vect_at(segments, seg_idx);
+
+        // fixup to head
+        if(rd_flagsbuffer_has_tail(seg->flags, idx))
+            rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+
+        if(sub_line == RD_SUB_LINE_NONE) {
+            // the segment banner is owed only at the segment's first byte.
+            // Any other landing simply starts at the head's row 0.
+            // Never let RD_SUB_LINE_NONE reach the dispatch
+            if(idx == 0) rd_i_render_segment_item(self->renderer, seg);
+            sub_line = 0;
+        }
+
+        usize last_len = 0;
+
+        /*
+         * One head can yield many rows. Dispatch contract:
+         *   OK        -> the row exists; .length is its byte width
+         *   EXHAUSTED -> no such row; advance idx by the LAST OK row's
+         *                width (for DATA that is the chain's deepest,
+         *                narrowest entity, exactly the step to the
+         *                next head).
+         *                Every head must yield a row at sub_line 0.
+         */
+        while(idx < rd_flagsbuffer_get_length(seg->flags)) {
+            if(vect_length(&self->renderer->rows_back) >= self->max_rows) break;
+
+            RDRenderItemResult r =
+                rd_i_render_item(self->renderer, seg, idx, sub_line);
+
+            if(r.status == RD_ROW_OK) {
+                // stamp the row's byte width for rd_surface_get_byte_span.
+                // Some renderers return OK without emitting a row under
+                // RD_RF_* flags, hence the count check
+                if(vect_length(&self->renderer->rows_back) > nrows) {
+                    vect_last(&self->renderer->rows_back)->bytes_length =
+                        r.length;
+                }
+
+                last_len = r.length;
+                sub_line++;
+            }
+            else {
+                sub_line = 0;
+                idx += last_len;
+            }
+        }
+
+        sub_line = RD_SUB_LINE_NONE;
+        seg_idx++;
+        idx = 0;
+    }
+
+    return true;
+}
+
+/*
+ * Find the first visible row for 'address', or -1.
+ * Self-contained scan over rows_front so the in-viewport test cannot depend on
+ * renderer index semantics.
+ * Banner rows are excluded: they share the segment start address but are not
+ * the item at that address.
+ */
+static int _rd_surface_find_row(const RDSurface* self, RDAddress address) {
+    int i = 0;
+
+    const RDRow* row;
+    vect_each(row, &self->renderer->rows_front) {
+        if(row->sub_line != RD_SUB_LINE_NONE && row->address == address)
+            return i;
+        i++;
+    }
+
+    return -1;
+}
+
+/*
+ * Every path that fills the viewport goes through here, so the state
+ * anchor (start + start_sub_line) is ALWAYS the actual current top:
+ * render, scroll, jump and history restore cannot drift from it.
+ */
+static bool _rd_surface_render_from(RDSurface* self, const RDSegmentFull* seg,
+                                    usize seg_idx, usize idx, usize sub_line) {
+    self->state.start = seg->base.start_address + idx;
+    self->state.start_sub_line = sub_line;
+
+    rd_i_renderer_clear(self->renderer);
+    bool ok = _rd_surface_render(self, seg_idx, idx, sub_line);
+    _rd_surface_render_finalize(self);
+    return ok;
+}
+
+static bool _rd_surface_render_at(RDSurface* self, RDAddress address,
+                                  usize sub_line) {
+    RDContext* ctx = self->renderer->context;
+
+    usize seg_idx;
+    if(!rd_i_db_find_segment_index(ctx, address, &seg_idx)) return false;
+
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+    usize idx = rd_i_address2index(seg, address);
+
+    return _rd_surface_render_from(self, seg, seg_idx, idx, sub_line);
 }
 
 RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags) {
@@ -48,8 +162,6 @@ RDSurface* rd_surface_create(RDContext* ctx, RDRenderFlags flags) {
         .renderer = rd_i_renderer_create(ctx, flags),
     };
 
-    rd_i_surfacestate_with_locked_history(&self->state,
-                                          rd_surface_jump_to_ep(self));
     return self;
 }
 
@@ -61,12 +173,12 @@ void rd_surface_destroy(RDSurface* self) {
     rd_free(self);
 }
 
-void rd_surface_seek(RDSurface* self, usize index) {
-    self->state.start = index;
-}
-
 void rd_surface_set_highlight_word(RDSurface* self, const char* word) {
     rd_i_renderer_set_highlight_word(self->renderer, word);
+}
+
+void rd_surface_set_max_rows(RDSurface* self, usize rows) {
+    self->max_rows = rows;
 }
 
 bool rd_surface_set_pos(RDSurface* self, int row, int col) {
@@ -103,11 +215,17 @@ bool rd_surface_can_go_forward(const RDSurface* self) {
 }
 
 bool rd_surface_go_back(RDSurface* self) {
-    return rd_i_surfacestate_go_back(&self->state);
+    if(!rd_i_surfacestate_go_back(&self->state)) return false;
+
+    return _rd_surface_render_at(self, self->state.start,
+                                 self->state.start_sub_line);
 }
 
 bool rd_surface_go_forward(RDSurface* self) {
-    return rd_i_surfacestate_go_forward(&self->state);
+    if(!rd_i_surfacestate_go_forward(&self->state)) return false;
+
+    return _rd_surface_render_at(self, self->state.start,
+                                 self->state.start_sub_line);
 }
 
 void rd_surface_clear_history(RDSurface* self) {
@@ -149,14 +267,159 @@ bool rd_surface_get_cell_data_under_pos(const RDSurface* self,
     return rd_i_renderer_get_cell_data_under_pos(self->renderer, pos, cd);
 }
 
-void rd_surface_render(RDSurface* self, usize n) {
-    rd_i_renderer_clear(self->renderer);
-    _rd_surface_render_range(self, self->state.start, n);
-    _rd_surface_render_finalize(self);
+bool rd_surface_render(RDSurface* self, RDAddress address) {
+    // repaint path: no history semantics (jumps go through
+    // rd_surface_jump_to, which pushes history and centers)
+    return _rd_surface_render_at(self, address, RD_SUB_LINE_NONE);
 }
 
-usize rd_surface_get_row_start(const RDSurface* self) {
-    return self->state.start;
+bool rd_surface_repaint(RDSurface* self) {
+    return _rd_surface_render_at(self, self->state.start,
+                                 self->state.start_sub_line);
+}
+
+bool rd_surface_scroll(RDSurface* self, int n) {
+    if(!n || vect_is_empty(&self->renderer->rows_front)) return false;
+
+    RDContext* ctx = self->renderer->context;
+    RDRowVect* front = &self->renderer->rows_front;
+
+    if(n > 0) {
+        RDRow* top = vect_first(front);
+
+        usize seg_idx;
+        if(!rd_i_db_find_segment_index(ctx, top->address, &seg_idx))
+            return false;
+
+        const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+        const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+        usize idx = rd_i_address2index(seg, top->address);
+
+        usize saved = self->max_rows;
+        self->max_rows = (usize)n + saved;
+        rd_i_renderer_clear(self->renderer);
+        _rd_surface_render(self, seg_idx, idx, top->sub_line);
+        self->max_rows = saved;
+
+        usize got = vect_length(&self->renderer->rows_back);
+
+        // everything to the end is already visible: nothing to scroll
+        // (rows_front untouched, the stale probe in rows_back is cleared
+        // by whichever render runs next)
+        if(got <= saved) return false;
+
+        usize new_top = (usize)n;
+        if(got < (usize)n + saved) new_top = got - saved; // bottom clamp
+
+        RDRow* r = vect_at(&self->renderer->rows_back, new_top);
+        RDAddress address = r->address;
+        usize sub_line = r->sub_line; // copy out: the render clears the probe
+
+        return _rd_surface_render_at(self, address, sub_line);
+    }
+
+    // backward: step in flag space from the current top
+    RDRow* r = vect_first(front);
+
+    usize seg_idx;
+    if(!rd_i_db_find_segment_index(ctx, r->address, &seg_idx)) return false;
+
+    const RDSegmentFullVect* segments =
+        rd_i_db_get_segments(self->renderer->context);
+
+    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+    usize idx = rd_i_address2index(seg, r->address);
+    usize sub_line = r->sub_line;
+
+    bool moved = false;
+
+    for(; n < 0; n++) {
+        if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+        moved = true;
+    }
+
+    if(!moved) return false; // already at the very top: end-stop
+    return _rd_surface_render_from(self, seg, seg_idx, idx, sub_line);
+}
+
+bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
+    RDContext* ctx = self->renderer->context;
+
+    usize seg_idx;
+    if(!rd_i_db_find_segment_index(ctx, address, &seg_idx)) return false;
+
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+
+    usize idx = rd_i_address2index(seg, address);
+    if(rd_flagsbuffer_has_tail(seg->flags, idx))
+        rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+
+    RDAddress head = seg->base.start_address + idx;
+
+    // a jump is THE history event; repaints and scrolls are not
+    rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
+    vect_clear(&self->state.fwd_history);
+
+    int row = _rd_surface_find_row(self, head);
+
+    if(row != -1) {
+        // destination already visible: keep the top unchanged, move the
+        // cursor, repeat a render cycle so highlights follow it
+        rd_surface_set_pos(self, row, 0);
+        return _rd_surface_render_at(self, self->state.start,
+                                     self->state.start_sub_line);
+    }
+
+    // destination off-screen: center it by stepping back half a viewport
+    // of ROWS from its head (row-granular: multi-row heads, banners and
+    // hex chunks all count as the rows they render as)
+    usize sub_line = 0;
+    usize steps = self->max_rows / 2;
+
+    for(usize i = 0; i < steps; i++) {
+        if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+    }
+
+    if(!_rd_surface_render_from(self, seg, seg_idx, idx, sub_line))
+        return false;
+
+    // bottom clamp: near the end of the listing, a centered top renders
+    // fewer than max_rows rows and leaves the viewport half empty.
+    // Pull the top up by the deficit so the viewport stays full and the
+    // destination simply sits below middle.
+    // (The top clamp is implicit: the step-back loop above breaks at the
+    // database start, leaving the destination above middle).
+    // If the whole listing is shorter than the viewport, this walks back to the
+    // very beginning and stops.
+    usize got = vect_length(&self->renderer->rows_front);
+
+    if(got < self->max_rows) {
+        usize deficit = self->max_rows - got;
+        bool moved = false;
+
+        for(usize i = 0; i < deficit; i++) {
+            if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+            moved = true;
+        }
+
+        if(moved && !_rd_surface_render_from(self, seg, seg_idx, idx, sub_line))
+            return false;
+    }
+
+    row = _rd_surface_find_row(self, head);
+    rd_surface_set_pos(self, row != -1 ? row : 0, 0);
+
+    // second cycle: finalize highlights from state.pos, which was only
+    // known after the first render materialized the rows
+    return _rd_surface_render_from(self, seg, seg_idx, idx, sub_line);
+}
+
+bool rd_surface_get_first_address(const RDSurface* self, RDAddress* address) {
+    if(vect_is_empty(&self->renderer->rows_front)) return false;
+
+    if(address) *address = vect_first(&self->renderer->rows_front)->address;
+    return true;
 }
 
 int rd_surface_index_of(const RDSurface* self, RDAddress address) {
@@ -171,8 +434,36 @@ usize rd_surface_get_row_count(const RDSurface* self) {
     return rd_i_renderer_get_row_count(self->renderer);
 }
 
-usize rd_surface_get_length(const RDSurface* self) {
-    return vect_length(&self->renderer->context->listing);
+usize rd_surface_get_byte_span(const RDSurface* self) {
+    RDContext* ctx = self->renderer->context;
+    const RDRowVect* rows = &self->renderer->rows_front;
+
+    usize span = 0;
+    const RDSegmentFull* run_seg = NULL;
+    RDAddress run_start = 0;
+    const RDRow* run_last = NULL;
+
+    const RDRow* row;
+    vect_each(row, rows) {
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
+        if(!seg) continue;
+
+        if(seg != run_seg) { // crossed into a new segment: close the run
+            if(run_last) {
+                span +=
+                    (run_last->address - run_start) + run_last->bytes_length;
+            }
+
+            run_seg = seg;
+            run_start = row->address;
+        }
+
+        run_last = row;
+    }
+
+    if(run_last)
+        span += (run_last->address - run_start) + run_last->bytes_length;
+    return span;
 }
 
 const char* rd_surface_get_selected_text(RDSurface* self) {
@@ -190,9 +481,9 @@ RDRowSlice rd_surface_get_row(const RDSurface* self, usize idx) {
 }
 
 RDSurfacePathSlice rd_surface_get_path(RDSurface* self) {
-    const RDSurfacePathVect* path = rd_i_surfacepath_build(
-        &self->path_builder, self->state.start, &self->renderer->rows_front,
-        self->renderer->context);
+    const RDSurfacePathVect* path =
+        rd_i_surfacepath_build(&self->path_builder, &self->renderer->rows_front,
+                               self->renderer->context);
 
     return vect_to_slice(RDSurfacePathSlice, path);
 }
@@ -209,40 +500,4 @@ bool rd_surface_select_word(RDSurface* self, int row, int col) {
 
     rd_surface_set_pos(self, startpos.row, startpos.col);
     return rd_surface_select(self, endpos.row, endpos.col);
-}
-
-bool rd_surface_jump_to_ep(RDSurface* self) {
-    bool res = false;
-
-    rd_i_surfacestate_with_locked_history(&self->state, {
-        const RDContext* ctx = self->renderer->context;
-
-        RDAddress ep;
-        res = rd_get_entry_point(ctx, &ep);
-        if(res) res = rd_surface_jump_to(self, ep);
-    });
-
-    return res;
-}
-
-bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
-    const RDContext* ctx = self->renderer->context;
-    LIndex index = rd_i_listing_lower_bound(&ctx->listing, address);
-    if(index == vect_length(&ctx->listing)) return false;
-
-    rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
-    vect_clear(&self->state.fwd_history);
-
-    if(!rd_i_renderer_is_index_visible(self->renderer, index)) {
-        const usize DIFF = (vect_length(&self->renderer->rows_front) / 4);
-        LIndex rindex = index;
-        if(rindex > DIFF) rindex -= DIFF;
-
-        self->state.start = rindex;
-        rd_surface_set_pos(self, (int)(index - rindex), -1);
-    }
-    else
-        rd_surface_set_pos(self, (int)(index - self->state.start), -1);
-
-    return true;
 }

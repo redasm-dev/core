@@ -19,8 +19,6 @@ bool rd_i_flagsbuffer_has_comment(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_xref_out(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_xref_in(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_op_over(const RDFlagsBuffer* self, usize idx);
-
-bool rd_i_flagsbuffer_has_type(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_jmpdst(const RDFlagsBuffer* self, usize idx);
 
 void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
@@ -28,6 +26,7 @@ void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
 RDFlags rd_i_flagsbuffer_get(const RDFlagsBuffer* self, usize idx);
 usize rd_i_flagsbuffer_get_range_length(const RDFlagsBuffer* self, usize idx);
 
+bool rd_i_flagsbuffer_set_tail(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_value(RDFlagsBuffer* self, usize idx, u8 v);
 bool rd_i_flagsbuffer_set_data(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_code(RDFlagsBuffer* self, usize idx, usize n);
@@ -40,7 +39,15 @@ bool rd_i_flagsbuffer_set_noret(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_cond(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_dslot(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_op_over(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_t8(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_t16(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_t32(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_t64(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_type(RDFlagsBuffer* self, usize idx, usize n);
+bool rd_i_flagsbuffer_set_field(RDFlagsBuffer* self, usize idx, usize n);
+bool rd_i_flagsbuffer_set_item(RDFlagsBuffer* self, usize idx, usize n);
+bool rd_i_flagsbuffer_set_sign(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_set_char(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_name(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_comment(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_xref_out(RDFlagsBuffer* self, usize idx);
