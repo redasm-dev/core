@@ -55,7 +55,7 @@ typedef struct RDTypeDefVect {
 } RDTypeDefVect;
 
 void rd_i_register_primitives(RDContext* ctx);
-
+void rd_i_typedef_measure(const RDContext* ctx, RDTypeDef* tdef);
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 
 static inline bool rd_i_typedef_is_compound(const RDTypeDef* self) {

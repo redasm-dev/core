@@ -756,18 +756,16 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
     if(tdef->kind == RD_TKIND_PRIM) return;
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
-        INSERT INTO TypeDefs \
-            VALUES (:name, :kind, :size, :is_noret, :enum_type) \
-        ON CONFLICT DO \
+        INSERT INTO TypeDefs (name, kind, is_noret, enum_type) \
+            VALUES (:name, :kind, :is_noret, :enum_type) \
+        ON CONFLICT(name) DO \
             UPDATE SET kind = EXCLUDED.kind, \
-                       size = EXCLUDED.size, \
                        is_noret = EXCLUDED.is_noret, \
                        enum_type = EXCLUDED.enum_type \
     ");
 
     _rd_db_bind_param_str(ctx, stmt, ":name", tdef->name);
     _rd_db_bind_param_int(ctx, stmt, ":kind", (sqlite3_int64)tdef->kind);
-    _rd_db_bind_param_int(ctx, stmt, ":size", (sqlite3_int64)tdef->size);
 
     if(tdef->kind == RD_TKIND_FUNC)
         _rd_db_bind_param_int(ctx, stmt, ":is_noret", tdef->func_.is_noret);
@@ -825,15 +823,15 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
                                                 RDTypeDefVect* v) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPE_DEFS, "\
-        SELECT name, kind, size, is_noret, enum_type \
+        SELECT name, kind, is_noret, enum_type \
         FROM TypeDefs \
+        ORDER BY id \
     ");
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         const char* name = (const char*)sqlite3_column_text(stmt, 0);
         RDTypeKind kind = (RDTypeKind)sqlite3_column_int(stmt, 1);
-        usize size = (usize)sqlite3_column_int64(stmt, 2);
-        bool is_noret = (bool)sqlite3_column_int(stmt, 3);
+        bool is_noret = (bool)sqlite3_column_int(stmt, 2);
         const char* enum_type = (const char*)sqlite3_column_text(stmt, 4);
 
         sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
@@ -853,7 +851,6 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
             unreachable();
 
         assert(tdef);
-        tdef->size = size;
 
         while(_rd_db_step(ctx, stmt_param) == SQLITE_ROW) {
             // clang-format off

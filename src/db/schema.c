@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS XRefs ( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS TypeDefs( \
-    name      TEXT PRIMARY KEY, \
+    id        INTEGER PRIMARY KEY AUTOINCREMENT, \
+    name      TEXT UNIQUE NOT NULL, \
     kind      INTEGER NOT NULL, \
-    size      INTEGER NOT NULL, \
     is_noret  INTEGER NOT NULL, \
     enum_type TEXT \
 ); \

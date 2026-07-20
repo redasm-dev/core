@@ -67,7 +67,7 @@ static RDTypeDef* _rd_typedef_create(const char* name, RDTypeKind kind,
     return self;
 }
 
-static void _rd_typedef_resolve_size(const RDContext* ctx, RDTypeDef* tdef) {
+void rd_i_typedef_measure(const RDContext* ctx, RDTypeDef* tdef) {
     if(tdef->size > 0) return;
 
     switch(tdef->kind) {
@@ -317,14 +317,14 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
     if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
         rd_i_kb_add_noret(ctx, self->name);
 
+    rd_i_typedef_measure(ctx, self);
+
     if(self->kind != RD_TKIND_PRIM) {
         rd_i_db_set_type_def(ctx, self); // don't save primitives in DB
 
         RD_LOG_INFO("%s definition '%s' registered",
                     _rd_typedef_kind_str(self->kind), self->name);
     }
-
-    _rd_typedef_resolve_size(ctx, self);
 
     if(!self->size) {
         RD_LOG_FAIL("type '%s' has unresolved size", self->name);
