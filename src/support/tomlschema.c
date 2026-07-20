@@ -61,18 +61,46 @@ static bool _rd_toml_expect_string_values(const toml_datum_t* d,
     return found;
 }
 
-static bool _rd_toml_expect_array_type(const toml_datum_t* d,
-                                       const RDTomlSchema* s) {
-    assert(d->type == TOML_ARRAY);
+static bool _rd_toml_expect_array_of_elem_type(const toml_datum_t* d,
+                                               const RDTomlSchema* s) {
+    const RDTomlSchema* elem = s->array_type;
 
-    if(!s->array_type) return true;
+    for(int i = 0; i < d->u.arr.size; i++) {
+        toml_datum_t e = d->u.arr.elem[i];
 
+        if(e.type != elem->type) {
+            RD_LOG_FAIL(
+                "expected array of %s for '%s' property, found %s at index "
+                "%d",
+                rd_i_toml_type_str(elem->type), s->key,
+                rd_i_toml_type_str(e.type), i);
+            return false;
+        }
+
+        if(e.type == TOML_STRING && !_rd_toml_expect_string_values(&e, elem))
+            return false;
+    }
+
+    return true;
+}
+
+static bool _rd_toml_expect_array_of_tables(const toml_datum_t* d,
+                                            const RDTomlSchema* s) {
     for(int i = 0; i < d->u.arr.size; i++) {
         if(!rd_i_toml_validate_schema(d->u.arr.elem[i], s->array_type))
             return false;
     }
 
     return true;
+}
+
+static bool _rd_toml_expect_array_type(const toml_datum_t* d,
+                                       const RDTomlSchema* s) {
+    assert(d->type == TOML_ARRAY);
+
+    if(!s->array_type) return true;
+    if(!s->array_type->key) return _rd_toml_expect_array_of_elem_type(d, s);
+    return _rd_toml_expect_array_of_tables(d, s);
 }
 
 static bool _rd_toml_expect_table_type(const toml_datum_t* d,
