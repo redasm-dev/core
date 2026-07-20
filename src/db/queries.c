@@ -832,7 +832,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
         const char* name = (const char*)sqlite3_column_text(stmt, 0);
         RDTypeKind kind = (RDTypeKind)sqlite3_column_int(stmt, 1);
         bool is_noret = (bool)sqlite3_column_int(stmt, 2);
-        const char* enum_type = (const char*)sqlite3_column_text(stmt, 4);
+        const char* enum_type = (const char*)sqlite3_column_text(stmt, 3);
 
         sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
         RDTypeDef* tdef = NULL;
