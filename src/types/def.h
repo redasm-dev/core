@@ -2,16 +2,6 @@
 
 #include <redasm/types/def.h>
 
-typedef enum {
-    RD_TKIND_PRIM = 0,
-    RD_TKIND_STRUCT,
-    RD_TKIND_UNION,
-    RD_TKIND_ENUM,
-    RD_TKIND_FUNC,
-
-    RD_TKIND_COUNT,
-} RDTypeKind;
-
 typedef struct RDParamVect {
     RDParam* data;
     usize length;

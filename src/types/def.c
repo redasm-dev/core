@@ -340,7 +340,12 @@ fail:
 }
 
 const char* rd_typedef_name(const RDTypeDef* self) { return self->name; }
+RDTypeKind rd_typedef_kind(const RDTypeDef* self) { return self->kind; }
 usize rd_typedef_size(const RDTypeDef* self) { return self->size; }
+
+bool rd_typedef_is_noret(const RDTypeDef* self) {
+    return self->kind == RD_TKIND_FUNC && self->func_.is_noret;
+}
 
 void rd_typedef_destroy(RDTypeDef* self) {
     if(rd_i_typedef_is_compound(self))

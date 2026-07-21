@@ -35,6 +35,7 @@ static inline bool rd_type_is_void(const RDType* t) { return !t->def; }
 RD_API const RDTypeDef* rd_integral_typedef_from_size(unsigned int size,
                                                       const RDContext* ctx);
 RD_API const char* rd_integral_from_size(unsigned int size);
+RD_API const char* rd_type_to_str(const RDType* self, RDContext* ctx);
 
 RD_API bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t);
 

@@ -11,6 +11,16 @@ typedef enum {
     RD_TYPE_CPTR,
 } RDTypeModifier;
 
+typedef enum {
+    RD_TKIND_PRIM = 0,
+    RD_TKIND_STRUCT,
+    RD_TKIND_UNION,
+    RD_TKIND_ENUM,
+    RD_TKIND_FUNC,
+
+    RD_TKIND_COUNT,
+} RDTypeKind;
+
 typedef struct RDType {
     const RDTypeDef* def;
     usize count;
@@ -27,3 +37,8 @@ typedef struct RDParamSlice {
     const RDParam* data;
     usize length;
 } RDParamSlice;
+
+typedef struct RDTypeDefSlice {
+    const RDTypeDef** data;
+    usize length;
+} RDTypeDefSlice;

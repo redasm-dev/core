@@ -891,6 +891,13 @@ RDProblemSlice rd_get_all_problems(const RDContext* self) {
     return vect_to_slice(RDProblemSlice, &self->problems);
 }
 
+RDTypeDefSlice rd_get_all_type_defs(const RDContext* self) {
+    return (RDTypeDefSlice){
+        .data = (const RDTypeDef**)self->typedefs.data,
+        .length = self->typedefs.length,
+    };
+}
+
 RDSegmentSlice rd_get_all_segments(const RDContext* self) {
     const RDSegmentFullVect* segments = rd_i_db_get_segments(self);
 

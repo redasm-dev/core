@@ -240,6 +240,10 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
     return buf->data;
 }
 
+const char* rd_type_to_str(const RDType* self, RDContext* ctx) {
+    return rd_i_type_to_str(self, &ctx->type_buf);
+}
+
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier mod, RDConfidence c) {
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
