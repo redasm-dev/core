@@ -12,7 +12,8 @@ typedef struct RDRenderer {
     RDContext* context;
     RDRenderFlags flags;
     RDRenderMode mode;
-    int columns, auto_columns;
+    int min_column;
+    int max_column;
     unsigned int group_idx;
     RDAddress curr_address;
     RDRowVect rows_front, rows_back;
@@ -38,6 +39,7 @@ const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
                                                 RDAddress address);
 void rd_i_renderer_clear(RDRenderer* self);
 void rd_i_renderer_swap(RDRenderer* self);
+void rd_i_renderer_set_min_columns(RDRenderer* self, int cols);
 void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m);
 void rd_i_renderer_set_cursor_visible(RDRenderer* self, bool b);
 void rd_i_renderer_fill_columns(RDRenderer* self);
@@ -70,6 +72,7 @@ bool rd_i_renderer_get_address(const RDRenderer* self, RDSurfacePos pos,
 RDRowSlice rd_i_renderer_get_row(const RDRenderer* self, usize idx);
 RDCellData* rd_i_renderer_get_current_cell_data(const RDRenderer* self);
 void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m);
+int rd_i_renderer_get_max_column(const RDRenderer* self);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);

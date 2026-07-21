@@ -29,8 +29,8 @@ RD_API bool rd_surface_scroll(RDSurface* self, int n);
 RD_API bool rd_surface_jump_to(RDSurface* self, RDAddress address);
 RD_API void rd_surface_set_mode(RDSurface* self, RDRenderMode m);
 RD_API void rd_surface_set_cursor_visible(RDSurface* self, bool b);
-RD_API void rd_surface_set_columns(RDSurface* self, int cols);
 RD_API void rd_surface_set_highlight_word(RDSurface* self, const char* word);
+RD_API void rd_surface_set_min_columns(RDSurface* self, int cols);
 RD_API void rd_surface_set_max_rows(RDSurface* self, usize rows);
 RD_API RDRenderMode rd_surface_get_mode(const RDSurface* self);
 RD_API bool rd_surface_has_selection(const RDSurface* self);
@@ -49,6 +49,7 @@ RD_API bool rd_surface_get_cell_data_under_pos(const RDSurface* self, const RDSu
 RD_API int rd_surface_index_of(const RDSurface* self, RDAddress address);
 RD_API int rd_surface_last_index_of(const RDSurface* self, RDAddress address);
 RD_API bool rd_surface_get_first_address(const RDSurface* self, RDAddress* address);
+RD_API int rd_surface_get_max_column(const RDSurface* self);
 RD_API usize rd_surface_get_row_count(const RDSurface* self);
 RD_API usize rd_surface_get_byte_span(const RDSurface* self);
 RD_API RDRowSlice rd_surface_get_row(const RDSurface* self, usize idx);

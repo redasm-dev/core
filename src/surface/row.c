@@ -58,7 +58,7 @@ static usize _rd_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
 
 // mirror of _rd_render_item_unknown's slot layout, keep in lockstep
 static usize _rd_unknown_last_sub_line(const RDSegmentFull* seg, usize idx) {
-    // rows: [optional label], hex line - the hex line is always last
+    // rows: [optional label], hex line: the hex line is always last
     return rd_i_flagsbuffer_has_info(seg->flags, idx) ? 1 : 0;
 }
 
@@ -134,7 +134,7 @@ bool rd_i_row_step_back(RDContext* ctx, const RDSegmentFull** seg,
     if(rd_flagsbuffer_has_unknown((*seg)->flags, *idx)) {
         /*
          * mirror of _rd_render_item_unknown's chunking, keep in lockstep.
-         * A chunk head is: a segment-relative alignment boundary, the
+         * A chunk head is: a segment relative alignment boundary, the
          * first byte of an unknown run, or a labeled byte.
          * All three are recomputable locally, so the walk is bounded
          * by one hex line

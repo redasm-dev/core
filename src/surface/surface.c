@@ -177,6 +177,10 @@ void rd_surface_set_highlight_word(RDSurface* self, const char* word) {
     rd_i_renderer_set_highlight_word(self->renderer, word);
 }
 
+void rd_surface_set_min_columns(RDSurface* self, int cols) {
+    rd_i_renderer_set_min_columns(self->renderer, cols);
+}
+
 void rd_surface_set_max_rows(RDSurface* self, usize rows) {
     self->max_rows = rows;
 }
@@ -192,10 +196,6 @@ void rd_surface_set_mode(RDSurface* self, RDRenderMode m) {
 
 void rd_surface_set_cursor_visible(RDSurface* self, bool b) {
     rd_i_renderer_set_cursor_visible(self->renderer, b);
-}
-
-void rd_surface_set_columns(RDSurface* self, int cols) {
-    self->renderer->columns = cols;
 }
 
 RDRenderMode rd_surface_get_mode(const RDSurface* self) {
@@ -428,6 +428,10 @@ int rd_surface_index_of(const RDSurface* self, RDAddress address) {
 
 int rd_surface_last_index_of(const RDSurface* self, RDAddress address) {
     return rd_i_renderer_last_index_of(self->renderer, address);
+}
+
+int rd_surface_get_max_column(const RDSurface* self) {
+    return rd_i_renderer_get_max_column(self->renderer);
 }
 
 usize rd_surface_get_row_count(const RDSurface* self) {

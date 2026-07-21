@@ -10,6 +10,7 @@
 #include <inttypes.h>
 
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
+#define RD_SURFACE_ROW_INITIAL_SIZE 1024
 
 static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
                                         int row, int col) {
@@ -38,10 +39,10 @@ static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
 }
 
 static void _rd_renderer_calc_auto_column(RDRenderer* self) {
-    if(self->columns || vect_is_empty(&self->rows_back)) return;
+    if(vect_is_empty(&self->rows_back)) return;
 
     int lastlen = rd_i_row_length(vect_last(&self->rows_back));
-    self->auto_columns = rd_i_max_i(self->auto_columns, lastlen);
+    self->max_column = rd_i_max_i(self->max_column, lastlen);
 }
 
 static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
@@ -95,13 +96,17 @@ void rd_i_renderer_destroy(RDRenderer* self) {
 void rd_i_renderer_clear(RDRenderer* self) {
     rd_i_rowvect_destroy(&self->rows_back);
     vect_clear(&self->rows_back);
-    self->auto_columns = 0;
+    self->max_column = self->min_column;
     self->group_idx = 0;
 }
 
 void rd_i_renderer_swap(RDRenderer* self) {
     mem_swap(RDRowVect, &self->rows_back, &self->rows_front);
     self->group_idx = 0;
+}
+
+void rd_i_renderer_set_min_columns(RDRenderer* self, int cols) {
+    self->min_column = cols;
 }
 
 void rd_i_renderer_set_mode(RDRenderer* self, RDRenderMode m) {
@@ -117,7 +122,6 @@ void rd_i_renderer_set_cursor_visible(RDRenderer* self, bool b) {
 
 void rd_i_renderer_fill_columns(RDRenderer* self) {
     _rd_renderer_calc_auto_column(self);
-    int ncols = self->columns > 0 ? self->columns : self->auto_columns;
 
     RDRow* row;
     vect_each(row, &self->rows_back) {
@@ -127,7 +131,7 @@ void rd_i_renderer_fill_columns(RDRenderer* self) {
         RDCellData olddata = row->curr_data;
         row->curr_data = rd_i_default_cell_data();
 
-        while(rd_i_row_length(row) <= ncols) {
+        while(rd_i_row_length(row) <= self->max_column) {
             rd_i_row_push(row, ' ', RD_THEME_FOREGROUND, RD_THEME_BACKGROUND);
         }
 
@@ -224,9 +228,7 @@ RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
 
     _rd_renderer_calc_auto_column(self);
     rd_i_rowvect_push(self->context, &self->rows_back, sub_line, address);
-
-    if(self->columns)
-        rd_i_row_reserve(vect_last(&self->rows_back), self->columns);
+    rd_i_row_reserve(vect_last(&self->rows_back), RD_SURFACE_ROW_INITIAL_SIZE);
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
         rd_renderer_norm(self, seg->base.name);
@@ -254,8 +256,6 @@ void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
     r->curr_data.group_idx = ++self->group_idx;
 
     while(*s) {
-        if(self->columns && rd_i_row_length(r) >= self->columns) break;
-
         u32 cp;
         s += rd_i_utf8_decode(s, &cp);
 
@@ -619,6 +619,10 @@ void rd_i_renderer_set_current_cell_data(RDRenderer* self, RDCellData m) {
     r->curr_data = m;
 }
 
+int rd_i_renderer_get_max_column(const RDRenderer* self) {
+    return self->max_column;
+}
+
 usize rd_i_renderer_get_row_count(const RDRenderer* self) {
     return vect_length(&self->rows_front);
 }
@@ -657,12 +661,10 @@ bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
 }
 
 void rd_i_renderer_write_text(RDRenderer* self, RDCharVect* v) {
-    int cols = self->columns;
     vect_clear(v);
 
-    if(cols && (int)vect_capacity(v) < cols)
-        vect_reserve(v,
-                     (usize)(cols * (int)vect_length(&self->rows_front)) + 1);
+    vect_reserve(
+        v, (usize)(self->max_column * (int)vect_length(&self->rows_front)) + 1);
 
     const RDRow* r;
     vect_each(r, &self->rows_front) {
