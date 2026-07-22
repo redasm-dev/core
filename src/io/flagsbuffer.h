@@ -30,6 +30,7 @@ bool rd_i_flagsbuffer_set_tail(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_value(RDFlagsBuffer* self, usize idx, u8 v);
 bool rd_i_flagsbuffer_set_data(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_code(RDFlagsBuffer* self, usize idx, usize n);
+bool rd_i_flagsbuffer_set_patch(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_set_flow(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_jump(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_jmpdst(RDFlagsBuffer* self, usize idx);
@@ -55,7 +56,8 @@ bool rd_i_flagsbuffer_set_xref_in(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_imported(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_exported(RDFlagsBuffer* self, usize idx);
 
-void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize startidx, usize n);
+void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize idx, usize n);
+void rd_i_flagsbuffer_undefine_patch(RDFlagsBuffer* self, usize idx, usize n);
 bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_func(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx);

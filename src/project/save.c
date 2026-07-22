@@ -3,6 +3,7 @@
 #include "plugins/analyzer.h"
 #include "project.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "support/utils.h"
 #include <inttypes.h>
 #include <miniz.h>
@@ -73,6 +74,85 @@ static void _rd_project_add_file(mz_zip_archive* zip, const char* filename,
     rd_i_buffer_destroy((RDBuffer*)b);
 }
 
+static bool _rd_export_input(RDContext* self, const char* filepath) {
+    usize len = rd_i_buffer_get_length((RDBuffer*)self->input);
+
+    switch(rd_i_writefile(filepath, (const char*)self->input->data, len)) {
+        case RD_WRITEFILE_FAIL:
+            RD_LOG_FAIL("cannot write to '%s'", filepath);
+            return false;
+
+        case RD_WRITEFILE_TRUNC:
+            RD_LOG_FAIL("file '%s' is truncated", filepath);
+            return false;
+
+        case RD_WRITEFILE_OK:
+            RD_LOG_INFO("input exported to '%s'", filepath);
+            break;
+
+        default: unreachable();
+    }
+
+    return true;
+}
+
+static bool _rd_export_patched_input(RDContext* self, const char* filepath) {
+    const RDMappingVect* mappings = rd_i_db_get_mappings(self);
+
+    usize len = rd_i_buffer_get_length((RDBuffer*)self->input);
+    u8* input = rd_alloc(sizeof(char) * len);
+    memcpy(input, self->input->data, len);
+    bool ok = true;
+
+    // apply patches
+    const RDInputMapping* m;
+    vect_each(m, mappings) { // only mapped portions can be serialized
+        const RDSegmentFull* seg = rd_i_db_find_segment(self, m->start_address);
+        panic_if(!seg, "cannot find segment %" PRIx64, m->start_address);
+
+        usize map_size = m->end_address - m->start_address;
+        usize idx = rd_i_address2index(seg, m->start_address);
+        usize end_idx = idx + map_size;
+
+        for(usize i = idx; i < end_idx; i++) {
+            if(!rd_flagsbuffer_has_patch(seg->flags, i)) continue;
+
+            usize dst_offset = m->offset + i;
+            panic_if(dst_offset >= len, "destination offset out of range");
+
+            u8 v;
+            bool has_value = rd_flagsbuffer_get_value(seg->flags, i, &v);
+            panic_if(!has_value, "patch @ %" PRIx64 " has not value",
+                     m->start_address + i);
+
+            input[dst_offset] = v;
+        }
+    }
+
+    switch(rd_i_writefile(filepath, (const char*)input, len)) {
+        case RD_WRITEFILE_FAIL: {
+            RD_LOG_FAIL("cannot write to '%s'", filepath);
+            ok = false;
+            break;
+        }
+
+        case RD_WRITEFILE_TRUNC: {
+            RD_LOG_FAIL("file '%s' is truncated", filepath);
+            ok = false;
+            break;
+        }
+
+        case RD_WRITEFILE_OK:
+            RD_LOG_INFO("patch input exported to '%s'", filepath);
+            break;
+
+        default: unreachable();
+    }
+
+    rd_free(input);
+    return ok;
+}
+
 bool rd_export(RDContext* self, const char* filepath, RDExportFormat f) {
     switch(f) {
         case RD_EXPORT_DB: {
@@ -83,6 +163,11 @@ bool rd_export(RDContext* self, const char* filepath, RDExportFormat f) {
 
             break;
         }
+
+        case RD_EXPORT_INPUT: return _rd_export_input(self, filepath);
+
+        case RD_EXPORT_INPUT_PATCH:
+            return _rd_export_patched_input(self, filepath);
 
         default: RD_LOG_FAIL("unsupported export format %d", f); break;
     }

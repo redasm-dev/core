@@ -31,6 +31,12 @@ typedef struct RDBaseParams {
     bool with_sign;
 } RDBaseParams;
 
+typedef enum {
+    RD_WRITEFILE_OK = 0,
+    RD_WRITEFILE_FAIL,
+    RD_WRITEFILE_TRUNC,
+} RDWriteFileResult;
+
 int rd_i_address_cmp_pred(const void* a, const void* b);
 int rd_i_address_kcmp_pred(const void* key, const void* item);
 int rd_i_strcmp_pred(const void* a, const void* b);
@@ -39,6 +45,8 @@ int rd_i_strcmp_key_pred(const void* key, const void* s);
 
 RDByteBuffer* rd_i_fromdata(const char* bytes, usize n);
 RDByteBuffer* rd_i_readfile(const char* filepath);
+RDWriteFileResult rd_i_writefile(const char* filepath, const char* data,
+                                 usize n);
 bool rd_i_file_exists(const char* filepath);
 bool rd_i_path_is_writable(const char* path);
 const char* rd_i_strip_prefix(const char* s);

@@ -107,6 +107,20 @@ RDByteBuffer* rd_i_readfile(const char* filepath) {
     return b;
 }
 
+RDWriteFileResult rd_i_writefile(const char* filepath, const char* data,
+                                 usize n) {
+    FILE* fp = fopen(filepath, "wb");
+    if(!fp) return RD_WRITEFILE_FAIL;
+
+    usize written = fwrite(data, sizeof(char), n, fp);
+    fclose(fp);
+    if(written == n) return RD_WRITEFILE_OK;
+
+    remove(filepath); // remove stale file
+    RD_LOG_FAIL("written %zu bytes (expected %zu) file deleted", written, n);
+    return RD_WRITEFILE_TRUNC;
+}
+
 bool rd_i_file_exists(const char* filepath) {
     assert(filepath);
 

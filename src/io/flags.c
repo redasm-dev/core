@@ -9,35 +9,36 @@
 // agnostic flags to be preserved during clears
 static const RDFlags FL_VALUE = 1U << 8;
 static const RDFlags FL_NAME = 1U << 9;
-static const RDFlags FL_NORET = 1U << 10;
-static const RDFlags FL_COMMENT = 1U << 11;
-static const RDFlags FL_XREFOUT = 1U << 12;
-static const RDFlags FL_XREFIN = 1U << 13;
-static const RDFlags FL_EXPORTED = 1U << 14;
-static const RDFlags FL_IMPORTED = 1U << 15;
+static const RDFlags FL_PATCH = 1U << 10;
+static const RDFlags FL_NORET = 1U << 11;
+static const RDFlags FL_COMMENT = 1U << 12;
+static const RDFlags FL_XREFOUT = 1U << 13;
+static const RDFlags FL_XREFIN = 1U << 14;
+static const RDFlags FL_EXPORTED = 1U << 15;
+static const RDFlags FL_IMPORTED = 1U << 16;
 
 // covers bits 0-15 (NOTE: always add the last flag above)
 #define FL_PRESERVE_MASK ((RDFlags)((FL_IMPORTED << 1) - 1))
 #define FL_HAS_INFO ((RDFlags)(FL_PRESERVE_MASK & ~(FL_VALUE | 0xFF)))
 
-static const RDFlags FL_CODE = 1U << 16;
-static const RDFlags FL_DATA = 1U << 17;
-static const RDFlags FL_TAIL = 1U << 18;
+static const RDFlags FL_CODE = 1U << 17;
+static const RDFlags FL_DATA = 1U << 18;
+static const RDFlags FL_TAIL = 1U << 19;
 
 // [CODE] bits
-static const RDFlags FL_FLOW = 1U << 19;
-static const RDFlags FL_JUMP = 1U << 20;
-static const RDFlags FL_JMPDST = 1U << 21;
-static const RDFlags FL_CALL = 1U << 22;
-static const RDFlags FL_FUNC = 1U << 23;
-static const RDFlags FL_COND = 1U << 24;
-static const RDFlags FL_DSLOT = 1U << 25;
-static const RDFlags FL_OPOVER = 1U << 26;
+static const RDFlags FL_FLOW = 1U << 20;
+static const RDFlags FL_JUMP = 1U << 21;
+static const RDFlags FL_JMPDST = 1U << 22;
+static const RDFlags FL_CALL = 1U << 23;
+static const RDFlags FL_FUNC = 1U << 24;
+static const RDFlags FL_COND = 1U << 25;
+static const RDFlags FL_DSLOT = 1U << 26;
+static const RDFlags FL_OPOVER = 1U << 27;
 
 // [DATA] bits
-static const RDFlags FL_TYPE = 1U << 19;
-static const RDFlags FL_FIELD = 1U << 20;
-static const RDFlags FL_ITEM = 1U << 21;
+static const RDFlags FL_TYPE = 1U << 20;
+static const RDFlags FL_FIELD = 1U << 21;
+static const RDFlags FL_ITEM = 1U << 22;
 
 // transient bits
 static const RDFlags FL_QUEUED = 1U << 31; // address is pending in a queue
@@ -51,6 +52,7 @@ bool rd_i_flags_has_code(RDFlags self) { return self & FL_CODE; }
 bool rd_i_flags_has_data(RDFlags self) { return self & FL_DATA; }
 bool rd_i_flags_has_tail(RDFlags self) { return self & FL_TAIL; }
 bool rd_i_flags_has_name(RDFlags self) { return self & FL_NAME; }
+bool rd_i_flags_has_patch(RDFlags self) { return self & FL_PATCH; }
 bool rd_i_flags_has_comment(RDFlags self) { return self & FL_COMMENT; }
 bool rd_i_flags_has_xref_out(RDFlags self) { return self & FL_XREFOUT; }
 bool rd_i_flags_has_xref_in(RDFlags self) { return self & FL_XREFIN; }
@@ -202,6 +204,11 @@ void rd_i_flags_set_name(RDFlags* self) {
     *self |= FL_NAME;
 }
 
+void rd_i_flags_set_patch(RDFlags* self) {
+    assert(rd_i_flags_get_value(*self, NULL));
+    *self |= FL_PATCH;
+}
+
 void rd_i_flags_set_comment(RDFlags* self) {
     assert(!rd_i_flags_has_tail(*self));
     *self |= FL_COMMENT;
@@ -232,6 +239,11 @@ void rd_i_flags_undefine(RDFlags* self) { *self &= FL_PRESERVE_MASK; }
 void rd_i_flags_undefine_name(RDFlags* self) {
     assert(!rd_i_flags_has_tail(*self));
     *self &= ~FL_NAME;
+}
+
+void rd_i_flags_undefine_patch(RDFlags* self) {
+    assert(rd_i_flags_get_value(*self, NULL));
+    *self &= ~FL_PATCH;
 }
 
 void rd_i_flags_undefine_func(RDFlags* self) {

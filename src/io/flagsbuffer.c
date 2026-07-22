@@ -66,6 +66,10 @@ bool rd_flagsbuffer_has_name(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_name(self->data[idx]);
 }
 
+bool rd_flagsbuffer_has_patch(const RDFlagsBuffer* self, usize idx) {
+    return idx < self->base.length && rd_i_flags_has_patch(self->data[idx]);
+}
+
 bool rd_i_flagsbuffer_has_comment(const RDFlagsBuffer* self, usize idx) {
     return idx < self->base.length && rd_i_flags_has_comment(self->data[idx]);
 }
@@ -208,6 +212,17 @@ bool rd_i_flagsbuffer_set_code(RDFlagsBuffer* self, usize idx, usize n) {
     if(n && (idx + n <= self->base.length)) {
         rd_i_flags_set_code(&self->data[idx]);
         rd_i_flagsbuffer_set_tail(self, idx + 1, n - 1);
+        return true;
+    }
+
+    return false;
+}
+
+bool rd_i_flagsbuffer_set_patch(RDFlagsBuffer* self, usize idx, usize n) {
+    if(idx + n <= self->base.length) {
+        for(usize i = 0; i < n; i++)
+            rd_i_flags_set_patch(&self->data[idx + i]);
+
         return true;
     }
 
@@ -406,14 +421,22 @@ usize rd_i_flagsbuffer_get_range_length(const RDFlagsBuffer* self, usize idx) {
     return end - start;
 }
 
-void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize startidx, usize n) {
-    usize endidx = startidx + n;
+void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize idx, usize n) {
+    usize endidx = idx + n;
     if(endidx > self->base.length) endidx = self->base.length;
 
-    rd_i_flagsbuffer_expand_range(self, &startidx, &endidx);
+    rd_i_flagsbuffer_expand_range(self, &idx, &endidx);
 
-    for(usize idx = startidx; idx < endidx; idx++)
-        rd_i_flags_undefine(&self->data[idx]);
+    for(usize i = idx; i < endidx; i++)
+        rd_i_flags_undefine(&self->data[i]);
+}
+
+void rd_i_flagsbuffer_undefine_patch(RDFlagsBuffer* self, usize idx, usize n) {
+    usize endidx = idx + n;
+    if(endidx > self->base.length) endidx = self->base.length;
+
+    for(usize i = idx; i < endidx; i++)
+        rd_i_flags_undefine_patch(&self->data[i]);
 }
 
 bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx) {

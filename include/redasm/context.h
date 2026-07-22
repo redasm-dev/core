@@ -41,6 +41,8 @@ typedef enum {
 
 typedef enum {
     RD_EXPORT_DB = 0,
+    RD_EXPORT_INPUT,
+    RD_EXPORT_INPUT_PATCH,
 } RDExportFormat;
 
 typedef struct RDProblem {
@@ -215,5 +217,6 @@ RD_API bool rd_write_be16(RDContext* self, RDAddress address, u16 v);
 RD_API bool rd_write_be32(RDContext* self, RDAddress address, u32 v);
 RD_API bool rd_write_be64(RDContext* self, RDAddress address, u64 v);
 RD_API usize rd_write(RDContext* self, RDAddress address, const void* data, usize n);
+RD_API usize rd_patch(RDContext* self, RDAddress address, const void* data, usize n);
 RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
 // clang-format on

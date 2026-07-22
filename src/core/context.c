@@ -874,6 +874,21 @@ usize rd_write(RDContext* self, RDAddress address, const void* data, usize n) {
     return rd_i_buffer_write((RDBuffer*)s->flags, idx, data, n);
 }
 
+usize rd_patch(RDContext* self, RDAddress address, const void* data, usize n) {
+    usize res = rd_write(self, address, data, n);
+
+    if(res > 0) {
+        const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+        panic_if(!s, "invalid segment");
+
+        usize idx = rd_i_address2index(s, address);
+        bool ok = rd_i_flagsbuffer_set_patch(s->flags, idx, res);
+        panic_if(!ok, "error applying patch");
+    }
+
+    return res;
+}
+
 bool rd_fill(RDContext* self, RDAddress address, usize n) {
     const RDSegmentFull* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
@@ -1429,7 +1444,7 @@ bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
         goto fail;
     }
 
-    if(!rd_write(self, address, rd_scratch_data(buf), len)) {
+    if(!rd_patch(self, address, rd_scratch_data(buf), len)) {
         RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIx64, len, address);
         goto fail;
     }
@@ -1457,7 +1472,7 @@ bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
         }
 
         while(remaining >= noplen) {
-            if(!rd_write(self, address, rd_scratch_data(buf), noplen)) {
+            if(!rd_patch(self, address, rd_scratch_data(buf), noplen)) {
                 RD_LOG_FAIL("failed to write NOP at %" PRIx64, address);
                 goto fail;
             }
