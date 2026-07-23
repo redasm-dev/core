@@ -102,8 +102,15 @@ RDByteBuffer* rd_i_readfile(const char* filepath) {
     RDByteBuffer* b = rd_i_buffer_create((usize)ftell(fp));
     fseek(fp, 0, SEEK_SET);
 
-    fread(b->data, 1, b->base.length, fp);
+    usize n = fread(b->data, 1, b->base.length, fp);
     fclose(fp);
+
+    if(n != b->base.length) {
+        RD_LOG_FAIL("read %zu bytes, expected %zu", n, b->base.length);
+        rd_i_buffer_destroy((RDBuffer*)b);
+        return NULL;
+    }
+
     return b;
 }
 
