@@ -2,12 +2,6 @@
 #include "kb/object.h"
 #include "support/tomlschema.h"
 
-static const char* rd_kb_kind_compound_values[] = {
-    "struct",
-    "union",
-    NULL,
-};
-
 static const char* rd_kb_mod_values[] = {
     "ptr",
     "cptr",
@@ -35,11 +29,6 @@ static const RDTomlSchema RD_KB_SCHEMA_PARAM[] = {
 };
 
 static const RDTomlSchema RD_KB_SCHEMA_COMPOUND[] = {
-    {
-        .key = "kind",
-        .type = TOML_STRING,
-        .string_values = rd_kb_kind_compound_values,
-    },
     {.key = "members", .type = TOML_ARRAY, .array_type = RD_KB_SCHEMA_PARAM},
     {0},
 };

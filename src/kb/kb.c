@@ -192,8 +192,9 @@ static void _rd_kb_load_dependencies(const RDKBObject* root, RDContext* ctx) {
     }
 }
 
-static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* types = rd_kbobject_get_table(root, "types");
+static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx,
+                                 const char* kind) {
+    const RDKBObject* types = rd_kbobject_get_table(root, kind);
     if(!types) return false;
 
     const char* name;
@@ -465,7 +466,8 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     _rd_kb_load_dependencies(kbfile->root, ctx);
 
     RD_LOG_INFO("loading KB '%s'", kb);
-    _rd_kb_load_compound(kbfile->root, ctx);
+    _rd_kb_load_compound(kbfile->root, ctx, "unions");
+    _rd_kb_load_compound(kbfile->root, ctx, "structs");
     _rd_kb_load_enums(kbfile->root, ctx);
     _rd_kb_load_functions(kbfile->root, ctx);
     _rd_kb_load_ordinals(kbfile->root, ctx);
