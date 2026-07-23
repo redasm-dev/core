@@ -93,7 +93,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         SQLite3::SQLite3
         tomlc17
-        miniz
+        miniz::miniz
 )
 
 include(cmake/Version.cmake)
