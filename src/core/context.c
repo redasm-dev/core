@@ -410,7 +410,7 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
     if(!seg) goto done;
 
     r = rd_i_renderer_create(self, RD_RF_TEXT);
-    rd_i_render_item(r, seg, rd_i_address2index(seg, address), 0);
+    rd_i_render_item_any(r, seg, rd_i_address2index(seg, address));
     rd_i_renderer_swap(r);
     rd_i_renderer_write_text(r, &self->str_buf);
     rd_i_renderer_destroy(r);

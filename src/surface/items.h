@@ -21,3 +21,6 @@ bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
 
 RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
                                     usize idx, usize sub_line);
+
+RDRenderItemResult rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg,
+                                        usize idx);

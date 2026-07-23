@@ -644,3 +644,13 @@ RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
 
     unreachable();
 }
+
+RDRenderItemResult rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg,
+                                        usize idx) {
+    usize sub_line = 0;
+
+    if(rd_flagsbuffer_has_code(seg->flags, idx))
+        sub_line = rd_i_row_code_instr_sub_line(seg, idx);
+
+    return rd_i_render_item(r, seg, idx, sub_line);
+}
