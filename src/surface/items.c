@@ -423,9 +423,13 @@ static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
     if(sub_line == slot) {
         rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
 
+        usize lead = (seg->base.start_address + idx) % RD_SURFACE_HEX_LINE;
+        if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
+
+        // hex part
         while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
-            if((curridx - idx) == RD_SURFACE_HEX_LINE) break;
             if(!rd_flagsbuffer_has_unknown(seg->flags, curridx)) break;
+            if(curridx != idx && rd_i_is_hexchunk_head(seg, curridx)) break;
 
             u8 v;
             if(rd_flagsbuffer_get_value(seg->flags, curridx, &v))
@@ -438,12 +442,14 @@ static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
         }
 
         usize n = curridx - idx;
-
-        if(n < RD_SURFACE_HEX_LINE)
-            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - n) * 3);
+        if(lead + n < RD_SURFACE_HEX_LINE)
+            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - lead - n) * 3);
 
         curridx = idx;
 
+        if(lead) rd_renderer_ws(r, lead); // ascii column: 1 char per byte
+
+        // ascii part
         for(usize i = 0; i < n; i++, curridx++) {
             char ptr[2] = {0};
             if(rd_flagsbuffer_get_value(seg->flags, curridx, (u8*)&ptr))
@@ -452,7 +458,9 @@ static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
                 rd_renderer_muted(r, "?");
         }
 
-        if(n < RD_SURFACE_HEX_LINE) rd_renderer_ws(r, RD_SURFACE_HEX_LINE - n);
+        if(lead + n < RD_SURFACE_HEX_LINE)
+            rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - n);
+
         return (RDRenderItemResult){
             .status = RD_ROW_OK,
             .length = curridx - idx,
@@ -580,6 +588,24 @@ bool rd_i_render_segment_item(RDRenderer* r, const RDSegmentFull* seg) {
     }
 
     return true;
+}
+
+/*
+ * A hex chunk head is the first byte of an unknown run, a byte
+ * on a hex-line boundary, or a labeled byte.
+ * All three are decidable from the byte and its predecessor, so the backward
+ * walk is bounded by one line and chunk boundaries never depend on where
+ * rendering started.
+ */
+bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx) {
+    if(!rd_flagsbuffer_has_unknown(seg->flags, idx)) return false;
+    if(idx == 0) return true;
+    if(!rd_flagsbuffer_has_unknown(seg->flags, idx - 1)) return true;
+
+    if(((seg->base.start_address + idx) % RD_SURFACE_HEX_LINE) == 0)
+        return true;
+
+    return rd_i_flagsbuffer_has_info(seg->flags, idx);
 }
 
 void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,

@@ -18,6 +18,7 @@ void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
                         RDDataHead* out);
 bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
                          RDResolveResult* out);
+bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx);
 
 RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
                                     usize idx, usize sub_line);

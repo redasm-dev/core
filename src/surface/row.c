@@ -132,22 +132,8 @@ bool rd_i_row_step_back(RDContext* ctx, const RDSegmentFull** seg,
     (*idx)--;
 
     if(rd_flagsbuffer_has_unknown((*seg)->flags, *idx)) {
-        /*
-         * mirror of _rd_render_item_unknown's chunking, keep in lockstep.
-         * A chunk head is: a segment relative alignment boundary, the
-         * first byte of an unknown run, or a labeled byte.
-         * All three are recomputable locally, so the walk is bounded
-         * by one hex line
-         */
-        while(*idx > 0) {
-            bool is_chunk_head =
-                (*idx % RD_SURFACE_HEX_LINE) == 0 ||
-                rd_i_flagsbuffer_has_info((*seg)->flags, *idx) ||
-                !rd_flagsbuffer_has_unknown((*seg)->flags, *idx - 1);
-
-            if(is_chunk_head) break;
+        while(*idx > 0 && !rd_i_is_hexchunk_head(*seg, *idx))
             (*idx)--;
-        }
     }
     else if(rd_flagsbuffer_has_tail((*seg)->flags, *idx)) {
         while(*idx > 0 && rd_flagsbuffer_has_tail((*seg)->flags, *idx))
