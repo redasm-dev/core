@@ -16,7 +16,7 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
 
     // clang-format off
     str_append(v, "[format]\n");
-    str_append(v, rd_i_format(&buf, "version = %d\n", RD_PROJECT_VERSION));
+    str_append(v, rd_i_format(&buf, "version = \"%s\"\n", rd_version_string()));
     str_append(v, "flags_compression = \"deflate\"\n");
     str_append(v, rd_i_format(&buf, "file_name = \"%s\"\n", ctx->file_name));
 

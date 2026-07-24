@@ -4,13 +4,14 @@
 #include "project.h"
 #include "support/containers.h"
 #include "support/tomlschema.h"
+#include "version.h"
 #include <inttypes.h>
 #include <miniz.h>
 #include <redasm/support/logging.h>
 #include <tomlc17.h>
 
 typedef struct RDProjectManifest {
-    int64_t version;
+    RDVersion version;
     const char* file_name;
 
     const RDLoaderPlugin* loaderplugin;
@@ -48,7 +49,7 @@ static const RDTomlSchema ANALYZER_SCHEMA[] = {
 };
 
 static const RDTomlSchema MANIFEST_SCHEMA[] = {
-    {.key = "format.version", .type = TOML_INT64},
+    {.key = "format.version", .type = TOML_STRING},
     {.key = "format.flags_compression", .type = TOML_STRING, .string_values = flags_compression_schema},
     {.key = "format.file_name", .type = TOML_STRING},
 
@@ -138,11 +139,17 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     if(!rd_i_toml_validate_schema(out->toml.toptab, MANIFEST_SCHEMA))
         return false;
 
-    out->version = toml_seek(out->toml.toptab, "format.version").u.int64;
+    const char* ver = toml_seek(out->toml.toptab, "format.version").u.s;
 
-    if(out->version != RD_PROJECT_VERSION) {
-        RD_LOG_FAIL("expected %d as project version, got %" PRId64,
-                    RD_PROJECT_VERSION, out->version);
+    if(!rd_i_version_parse(ver, &out->version)) {
+        RD_LOG_FAIL("invalid formatting for version '%s'", ver);
+        return false;
+    }
+
+    // NOTE: retain project compatibility between major?
+    if(out->version.major != rd_version().major) {
+        RD_LOG_FAIL("expected %s as project version, got %s",
+                    rd_version_string(), ver);
         return false;
     }
 

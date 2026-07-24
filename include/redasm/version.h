@@ -4,5 +4,13 @@
 
 #define RD_API_LEVEL 1
 
-RD_API const char* rd_version(void);
-RD_API const char* rd_build_version(void);
+typedef struct RDVersion {
+    int major;
+    int minor;
+    int rev;
+    const char* suffix;
+} RDVersion;
+
+RD_API RDVersion rd_version(void);
+RD_API const char* rd_version_string(void);
+RD_API const char* rd_version_build(void);
