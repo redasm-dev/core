@@ -242,6 +242,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
     if(!ctx) return NULL;
 
+    ctx->min_string = manifest->min_string;
     rd_i_db_load_segments(ctx);
 
     RDCharVect buf = {0};
