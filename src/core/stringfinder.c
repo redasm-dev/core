@@ -44,6 +44,8 @@ static void _rd_i_strings_init(void) {
 }
 
 static bool _rd_strings_check_format(const char* s, int len) {
+    assert(len > 0);
+
     for(unsigned int i = 0; i < RD_N_FORMATS; i++) {
         int fmtlen = (int)strlen(RD_C_FORMATS[i]);
         if(fmtlen == len && !strncmp(s, RD_C_FORMATS[i], (usize)fmtlen))
@@ -57,12 +59,12 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
                                      usize idx, const char* type,
                                      const RDCharVect* str,
                                      RDCharVect* fmt_buf) {
-    int len = (int)vect_length(str) - 1;
+    int len = (int)vect_length(str) - 1; // strip null terminator
 
     if(!strcmp(type, "char")) { // C-style strings valid only for ASCII
-        bool valid =
-            (*str->data == '%' && _rd_strings_check_format(str->data, len)) ||
-            len >= ctx->min_string;
+        bool valid = (len > 0 && (*vect_first(str) == '%' &&
+                                  _rd_strings_check_format(str->data, len))) ||
+                     len >= ctx->min_string;
 
         if(!valid) return;
     }
@@ -90,6 +92,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
 
         for(usize idx = 0; idx < flags->base.length; idx++) {
             u8 v = 0;
+
             bool skip = rd_flagsbuffer_has_code(flags, idx) ||
                         rd_flagsbuffer_has_tail(flags, idx) ||
                         rd_flagsbuffer_has_field(flags, idx) ||
@@ -102,7 +105,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
             }
 
             if(v == 0) {
-                vect_push(str, 0);
+                vect_push(str, 0); // add null terminator
                 _rd_strings_try_classify(ctx, seg, startidx, "char", str,
                                          fmt_buf);
                 vect_clear(str);
@@ -159,7 +162,7 @@ static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
             }
 
             if(lo == 0x00 && hi == 0x00) {
-                vect_push(str, 0);
+                vect_push(str, 0); // add null terminator
                 _rd_strings_try_classify(ctx, seg, startidx, "char16", str,
                                          fmt_buf);
                 vect_clear(str);
