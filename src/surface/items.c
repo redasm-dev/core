@@ -280,16 +280,16 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
     const RDProcessorPlugin* p = r->context->processorplugin;
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 4);
 
+    // RDFunction may be NULL (eg. during intermediate state analysis)
     const RDFunction* f = rd_i_find_function(r->context, address);
-    panic_if(!f, "function not found @ %x", address);
 
-    if(p->render_function) {
+    if(f && p->render_function) {
         p->render_function(r, f, r->context->processor);
         return;
     }
 
     _rd_render_modifiers(r, address, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    const char* func_str = rd_i_function_to_str(f, r->context);
+    const char* func_str = f ? rd_i_function_to_str(f, r->context) : NULL;
 
     if(func_str) {
         rd_renderer_text(r, func_str, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
@@ -304,7 +304,7 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
     rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
     rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
 
-    if(rd_function_is_noret(f)) {
+    if(f && rd_function_is_noret(f)) {
         rd_renderer_text(r, " noreturn", RD_THEME_FUNCTION,
                          RD_THEME_BACKGROUND);
     }
