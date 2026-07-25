@@ -168,11 +168,7 @@ static void _rd_worker_dedup_names(RDContext* ctx) {
     vect_clear(&ctx->pending_renames);
 }
 
-static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
-    // rd_i_listing_build(ctx); // Show pre-analysis listing
-    if(status) status->is_listing_changed = true;
-    ctx->engine.step++;
-}
+static void _rd_worker_step_init(RDContext* ctx) { ctx->engine.step++; }
 
 static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
     if(!ctx->engine.emulate_start) ctx->engine.emulate_start = clock();
@@ -223,7 +219,7 @@ static void _rd_worker_step_mergedata(RDContext* ctx) {
     ctx->engine.step++;
 }
 
-static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
+static void _rd_worker_step_finalize(RDContext* ctx) {
     _rd_worker_rebuild_functions(ctx);
     _rd_worker_follow_pointers(ctx);
     _rd_worker_resolve_ordinals(ctx);
@@ -231,11 +227,9 @@ static void _rd_worker_step_finalize(RDContext* ctx, RDWorkerStatus* status) {
     rd_i_autorename(ctx);
     _rd_worker_apply_function_types(ctx);
     _rd_worker_apply_noret(ctx);
-    // rd_i_listing_build(ctx);
     rd_fire_hook(ctx, "redasm.finalized");
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
 
-    if(status) status->is_listing_changed = true;
     ctx->engine.step++;
 
     // post-analysis summary
@@ -253,7 +247,6 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
         status->is_busy = is_busy;
         status->step = RD_STEP_NAMES[self->engine.step];
         status->segment = (const RDSegment*)self->engine.segment;
-        status->is_listing_changed = false;
         status->pending_calls = queue_length(&self->engine.qcall);
         status->pending_jumps = queue_length(&self->engine.qjump);
         optional_unset(&status->address);
@@ -261,7 +254,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 
     if(is_busy) {
         switch(self->engine.step) {
-            case RD_WS_INIT: _rd_worker_step_init(self, status); break;
+            case RD_WS_INIT: _rd_worker_step_init(self); break;
 
             case RD_WS_EMULATE1:
             case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
@@ -272,12 +265,21 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
             case RD_WS_MERGEDATA1:
             case RD_WS_MERGEDATA2: _rd_worker_step_mergedata(self); break;
 
-            case RD_WS_FINALIZE: _rd_worker_step_finalize(self, status); break;
+            case RD_WS_FINALIZE: _rd_worker_step_finalize(self); break;
             default: unreachable();
         }
     }
 
     return is_busy;
+}
+
+bool rd_reanalyze(RDContext* self) {
+    if(self->engine.step > RD_WS_EMULATE2) {
+        self->engine.step = RD_WS_EMULATE2;
+        return true;
+    }
+
+    return false;
 }
 
 void rd_disassemble(RDContext* ctx) {

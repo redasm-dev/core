@@ -68,7 +68,6 @@ typedef struct RDProblemSlice {
 } RDProblemSlice;
 
 typedef struct RDWorkerStatus {
-    bool is_listing_changed;
     bool is_busy;
     const char* step;
     const RDSegment* segment;
