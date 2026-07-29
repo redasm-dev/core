@@ -48,6 +48,7 @@ RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
             },
 
         .flags = rd_i_flagsbuffer_create(endaddr - addr),
+        .ovl_flags = rd_alloc0(endaddr - addr, sizeof(*s->ovl_flags)),
     };
 
     return s;
@@ -55,5 +56,21 @@ RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
 
 void rd_i_segment_destroy(RDSegmentFull* self) {
     rd_i_buffer_destroy((RDBuffer*)self->flags);
+    rd_free(self->ovl_flags);
     rd_free(self);
+}
+
+void rd_i_segment_set_queued(const RDSegmentFull* self, usize idx) {
+    usize n = self->base.end_address - self->base.start_address;
+    if(idx < n) self->ovl_flags[idx] |= OFL_QUEUED;
+}
+
+bool rd_i_segment_has_queued(const RDSegmentFull* self, usize idx) {
+    usize n = self->base.end_address - self->base.start_address;
+    return idx < n ? self->ovl_flags[idx] & OFL_QUEUED : false;
+}
+
+void rd_i_segment_clear_queued(const RDSegmentFull* self, usize idx) {
+    usize n = self->base.end_address - self->base.start_address;
+    if(idx < n) self->ovl_flags[idx] &= (u8)~OFL_QUEUED;
 }

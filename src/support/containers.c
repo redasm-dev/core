@@ -90,6 +90,16 @@ void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
     }
 }
 
+void _vect_del(void* data, size_t* length, size_t idx, size_t n,
+               size_t elem_size) {
+    assert(idx + n <= *length && "_vect_del: out of bounds");
+
+    char* p = (char*)data;
+    memmove(p + (idx * elem_size), p + ((idx + n) * elem_size),
+            (*length - idx - n) * elem_size);
+    *length -= n;
+}
+
 void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
                   VectDelIf cb) {
     char* p = (char*)data;

@@ -48,10 +48,9 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_del(self, i, n)                                                   \
     do {                                                                       \
-        assert((i) + (n) <= (self)->length && "vect_del_at: out of bounds");   \
-        memmove(&(self)->data[(i)], &(self)->data[(i) + (n)],                  \
-                ((self)->length - (i) - (n)) * sizeof(*(self)->data));         \
-        (self)->length -= (n);                                                 \
+        assert((i) + (n) <= (self)->length && "vect_del: out of bounds");      \
+        _vect_del((void*)(self)->data, &(self)->length, (i), (n),              \
+                  sizeof(*(self)->data));                                      \
     } while(0)
 
 #define vect_at(self, n)                                                       \
@@ -201,6 +200,10 @@ typedef bool (*VectPredicate)(const void*);
 #define queue_length(self) ((self)->length)
 #define queue_is_empty(self) ((self)->length == 0)
 
+#define queue_at(self, n)                                                      \
+    (assert((usize)(n) < (self)->length && "queue_at: index out of bounds"),   \
+     &(self)->data[(self)->head + (n)])
+
 #define queue_peek_first(self)                                                 \
     (assert(!queue_is_empty(self)), (self)->data[(self)->head])
 
@@ -223,6 +226,18 @@ typedef bool (*VectPredicate)(const void*);
         (self)->head++;                                                        \
         (self)->length--;                                                      \
     } while(0)
+
+#define queue_discard(self)                                                    \
+    do {                                                                       \
+        assert(!queue_is_empty(self));                                         \
+        (self)->head++;                                                        \
+        (self)->length--;                                                      \
+    } while(0)
+
+#define queue_each(it, self)                                                   \
+    for((it) = (self)->data + (self)->head;                                    \
+        (self)->data && ((it) < (self)->data + (self)->head + (self)->length); \
+        (it)++)
 
 #define queue_reserve(self, n)                                                 \
     _queue_reserve((void**)&(self)->data, &(self)->capacity, (n),              \
@@ -334,6 +349,8 @@ void _str_append(char** data, size_t* cap, size_t* len, const char* cstr,
                  size_t slen);
 void _str_push(char** data, size_t* cap, size_t* len, char c);
 void _vect_ins(void** data, size_t* capacity, size_t length, size_t idx,
+               size_t elem_size);
+void _vect_del(void* data, size_t* length, size_t idx, size_t n,
                size_t elem_size);
 void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
                   VectDelIf cb);

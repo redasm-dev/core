@@ -87,6 +87,7 @@ typedef struct RDContext {
     struct {
         const RDSegmentFull* segment;
         RDDelaySlotInfo dslot_info;
+        RDEngineQueue qdirty;
         RDEngineQueue qjump;
         RDEngineQueue qcall;
         RDEngineItem current;
@@ -106,6 +107,9 @@ static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
                                          RDAddress addr) {
     return addr >= seg->base.start_address && addr < seg->base.end_address;
 }
+
+void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
+                       usize* end);
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
                                const RDProcessorPlugin* pplugin,
@@ -127,6 +131,7 @@ bool rd_i_set_external(RDContext* self, const RDExternal* ext);
 bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c);
 bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
                      RDConfidence c);
+void rd_i_clear_n(RDContext* self, RDAddress address, usize n);
 
 const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
                                       RDXRefType type);

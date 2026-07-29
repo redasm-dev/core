@@ -3,6 +3,7 @@
 // clang-format off
 typedef enum {
     RD_WS_INIT = 0,
+    RD_WS_RECONCILE,
 
     // 1st pass
     RD_WS_EMULATE1, RD_WS_ANALYZE1, 

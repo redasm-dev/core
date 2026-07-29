@@ -22,7 +22,7 @@ static bool _rd_reg_getmask(RDContext* ctx, const char* regname, RDRegMask* m) {
         if(!ctx->processorplugin->get_reg_mask(regname, m, ctx->processor))
             return false;
 
-        return ctx->processorplugin->get_reg_name(m->reg, ctx->processor);
+        return rd_get_reg_name(ctx, m->reg);
     }
 
     return false;
@@ -39,10 +39,7 @@ bool rd_set_regval(RDContext* ctx, const char* regname, u64 value) {
     if(!regname) return false;
 
     RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(_rd_reg_getmask(ctx, regname, &m))
-        regname = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
-
+    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
     if(!regname) return false;
 
     RDRegister r = {
@@ -72,8 +69,7 @@ bool rd_get_regval(RDContext* ctx, const char* regname, RDRegValue* value) {
 
     RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
 
-    if(_rd_reg_getmask(ctx, regname, &m))
-        regname = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
 
     if(!regname) return false;
 
@@ -93,8 +89,7 @@ bool rd_del_regval(RDContext* ctx, const char* regname) {
 
     RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
 
-    if(_rd_reg_getmask(ctx, regname, &m))
-        regname = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
 
     if(!regname) return false;
 
@@ -107,26 +102,17 @@ bool rd_del_regval(RDContext* ctx, const char* regname) {
 }
 
 bool rd_set_regval_id(RDContext* ctx, RDReg id, RDRegValue value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_set_regval(ctx, regname, value);
 }
 
 bool rd_get_regval_id(RDContext* ctx, RDReg id, RDRegValue* value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_get_regval(ctx, regname, value);
 }
 
 bool rd_del_regval_id(RDContext* ctx, RDReg id) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_del_regval(ctx, regname);
 }
 
@@ -170,61 +156,40 @@ bool rd_get_sregval(RDContext* ctx, RDAddress address, const char* regname,
 
 bool rd_auto_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                         RDRegValue value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_auto_sregval(ctx, address, regname, value);
 }
 
 bool rd_library_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                            RDRegValue value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_library_sregval(ctx, address, regname, value);
 }
 
 bool rd_user_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                         RDRegValue value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_user_sregval(ctx, address, regname, value);
 }
 
 bool rd_del_auto_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_del_auto_sregval(ctx, address, regname);
 }
 
 bool rd_del_library_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_del_library_sregval(ctx, address, regname);
 }
 
 bool rd_del_user_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_del_user_sregval(ctx, address, regname);
 }
 
 bool rd_get_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                        RDRegValue* value) {
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_get_sregval(ctx, address, regname, value);
 }
 

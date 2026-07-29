@@ -7,6 +7,8 @@ typedef enum {
     RD_CONFIDENCE_AUTO,
     RD_CONFIDENCE_LIBRARY,
     RD_CONFIDENCE_USER,
+
+    RD_CONFIDENCE_MAX, // internal use
 } RDConfidence;
 
 #define RD_UNUSED(x) (void)(x)

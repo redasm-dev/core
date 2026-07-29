@@ -52,7 +52,7 @@ static bool _rd_surface_render(RDSurface* self, usize seg_idx, usize idx,
 
         // fixup to head
         if(rd_flagsbuffer_has_tail(seg->flags, idx))
-            rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+            rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
         if(sub_line == RD_SUB_LINE_NONE) {
             // the segment banner is owed only at the segment's first byte.
@@ -353,7 +353,7 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
 
     usize idx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, idx))
-        rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+        rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
     RDAddress head = seg->base.start_address + idx;
 

@@ -7,10 +7,15 @@ typedef struct RDHookItem {
     RDHook hook;
 } RDHookItem;
 
-typedef struct RDInstructionHookItem {
+typedef struct RDDecodeHookItem {
     const char* name;
-    RDInstructionHook hook;
-} RDInstructionHookItem;
+    RDDecodeHook hook;
+} RDDecodeHookItem;
+
+typedef struct RDEmulateHookItem {
+    const char* name;
+    RDEmulateHook hook;
+} RDEmulateHookItem;
 
 typedef struct RDAddressHookItem {
     const char* name;
@@ -41,10 +46,16 @@ typedef struct RDHooks {
     } general;
 
     struct {
-        RDInstructionHookItem* data;
+        RDDecodeHookItem* data;
         usize length;
         usize capacity;
-    } instruction;
+    } decode;
+
+    struct {
+        RDEmulateHookItem* data;
+        usize length;
+        usize capacity;
+    } emulate;
 
     struct {
         RDAddressHookItem* data;

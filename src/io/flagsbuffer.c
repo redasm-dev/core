@@ -397,7 +397,7 @@ bool rd_i_flagsbuffer_set_exported(RDFlagsBuffer* self, usize idx) {
     return false;
 }
 
-void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
+void rd_i_flagsbuffer_expand_tails(const RDFlagsBuffer* self, usize* start,
                                    usize* end) {
     if(start) {
         while(*start > 0 && rd_i_flags_has_tail(self->data[*start]))
@@ -417,107 +417,90 @@ RDFlags rd_i_flagsbuffer_get(const RDFlagsBuffer* self, usize idx) {
 
 usize rd_i_flagsbuffer_get_range_length(const RDFlagsBuffer* self, usize idx) {
     usize start = idx, end = idx + 1;
-    rd_i_flagsbuffer_expand_range(self, &start, &end);
+    rd_i_flagsbuffer_expand_tails(self, &start, &end);
     return end - start;
 }
 
-void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize idx, usize n) {
-    usize endidx = idx + n;
+void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize startidx,
+                               usize endidx) {
     if(endidx > self->base.length) endidx = self->base.length;
 
-    rd_i_flagsbuffer_expand_range(self, &idx, &endidx);
-
-    for(usize i = idx; i < endidx; i++)
+    for(usize i = startidx; i < endidx; i++)
         rd_i_flags_undefine(&self->data[i]);
 }
 
-void rd_i_flagsbuffer_undefine_patch(RDFlagsBuffer* self, usize idx, usize n) {
+void rd_i_flagsbuffer_clear(RDFlagsBuffer* self, usize startidx, usize endidx) {
+    if(endidx > self->base.length) endidx = self->base.length;
+
+    for(usize i = startidx; i < endidx; i++)
+        rd_i_flags_clear(&self->data[i]);
+}
+
+void rd_i_flagsbuffer_clear_patch(RDFlagsBuffer* self, usize idx, usize n) {
     usize endidx = idx + n;
     if(endidx > self->base.length) endidx = self->base.length;
 
     for(usize i = idx; i < endidx; i++)
-        rd_i_flags_undefine_patch(&self->data[i]);
+        rd_i_flags_clear_patch(&self->data[i]);
 }
 
-bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_name(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_name(&self->data[idx]);
+        rd_i_flags_clear_name(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_func(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_func(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_func(&self->data[idx]);
+        rd_i_flags_clear_func(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_comment(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_comment(&self->data[idx]);
+        rd_i_flags_clear_comment(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_xref_out(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_xref_out(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_xref_out(&self->data[idx]);
+        rd_i_flags_clear_xref_out(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_xref_in(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_xref_in(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_xref_in(&self->data[idx]);
+        rd_i_flags_clear_xref_in(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_flow(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_flow(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_flow(&self->data[idx]);
+        rd_i_flags_clear_flow(&self->data[idx]);
         return true;
     }
 
     return false;
 }
 
-bool rd_i_flagsbuffer_undefine_op_over(RDFlagsBuffer* self, usize idx) {
+bool rd_i_flagsbuffer_clear_op_over(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
-        rd_i_flags_undefine_op_over(&self->data[idx]);
-        return true;
-    }
-
-    return false;
-}
-
-bool rd_i_flagsbuffer_set_queued(RDFlagsBuffer* self, usize idx) {
-    if(idx < self->base.length) {
-        rd_i_flags_set_queued(&self->data[idx]);
-        return true;
-    }
-
-    return false;
-}
-
-bool rd_i_flagsbuffer_has_queued(const RDFlagsBuffer* self, usize idx) {
-    return idx < self->base.length && rd_i_flags_has_queued(self->data[idx]);
-}
-
-bool rd_i_flagsbuffer_undefine_queued(RDFlagsBuffer* self, usize idx) {
-    if(idx < self->base.length) {
-        rd_i_flags_undefine_queued(&self->data[idx]);
+        rd_i_flags_clear_op_over(&self->data[idx]);
         return true;
     }
 

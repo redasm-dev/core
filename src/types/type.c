@@ -259,7 +259,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 
     usize idx = rd_i_address2index(seg, address);
     usize startidx_exp = idx, endidx_exp = startidx_exp + sz;
-    rd_i_flagsbuffer_expand_range(seg->flags, &startidx_exp, &endidx_exp);
+    rd_i_expand_range(ctx, seg, &startidx_exp, &endidx_exp);
 
     if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
                                    endidx_exp - startidx_exp))
@@ -269,6 +269,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 
     rd_i_type_unroll(ctx, address, &t);
     rd_i_db_set_type(ctx, address, &t, c);
+    rd_i_engine_mark_dirty(ctx);
     return true;
 }
 

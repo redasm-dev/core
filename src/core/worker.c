@@ -3,6 +3,7 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
+#include "io/flagsbuffer.h"
 #include "plugins/analyzer.h"
 #include "support/containers.h"
 #include "support/error.h"
@@ -11,6 +12,7 @@
 // clang-format off
 static const char* const RD_STEP_NAMES[] = {
     "Init",
+    "Reconcile",
     "Emulate #1", "Analyze #1", 
     "Merge Data #1",
     "Emulate #2","Analyze #2", 
@@ -33,32 +35,18 @@ static int _rd_worker_problem_cmp(const void* a, const void* b) {
 
 static void _rd_worker_rebuild_functions(RDContext* ctx) {
     RD_LOG_INFO("generating functions");
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
-    RDFunctionVect functions = {0};
-    vect_reserve(&functions, vect_capacity(&ctx->functions));
-    vect_reserve(&functions.chunks, vect_capacity(&ctx->functions.chunks));
+    RDFunctionChunkVect chunks = {0};
+    vect_reserve(&chunks, vect_capacity(&ctx->functions.chunks));
 
-    RDSegmentFull** it;
-    vect_each(it, segments) {
-        const RDSegmentFull* s = *it;
-        if(!(s->base.perm & RD_SP_X)) continue;
-
-        RDAddress address = s->base.start_address;
-
-        for(usize i = 0; i < rd_flagsbuffer_get_length(s->flags);
-            i++, address++) {
-            if(!rd_flagsbuffer_has_func(s->flags, i)) continue;
-
-            RDFunction* f = rd_i_function_create(ctx, address);
-            rd_i_function_rebuild_graph(f, &functions.chunks);
-            vect_push(&functions, f);
-        }
+    RDFunction** it;
+    vect_each(it, &ctx->functions) {
+        rd_i_function_rebuild_graph(*it, &chunks);
     }
 
-    rd_i_functionchunk_sort(&functions.chunks);
-    mem_swap(RDFunctionVect, &functions, &ctx->functions);
-    rd_i_functionvect_destroy(&functions);
+    rd_i_functionchunk_sort(&chunks);
+    mem_swap(RDFunctionChunkVect, &ctx->functions.chunks, &chunks);
+    rd_i_functionchunk_destroy(&chunks);
 }
 
 static void _rd_worker_follow_pointers(RDContext* ctx) {
@@ -168,7 +156,55 @@ static void _rd_worker_dedup_names(RDContext* ctx) {
     vect_clear(&ctx->pending_renames);
 }
 
+static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegmentFull* seg,
+                                      usize start, usize end) {
+    RDAddress curr = seg->base.start_address + start;
+
+    for(usize i = start; i < end; i++, curr++) {
+        if(!rd_i_flagsbuffer_has_xref_out(seg->flags, i)) continue;
+
+        const RDXRefVect* refs =
+            rd_i_get_xrefs_from_ex(ctx, curr, RD_XR_NONE, &ctx->und_xrefs);
+
+        const RDXRef* r;
+        vect_each(r, refs)
+            rd_i_del_xref(ctx, curr, r->address, RD_CONFIDENCE_MAX);
+    }
+}
+
 static void _rd_worker_step_init(RDContext* ctx) { ctx->engine.step++; }
+
+static void _rd_worker_step_reconcile(RDContext* ctx) {
+    RDEngineItem* item;
+    queue_each(item, &ctx->engine.qdirty) {
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, item->address);
+        if(!seg) continue;
+
+        usize start_idx = rd_i_address2index(seg, item->address);
+        usize end_idx = start_idx + item->n;
+        rd_i_expand_range(ctx, seg, &start_idx, &end_idx);
+
+        if(!rd_flagsbuffer_has_code(seg->flags, start_idx)) {
+            // data: refresh what the old bytes derived.
+            // unknown: nothing.
+            // neither needs decoding, so the item is done
+            if(rd_flagsbuffer_has_data(seg->flags, start_idx))
+                _rd_worker_reconcile_data(ctx, seg, start_idx, end_idx);
+
+            item->kind = RD_EI_NONE;
+            hmap_destroy(&item->registers);
+            continue;
+        }
+
+        item->address = seg->base.start_address + start_idx;
+        item->from = item->address;
+        item->n = end_idx - start_idx;
+
+        rd_i_clear_n(ctx, item->address, item->n);
+    }
+
+    ctx->engine.step = RD_WS_EMULATE1;
+}
 
 static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
     if(!ctx->engine.emulate_start) ctx->engine.emulate_start = clock();
@@ -255,6 +291,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
     if(is_busy) {
         switch(self->engine.step) {
             case RD_WS_INIT: _rd_worker_step_init(self); break;
+            case RD_WS_RECONCILE: _rd_worker_step_reconcile(self); break;
 
             case RD_WS_EMULATE1:
             case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
@@ -273,14 +310,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
     return is_busy;
 }
 
-bool rd_reanalyze(RDContext* self) {
-    if(self->engine.step > RD_WS_EMULATE2) {
-        self->engine.step = RD_WS_EMULATE2;
-        return true;
-    }
-
-    return false;
-}
+bool rd_reanalyze(RDContext* self) { return rd_i_engine_mark_dirty(self); }
 
 void rd_disassemble(RDContext* ctx) {
     while(rd_step(ctx, NULL))

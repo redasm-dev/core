@@ -6,7 +6,8 @@
 #include <redasm/surface/renderer.h>
 
 typedef void (*RDHook)(RDContext*);
-typedef void (*RDInstructionHook)(RDContext*, RDInstruction*);
+typedef void (*RDDecodeHook)(RDContext*, RDInstruction*);
+typedef void (*RDEmulateHook)(RDContext*, const RDInstruction*);
 typedef void (*RDAddressHook)(RDContext*, RDAddress);
 typedef void (*RDStringHook)(RDContext*, RDAddress, const char* s, usize n);
 typedef void (*RDXRefHook)(RDContext*, RDAddress from, RDAddress to,
@@ -17,8 +18,10 @@ typedef void (*RDRenderOperandHook)(RDContext*, RDRenderer*,
                                     const RDInstruction*, usize idx);
 
 RD_API bool rd_register_hook(RDContext* ctx, const char* name, RDHook h);
-RD_API bool rd_register_instruction_hook(RDContext* ctx, const char* name,
-                                         RDInstructionHook h);
+RD_API bool rd_register_decode_hook(RDContext* ctx, const char* name,
+                                    RDDecodeHook h);
+RD_API bool rd_register_emulate_hook(RDContext* ctx, const char* name,
+                                     RDEmulateHook h);
 RD_API bool rd_register_address_hook(RDContext* ctx, const char* name,
                                      RDAddressHook h);
 RD_API bool rd_register_string_hook(RDContext* ctx, const char* name,
@@ -31,8 +34,10 @@ RD_API bool rd_register_render_operand_hook(RDContext* ctx, const char* name,
                                             RDRenderOperandHook h);
 
 RD_API void rd_fire_hook(RDContext* ctx, const char* name);
-RD_API void rd_fire_instruction_hook(RDContext* ctx, const char* name,
-                                     RDInstruction*);
+RD_API void rd_fire_decode_hook(RDContext* ctx, const char* name,
+                                RDInstruction*);
+RD_API void rd_fire_emulate_hook(RDContext* ctx, const char* name,
+                                 const RDInstruction*);
 RD_API void rd_fire_address_hook(RDContext* ctx, const char* name,
                                  RDAddress addr);
 RD_API void rd_fire_string_hook(RDContext* ctx, const char* name,

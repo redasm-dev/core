@@ -30,9 +30,17 @@
         }                                                                      \
     } while(0)
 
-static int _rd_instruction_hook_cmp(const void* a, const void* b) {
-    const RDInstructionHookItem* ia = a;
-    const RDInstructionHookItem* ib = b;
+static int _rd_decode_hook_cmp(const void* a, const void* b) {
+    const RDDecodeHookItem* ia = a;
+    const RDDecodeHookItem* ib = b;
+    if(ia->name < ib->name) return -1;
+    if(ia->name > ib->name) return 1;
+    return 0;
+}
+
+static int _rd_emulate_hook_cmp(const void* a, const void* b) {
+    const RDEmulateHookItem* ia = a;
+    const RDEmulateHookItem* ib = b;
     if(ia->name < ib->name) return -1;
     if(ia->name > ib->name) return 1;
     return 0;
@@ -78,9 +86,17 @@ static int _rd_hook_search(const void* key, const void* elem) {
     return 0;
 }
 
-static int _rd_instruction_hook_search(const void* key, const void* elem) {
+static int _rd_decode_hook_search(const void* key, const void* elem) {
     const char* name = (const char*)key;
-    const char* ename = ((const RDInstructionHookItem*)elem)->name;
+    const char* ename = ((const RDDecodeHookItem*)elem)->name;
+    if(name < ename) return -1;
+    if(name > ename) return 1;
+    return 0;
+}
+
+static int _rd_emulate_hook_search(const void* key, const void* elem) {
+    const char* name = (const char*)key;
+    const char* ename = ((const RDEmulateHookItem*)elem)->name;
     if(name < ename) return -1;
     if(name > ename) return 1;
     return 0;
@@ -123,7 +139,8 @@ RDHooks* rd_i_hooks_create(void) { return rd_alloc0(1, sizeof(RDHooks)); }
 void rd_i_hooks_destroy(RDHooks* self) {
     if(!self) return;
     vect_destroy(&self->general);
-    vect_destroy(&self->instruction);
+    vect_destroy(&self->emulate);
+    vect_destroy(&self->decode);
     vect_destroy(&self->address);
     vect_destroy(&self->string);
     vect_destroy(&self->xref);
@@ -156,24 +173,23 @@ bool rd_register_hook(RDContext* ctx, const char* name, RDHook h) {
                                         .hook = h,
                                     });
 
-    vect_sort(&ctx->hooks->general, _rd_instruction_hook_cmp);
+    vect_sort(&ctx->hooks->general, _rd_decode_hook_cmp);
     return true;
 }
 
-bool rd_register_instruction_hook(RDContext* ctx, const char* name,
-                                  RDInstructionHook h) {
+bool rd_register_decode_hook(RDContext* ctx, const char* name, RDDecodeHook h) {
     if(!name || !h) return false;
 
     const char* interned = rd_i_strpool_intern(&ctx->strings, name);
 
-    size_t i = vect_lower_bound(&ctx->hooks->instruction, interned,
-                                _rd_instruction_hook_search);
+    size_t i =
+        vect_lower_bound(&ctx->hooks->decode, interned, _rd_decode_hook_search);
 
     // check for duplicate
-    while(i < vect_length(&ctx->hooks->instruction) &&
-          vect_at(&ctx->hooks->instruction, i)->name == interned) {
-        if(vect_at(&ctx->hooks->instruction, i)->hook == h) {
-            RD_LOG_WARN("instruction hook '%s' already registered with same "
+    while(i < vect_length(&ctx->hooks->decode) &&
+          vect_at(&ctx->hooks->decode, i)->name == interned) {
+        if(vect_at(&ctx->hooks->decode, i)->hook == h) {
+            RD_LOG_WARN("decode hook '%s' already registered with same "
                         "handler, ignoring",
                         name);
             return false;
@@ -181,12 +197,42 @@ bool rd_register_instruction_hook(RDContext* ctx, const char* name,
         i++;
     }
 
-    vect_push(&ctx->hooks->instruction, (RDInstructionHookItem){
-                                            .name = interned,
-                                            .hook = h,
-                                        });
+    vect_push(&ctx->hooks->decode, (RDDecodeHookItem){
+                                       .name = interned,
+                                       .hook = h,
+                                   });
 
-    vect_sort(&ctx->hooks->instruction, _rd_instruction_hook_cmp);
+    vect_sort(&ctx->hooks->decode, _rd_decode_hook_cmp);
+    return true;
+}
+
+bool rd_register_emulate_hook(RDContext* ctx, const char* name,
+                              RDEmulateHook h) {
+    if(!name || !h) return false;
+
+    const char* interned = rd_i_strpool_intern(&ctx->strings, name);
+
+    size_t i = vect_lower_bound(&ctx->hooks->emulate, interned,
+                                _rd_emulate_hook_search);
+
+    // check for duplicate
+    while(i < vect_length(&ctx->hooks->emulate) &&
+          vect_at(&ctx->hooks->emulate, i)->name == interned) {
+        if(vect_at(&ctx->hooks->emulate, i)->hook == h) {
+            RD_LOG_WARN("emulate hook '%s' already registered with same "
+                        "handler, ignoring",
+                        name);
+            return false;
+        }
+        i++;
+    }
+
+    vect_push(&ctx->hooks->emulate, (RDEmulateHookItem){
+                                        .name = interned,
+                                        .hook = h,
+                                    });
+
+    vect_sort(&ctx->hooks->emulate, _rd_emulate_hook_cmp);
     return true;
 }
 
@@ -340,13 +386,22 @@ void rd_fire_hook(RDContext* ctx, const char* name) {
                            _rd_hook_search, { item->hook(ctx); });
 }
 
-void rd_fire_instruction_hook(RDContext* ctx, const char* name,
-                              RDInstruction* instr) {
+void rd_fire_decode_hook(RDContext* ctx, const char* name,
+                         RDInstruction* instr) {
     if(!instr) return;
 
-    RDInstructionHookItem* item;
-    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->instruction,
-                           _rd_instruction_hook_search,
+    RDDecodeHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->decode,
+                           _rd_decode_hook_search, { item->hook(ctx, instr); });
+}
+
+void rd_fire_emulate_hook(RDContext* ctx, const char* name,
+                          const RDInstruction* instr) {
+    if(!instr) return;
+
+    RDEmulateHookItem* item;
+    rd_fire_all_hooks_impl(item, ctx, name, &ctx->hooks->emulate,
+                           _rd_emulate_hook_search,
                            { item->hook(ctx, instr); });
 }
 

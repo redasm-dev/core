@@ -19,8 +19,6 @@
 #include <inttypes.h>
 #include <redasm/support/logging.h>
 
-#define RD_WORKER_QUEUE_SIZE 8192
-
 static bool _rd_vect_contains_address(const RDAddressVect* v, RDAddress addr) {
     RDAddress* a;
     vect_each(a, v) {
@@ -28,6 +26,47 @@ static bool _rd_vect_contains_address(const RDAddressVect* v, RDAddress addr) {
     }
 
     return false;
+}
+
+static void _rd_teardown_range(RDContext* self, const RDSegmentFull* seg,
+                               usize startidx, usize endidx, RDConfidence c) {
+    RDAddress curr = rd_i_index2address(seg, startidx);
+
+    for(usize i = startidx; i < endidx; i++, curr++) {
+        if(rd_flagsbuffer_has_type(seg->flags, i)) rd_i_db_del_type(self, curr);
+
+        // remove references outgoing from this location
+        if(rd_i_flagsbuffer_has_xref_out(seg->flags, i)) {
+            const RDXRefVect* refs = rd_i_get_xrefs_from_ex(
+                self, curr, RD_XR_NONE, &self->und_xrefs);
+            const RDXRef* r;
+            vect_each(r, refs) rd_i_del_xref(self, curr, r->address, c);
+        }
+    }
+}
+
+void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
+                       usize* end) {
+    assert(start && end);
+
+    usize seglen = rd_flagsbuffer_get_length(seg->flags);
+    if(*end > seglen) *end = seglen;
+
+    rd_i_flagsbuffer_expand_tails(seg->flags, start, end);
+
+    for(usize i = *start; i < *end; i++) {
+        if(!rd_flagsbuffer_has_type(seg->flags, i)) continue;
+
+        RDAddress address = seg->base.start_address + i;
+
+        RDTypeFull t;
+        panic_if(!rd_i_get_type(self, address, &t), "type not found @ %" PRIx64,
+                 address);
+
+        usize tend = i + rd_type_size(&t.base, self);
+        if(tend > seglen) tend = seglen;
+        if(tend > *end) *end = tend;
+    }
 }
 
 const RDAnalyzerPlugin* rd_analyzeritem_get_plugin(const RDAnalyzerItem* self) {
@@ -63,12 +102,9 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
     assert(self->working_dir);
     assert(self->file_name);
 
-    rd_i_registermap_init(&self->engine.current.registers);
     rd_i_strpool_init(&self->strings);
+    rd_i_engine_init(self);
     rd_i_register_primitives(self);
-
-    queue_reserve(&self->engine.qcall, RD_WORKER_QUEUE_SIZE);
-    queue_reserve(&self->engine.qjump, RD_WORKER_QUEUE_SIZE);
 
     if(self->processorplugin->create)
         self->processor = self->processorplugin->create(self->processorplugin);
@@ -174,7 +210,7 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
     if((!name || !(*name))) {
         if(!hasname || c < oldname.confidence) return false;
         rd_i_db_del_name(self, address);
-        rd_i_flagsbuffer_undefine_name(seg->flags, idx);
+        rd_i_flagsbuffer_clear_name(seg->flags, idx);
         return true;
     }
 
@@ -505,7 +541,7 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
     }
 
     if((!cmt || !(*cmt)) && rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
-        rd_i_flagsbuffer_undefine_comment(seg->flags, idx);
+        rd_i_flagsbuffer_clear_comment(seg->flags, idx);
         rd_i_db_del_comment(self, address);
         return true;
     }
@@ -529,35 +565,35 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
     if(!seg) return false;
 
     usize startidx = rd_i_address2index(seg, address), endidx = startidx + n;
-    rd_i_flagsbuffer_expand_range(seg->flags, &startidx, &endidx);
+    rd_i_expand_range(self, seg, &startidx, &endidx); // 1. true range
 
     RDAddress startaddr = rd_i_index2address(seg, startidx);
     RDAddress endaddr = startaddr + (endidx - startidx);
 
     RDConfidence maxc =
         rd_i_db_get_undefine_confidence(self, startaddr, endaddr);
-    if(maxc > c) return false;
+    if(maxc > c) return false; // 2. gate
 
-    RDAddress curr = startaddr;
-
-    for(usize i = startidx; i < endidx; i++, curr++) {
-        if(rd_flagsbuffer_has_type(seg->flags, i)) {
-            rd_i_db_del_type(self, curr);
-            // FL_TYPE cleared by rd_i_flagsbuffer_undefine below
-        }
-
-        // remove references outgoing from this location
-        if(rd_i_flagsbuffer_has_xref_out(seg->flags, i)) {
-            const RDXRefVect* refs = rd_i_get_xrefs_from_ex(
-                self, curr, RD_XR_NONE, &self->und_xrefs);
-
-            const RDXRef* r;
-            vect_each(r, refs) rd_i_del_xref(self, curr, r->address, c);
-        }
+    for(usize i = startidx; i < endidx; i++) { // 3. entities
+        if(rd_flagsbuffer_has_func(seg->flags, i))
+            rd_i_function_undeclare(self, seg, i);
     }
 
-    rd_i_flagsbuffer_undefine(seg->flags, startidx, endidx - startidx);
+    _rd_teardown_range(self, seg, startidx, endidx, c);      // 4. DB rows
+    rd_i_flagsbuffer_undefine(seg->flags, startidx, endidx); // 5. flags
+    rd_i_engine_mark_dirty(self);                            // 6. dirty state
     return true;
+}
+
+void rd_i_clear_n(RDContext* self, RDAddress address, usize n) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return;
+
+    usize startidx = rd_i_address2index(seg, address), endidx = startidx + n;
+    rd_i_expand_range(self, seg, &startidx, &endidx);
+
+    _rd_teardown_range(self, seg, startidx, endidx, RD_CONFIDENCE_MAX);
+    rd_i_flagsbuffer_clear(seg->flags, startidx, endidx);
 }
 
 bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
@@ -876,16 +912,16 @@ usize rd_write(RDContext* self, RDAddress address, const void* data, usize n) {
 
 usize rd_patch(RDContext* self, RDAddress address, const void* data, usize n) {
     usize res = rd_write(self, address, data, n);
+    if(!res) return 0;
 
-    if(res > 0) {
-        const RDSegmentFull* s = rd_i_db_find_segment(self, address);
-        panic_if(!s, "invalid segment");
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    panic_if(!s, "invalid segment");
 
-        usize idx = rd_i_address2index(s, address);
-        bool ok = rd_i_flagsbuffer_set_patch(s->flags, idx, res);
-        panic_if(!ok, "error applying patch");
-    }
+    usize idx = rd_i_address2index(s, address);
+    panic_if(!rd_i_flagsbuffer_set_patch(s->flags, idx, res),
+             "error applying patch");
 
+    rd_i_engine_enqueue_dirty(self, address, n);
     return res;
 }
 
@@ -1180,10 +1216,10 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     if(!rd_i_db_del_xref(self, fromaddr, toaddr, c)) return false;
 
     if(!rd_i_db_has_xrefs_from(self, fromaddr))
-        rd_i_flagsbuffer_undefine_xref_out(fromseg->flags, fromidx);
+        rd_i_flagsbuffer_clear_xref_out(fromseg->flags, fromidx);
 
     if(!rd_i_db_has_xrefs_to(self, toaddr))
-        rd_i_flagsbuffer_undefine_xref_in(toseg->flags, toidx);
+        rd_i_flagsbuffer_clear_xref_in(toseg->flags, toidx);
 
     return true;
 }
@@ -1300,7 +1336,7 @@ bool rd_i_set_noret(RDContext* self, RDAddress address) {
     idx += len; // un-FLOW next instruction
 
     if(rd_flagsbuffer_has_flow(seg->flags, idx))
-        rd_i_flagsbuffer_undefine_flow(seg->flags, idx);
+        rd_i_flagsbuffer_clear_flow(seg->flags, idx);
 
     return true;
 }
@@ -1392,9 +1428,48 @@ bool rd_operand_as_immediate(RDContext* self, RDAddress address, int index) {
     rd_i_db_del_ovr_operand(self, address, index);
 
     if(!rd_i_db_has_ovr_operand(self, address))
-        rd_i_flagsbuffer_undefine_op_over(seg->flags, flag_idx);
+        rd_i_flagsbuffer_clear_op_over(seg->flags, flag_idx);
 
     return true;
+}
+
+bool rd_fill_nops(RDContext* self, RDAddress address, usize n) {
+    if(!n) return true;
+
+    RDScratchBuffer* buf = rd_scratch_create();
+    usize noplen = 0;
+    bool res = false;
+
+    if(!rd_encode(self, address, NULL, buf) || rd_scratch_is_empty(buf)) {
+        RD_LOG_WARN("cannot encode NOP at %" PRIx64 ", %zu byte(s) left stale",
+                    address, n);
+        goto out;
+    }
+
+    noplen = rd_scratch_length(buf);
+
+    while(n >= noplen) {
+        if(rd_patch(self, address, rd_scratch_data(buf), noplen) != noplen) {
+            RD_LOG_WARN("failed to write NOP at %" PRIx64, address);
+            goto out;
+        }
+
+        address += noplen;
+        n -= noplen;
+    }
+
+    if(n) {
+        RD_LOG_WARN("%zu byte(s) at %" PRIx64 " left unfilled "
+                    "(smaller than one NOP unit)",
+                    n, address);
+        goto out;
+    }
+
+    res = true;
+
+out:
+    rd_scratch_destroy(buf);
+    return res;
 }
 
 bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
@@ -1406,115 +1481,59 @@ bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
         return false;
     }
 
-    usize idx = rd_i_address2index(seg, address), start = idx, end = idx + 1;
+    bool res = false;
+    usize start = rd_i_address2index(seg, address), end = start + 1, s = 0,
+          len = 0, remaining = 0, i = 0;
+    RDAddress head = 0;
+    RDScratchBuffer* buf = NULL;
 
-    rd_i_flagsbuffer_expand_range(seg->flags, &start, &end);
-    address = rd_i_index2address(seg, start);
+    // snap to the containing item's boundaries
+    rd_i_flagsbuffer_expand_tails(seg->flags, &start, &end);
+    head = rd_i_index2address(seg, start);
+    buf = rd_scratch_create();
 
-    RDAddress startaddress = address; // remember start address
-    usize maxlen = end - start, len = 0, remaining = 0;
-    RDScratchBuffer* buf = rd_scratch_create();
-
-    if(!rd_encode(self, address, instr, buf)) {
+    if(!rd_encode(self, head, instr, buf)) {
         RD_LOG_FAIL("%s", rd_scratch_data(buf));
-        goto fail;
+        goto done;
     }
 
     if(rd_scratch_is_empty(buf)) {
-        RD_LOG_FAIL("buffer is empty");
-        goto fail;
+        RD_LOG_FAIL("encoder produced no bytes");
+        goto done;
     }
 
     len = rd_scratch_length(buf);
 
-    if(len > maxlen) { // new instruction is bigger than the previous one
-        usize needed_end = start + len;
-
-        while(end < needed_end) {
-            end = needed_end;
-            rd_i_flagsbuffer_expand_range(seg->flags, &start, &end);
-        }
-
-        maxlen = end - start;
+    // grow the span if the new encoding overruns the old item
+    if(start + len > end) {
+        s = start;
+        end = start + len;
+        rd_i_flagsbuffer_expand_tails(seg->flags, &s, &end);
+        panic_if(s != start, "patch head moved while growing span");
     }
 
-    if(!rd_user_undefine_n(self, address, maxlen)) {
-        RD_LOG_FAIL("failed to undefine range [%" PRIx64 ", %" PRIx64 ")",
-                    address, address + maxlen);
-        goto fail;
+    // function bounds may not intersect another function.
+    // start itself may be a function head (patching a prologue is fine).
+    for(i = start + 1; i < end; i++) {
+        if(!rd_flagsbuffer_has_func(seg->flags, i)) continue;
+
+        RD_LOG_FAIL("patch at %" PRIx64 " would overlap function %" PRIx64,
+                    head, rd_i_index2address(seg, i));
+        goto done;
     }
 
-    if(!rd_patch(self, address, rd_scratch_data(buf), len)) {
-        RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIx64, len, address);
-        goto fail;
+    if(rd_patch(self, head, rd_scratch_data(buf), len) != len) {
+        RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIx64, len, head);
+        goto done;
     }
 
-    if(!rd_i_flagsbuffer_set_code(seg->flags, rd_i_address2index(seg, address),
-                                  len)) {
-        RD_LOG_WARN("failed to flag %zu byte(s) at %" PRIx64 " as code", len,
-                    address);
-    }
+    res = true; // bytes are in, fill is best effort from here
+    remaining = (end - start) - len;
+    if(fill_nops) rd_fill_nops(self, head + len, remaining);
 
-    address += len;
-    remaining = maxlen - len;
-
-    if(fill_nops && remaining) {
-        if(!rd_encode(self, address, NULL, buf)) {
-            RD_LOG_FAIL("%s", rd_scratch_data(buf));
-            goto fail;
-        }
-
-        usize noplen = rd_scratch_length(buf);
-
-        if(!noplen) {
-            RD_LOG_FAIL("processor produced an empty NOP");
-            goto fail;
-        }
-
-        while(remaining >= noplen) {
-            if(!rd_patch(self, address, rd_scratch_data(buf), noplen)) {
-                RD_LOG_FAIL("failed to write NOP at %" PRIx64, address);
-                goto fail;
-            }
-
-            if(!rd_i_flagsbuffer_set_code(
-                   seg->flags, rd_i_address2index(seg, address), len)) {
-                RD_LOG_WARN("failed to flag %zu byte(s) at %" PRIx64 " as code",
-                            len, address);
-            }
-
-            address += noplen;
-            remaining -= noplen;
-        }
-
-        if(remaining) {
-            RD_LOG_WARN("%zu byte(s) at %" PRIx64
-                        " left unfilled (smaller than one NOP unit)",
-                        remaining, address);
-        }
-    }
-
-    RDFunction* f = rd_i_find_function(self, address);
-    if(f) rd_i_function_rebuild(f);
-
-    for(idx = rd_i_address2index(seg, startaddress);
-        idx < rd_i_address2index(seg, address); idx++) {
-        if(!rd_flagsbuffer_has_func(seg->flags, idx)) continue;
-
-        RDFunction* curr_f =
-            rd_i_find_function(self, rd_i_index2address(seg, idx));
-        if(curr_f == f) continue;
-
-        rd_i_function_destroy(curr_f);
-        rd_i_flagsbuffer_undefine_func(seg->flags, idx);
-    }
-
+done:
     rd_scratch_destroy(buf);
-    return true;
-
-fail:
-    rd_scratch_destroy(buf);
-    return false;
+    return res;
 }
 
 void rd_set_scan_char16(RDContext* self, bool b) { self->scan_char16 = b; }

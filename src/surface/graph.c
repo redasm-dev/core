@@ -70,7 +70,7 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
 
     // fixup to head
     if(rd_flagsbuffer_has_tail(seg->flags, idx))
-        rd_i_flagsbuffer_expand_range(seg->flags, &idx, NULL);
+        rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
     usize sub_line = 0, last_len = 0;
 

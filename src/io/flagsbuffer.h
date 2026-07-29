@@ -21,7 +21,7 @@ bool rd_i_flagsbuffer_has_xref_in(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_op_over(const RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_has_jmpdst(const RDFlagsBuffer* self, usize idx);
 
-void rd_i_flagsbuffer_expand_range(const RDFlagsBuffer* self, usize* start,
+void rd_i_flagsbuffer_expand_tails(const RDFlagsBuffer* self, usize* start,
                                    usize* end);
 RDFlags rd_i_flagsbuffer_get(const RDFlagsBuffer* self, usize idx);
 usize rd_i_flagsbuffer_get_range_length(const RDFlagsBuffer* self, usize idx);
@@ -56,16 +56,15 @@ bool rd_i_flagsbuffer_set_xref_in(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_imported(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_set_exported(RDFlagsBuffer* self, usize idx);
 
-void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize idx, usize n);
-void rd_i_flagsbuffer_undefine_patch(RDFlagsBuffer* self, usize idx, usize n);
-bool rd_i_flagsbuffer_undefine_name(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_func(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_comment(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_xref_out(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_xref_in(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_flow(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_op_over(RDFlagsBuffer* self, usize idx);
+void rd_i_flagsbuffer_undefine(RDFlagsBuffer* self, usize startidx,
+                               usize endidx);
+void rd_i_flagsbuffer_clear(RDFlagsBuffer* self, usize startidx, usize endidx);
 
-bool rd_i_flagsbuffer_set_queued(RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_has_queued(const RDFlagsBuffer* self, usize idx);
-bool rd_i_flagsbuffer_undefine_queued(RDFlagsBuffer* self, usize idx);
+void rd_i_flagsbuffer_clear_patch(RDFlagsBuffer* self, usize idx, usize n);
+bool rd_i_flagsbuffer_clear_name(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_func(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_comment(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_xref_out(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_xref_in(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_flow(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_op_over(RDFlagsBuffer* self, usize idx);

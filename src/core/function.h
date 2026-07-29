@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/segment.h"
 #include "support/utils.h"
 #include "types/def.h"
 #include <redasm/function.h>
@@ -30,6 +31,11 @@ typedef struct RDFunctionVect {
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_destroy(RDFunction* self);
+
+void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg, usize idx);
+void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
+                             usize idx);
+
 void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef);
 void rd_i_function_rebuild(RDFunction* self);
 void rd_i_function_rebuild_graph(RDFunction* self, RDFunctionChunkVect* chunks);
@@ -43,4 +49,3 @@ void rd_i_functionchunk_destroy(RDFunctionChunkVect* self);
 void rd_i_functionvect_destroy(RDFunctionVect* self);
 
 int rd_i_functionchunk_kcmp_pred(const void* key, const void* item);
-int rd_i_function_kcmp_pred(const void* key, const void* item);

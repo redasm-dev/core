@@ -4,6 +4,7 @@
 #include "io/flags.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include <inttypes.h>
 #include <redasm/allocator.h>
 #include <redasm/function.h>
@@ -18,6 +19,14 @@ typedef struct RDFunctionWorkVect {
     usize length;
     usize capacity;
 } RDFunctionWorkVect;
+
+static int _rd_function_kcmp_pred(const void* key, const void* item) {
+    RDAddress address = *(const RDAddress*)key;
+    const RDFunction* f = *(const RDFunction**)item;
+    if(address < f->address) return -1;
+    if(address > f->address) return 1;
+    return 0;
+}
 
 static int _rd_functionchunk_cmp_pred(const void* arg1, const void* arg2) {
     const RDFunctionChunk* chunk1 = *(const RDFunctionChunk**)arg1;
@@ -284,6 +293,44 @@ RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
     return self;
 }
 
+void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg,
+                           usize idx) {
+    if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
+
+    rd_i_flagsbuffer_set_func(seg->flags, idx);
+
+    RDAddress address = seg->base.start_address + idx;
+    RDFunction* self = rd_i_function_create(ctx, address);
+
+    usize func_idx =
+        vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
+    vect_ins(&ctx->functions, func_idx, self);
+}
+
+void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
+                             usize idx) {
+    if(!rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
+
+    rd_i_flagsbuffer_clear_func(seg->flags, idx);
+
+    RDAddress address = seg->base.start_address + idx;
+
+    usize i =
+        vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
+
+    // FL_FUNC and ctx->functions are set together by rd_i_function_declare:
+    // one without the other is a bug, not a tolerable state
+    panic_if(i >= vect_length(&ctx->functions) ||
+                 (*vect_at(&ctx->functions, i))->address != address,
+             "FL_FUNC set with no record @ %" PRIx64, address);
+
+    RDFunction* f = *vect_at(&ctx->functions, i);
+
+    // remove from the vector FIRST
+    vect_del(&ctx->functions, i, 1);
+    rd_i_function_destroy(f);
+}
+
 void rd_i_function_destroy(RDFunction* self) {
     if(!self) return;
 
@@ -423,13 +470,5 @@ int rd_i_functionchunk_kcmp_pred(const void* key, const void* item) {
     const RDFunctionChunk* c = *(const RDFunctionChunk**)item;
     if(address < c->start) return -1;
     if(address >= c->end) return 1;
-    return 0;
-}
-
-int rd_i_function_kcmp_pred(const void* key, const void* item) {
-    RDAddress address = *(const RDAddress*)key;
-    const RDFunction* f = *(const RDFunction**)item;
-    if(address < f->address) return -1;
-    if(address > f->address) return 1;
     return 0;
 }

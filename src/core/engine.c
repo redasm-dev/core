@@ -1,9 +1,23 @@
 #include "engine.h"
 #include "core/context.h"
+#include "core/worker.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/scratch.h"
+
+#define RD_ENGINE_QUEUE_SIZE 8192
+
+static void _rd_engine_queue_drain(RDEngineQueue* q) {
+    while(!queue_is_empty(q)) {
+        RDEngineItem item;
+        queue_pop(q, &item);
+        rd_free(item.name);            // NULL-safe
+        hmap_destroy(&item.registers); // tolerates zeroed
+    }
+
+    queue_destroy(q);
+}
 
 static const char* _rd_engine_queue_name(RDEngineItemKind k) {
     switch(k) {
@@ -38,7 +52,7 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_flagsbuffer_has_queued(seg->flags, idx)) return false;
+    if(rd_i_segment_has_queued(seg, idx)) return false;
 
     // tail = pointing into the middle of an existing instruction:
     // plugin bug or deliberate obfuscation: reject and surface as problem
@@ -52,7 +66,7 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
     // already fully decoded at this boundary: tick would be a no-op
     if(rd_flagsbuffer_has_code(seg->flags, idx)) return false;
 
-    rd_i_flagsbuffer_set_queued(seg->flags, idx);
+    rd_i_segment_set_queued(seg, idx);
     return true;
 }
 
@@ -198,7 +212,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
 
     if((seg->base.perm & RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
-        rd_i_flagsbuffer_set_func(seg->flags, dstidx);
+        rd_i_function_declare(ctx, seg, dstidx);
         if(name) rd_i_set_name(ctx, address, name, c);
     }
 
@@ -208,15 +222,43 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
     return false;
 }
 
+void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    if(!seg) return;
+
+    RDEngineItem item = {
+        .kind = RD_EI_DIRTY,
+        .address = address,
+        .from = address,
+        .n = n,
+    };
+
+    rd_i_registermap_init(&item.registers);
+    queue_push(&ctx->engine.qdirty, item);
+    rd_i_engine_mark_dirty(ctx);
+}
+
+bool rd_i_engine_mark_dirty(RDContext* ctx) {
+    // rewind already done and waiting to be driven: still dirty, nothing to do
+    if(ctx->engine.step == RD_WS_RECONCILE) return true;
+
+    if(ctx->engine.step < RD_WS_DONE) return false; // pipeline still running
+    ctx->engine.step = RD_WS_RECONCILE;
+    return true;
+}
+
 bool rd_i_engine_has_pending_code(const RDContext* ctx) {
     return (ctx->engine.flow.has_value || !queue_is_empty(&ctx->engine.qjump) ||
-            !queue_is_empty(&ctx->engine.qcall));
+            !queue_is_empty(&ctx->engine.qcall) ||
+            !queue_is_empty(&ctx->engine.qdirty));
 }
 
 u16 rd_i_engine_tick(RDContext* ctx) {
     RDInstruction instr = {
         .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
     };
+
+    usize idx = 0;
 
     if(ctx->engine.flow.has_value) {
         ctx->engine.current.address = optional_take(&ctx->engine.flow);
@@ -226,16 +268,23 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         assert(ctx->engine.segment && "flow tick with no current segment");
     }
     else {
-        if(!queue_is_empty(&ctx->engine.qcall)) {
-            hmap_destroy(&ctx->engine.current.registers);
-            queue_pop(&ctx->engine.qcall, &ctx->engine.current);
+        RDEngineQueue* q = NULL;
+
+        while(!queue_is_empty(&ctx->engine.qdirty)) {
+            if(queue_peek_first(&ctx->engine.qdirty).kind != RD_EI_NONE) {
+                q = &ctx->engine.qdirty;
+                break;
+            }
+
+            queue_discard(&ctx->engine.qdirty);
         }
-        else if(!queue_is_empty(&ctx->engine.qjump)) {
-            hmap_destroy(&ctx->engine.current.registers);
-            queue_pop(&ctx->engine.qjump, &ctx->engine.current);
-        }
-        else
-            return 0;
+
+        if(!q && !queue_is_empty(&ctx->engine.qcall)) q = &ctx->engine.qcall;
+        if(!q && !queue_is_empty(&ctx->engine.qjump)) q = &ctx->engine.qjump;
+        if(!q) return 0;
+
+        hmap_destroy(&ctx->engine.current.registers);
+        queue_pop(q, &ctx->engine.current);
 
         ctx->engine.segment =
             _rd_engine_find_segment(ctx, ctx->engine.current.address);
@@ -255,10 +304,14 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     assert(ctx->engine.current.registers.equal &&
            "invalid registers equal function");
 
-    usize idx =
-        rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
+    idx = rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
+    rd_i_segment_clear_queued(ctx->engine.segment, idx);
 
-    rd_i_flagsbuffer_undefine_queued(ctx->engine.segment->flags, idx);
+    // something already re-decoded this range (eg. flow from a neighbour,
+    // or a duplicate mark) there is nothing left to do
+    if(ctx->engine.current.kind == RD_EI_DIRTY &&
+       !rd_flagsbuffer_has_unknown(ctx->engine.segment->flags, idx))
+        return 0;
 
     if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx)) {
         const char* queue_kind =
@@ -333,7 +386,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         if(ctx->engine.current.kind == RD_EI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
         else if(ctx->engine.current.kind == RD_EI_CALL)
-            rd_i_flagsbuffer_set_func(ctx->engine.segment->flags, idx);
+            rd_i_function_declare(ctx, ctx->engine.segment, idx);
         else if(ctx->engine.current.kind == RD_EI_JUMP)
             rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
 
@@ -347,6 +400,38 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 done:
     if(ctx->engine.current.name) rd_free(ctx->engine.current.name);
     return instr.length;
+}
+
+void rd_i_engine_reconcile_tick(RDContext* ctx) {
+    if(queue_is_empty(&ctx->engine.qdirty)) return;
+
+    // RDDirtyRange d;
+    // queue_pop(&ctx->engine.qdirty, &d);
+    //
+    // const RDSegmentFull* seg = rd_i_db_find_segment(ctx, d.address);
+    // if(!seg) return; // no segment: nothing to reconcile
+    //
+    // usize start_idx = rd_i_address2index(seg, d.address);
+    // usize end_idx = start_idx + d.n;
+    //
+    // // clamp: ranges never cross segments
+    // if(end_idx > rd_flagsbuffer_get_length(seg->flags))
+    //     end_idx = rd_flagsbuffer_get_length(seg->flags);
+    //
+    // // snap both ends outward to item boundaries
+    // rd_i_flagsbuffer_expand_range(seg->flags, &start_idx, &end_idx);
+    //
+    // switch(_rd_engine_reconcile_kind(seg, start_idx, d.hint)) {
+    //     case RD_DIRTY_CODE:
+    //         _rd_engine_reconcile_code(ctx, seg, start_idx, end_idx);
+    //         break;
+    //
+    //     case RD_DIRTY_DATA:
+    //         _rd_engine_reconcile_data(ctx, seg, start_idx, end_idx);
+    //         break;
+    //
+    //     default: break;
+    // }
 }
 
 void rd_flow(RDContext* ctx, RDAddress address) {
@@ -451,13 +536,15 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
                               instr);
 }
 
-void rd_i_engine_destroy(RDContext* ctx) {
-    while(!queue_is_empty(&ctx->engine.qcall)) {
-        RDEngineItem item;
-        queue_pop(&ctx->engine.qcall, &item);
-        rd_free(item.name);
-    }
+void rd_i_engine_init(RDContext* ctx) {
+    rd_i_registermap_init(&ctx->engine.current.registers);
+    queue_reserve(&ctx->engine.qdirty, RD_ENGINE_QUEUE_SIZE);
+    queue_reserve(&ctx->engine.qcall, RD_ENGINE_QUEUE_SIZE);
+    queue_reserve(&ctx->engine.qjump, RD_ENGINE_QUEUE_SIZE);
+}
 
-    queue_destroy(&ctx->engine.qcall);
-    queue_destroy(&ctx->engine.qjump);
+void rd_i_engine_destroy(RDContext* ctx) {
+    _rd_engine_queue_drain(&ctx->engine.qdirty);
+    _rd_engine_queue_drain(&ctx->engine.qcall);
+    _rd_engine_queue_drain(&ctx->engine.qjump);
 }

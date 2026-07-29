@@ -390,7 +390,7 @@ bool rd_il_get_regval(const RDIL* self, const char* regname,
 
     const char* canonical = regname;
     if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+        canonical = rd_get_reg_name(ctx, m.reg);
 
     RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
     const RDRegister* r = hmap_get(&self->registers, &key);
@@ -411,7 +411,7 @@ bool rd_il_set_regval(RDIL* self, const char* regname, RDRegValue value) {
 
     const char* canonical = regname;
     if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+        canonical = rd_get_reg_name(ctx, m.reg);
 
     // merge if bit field
     if(m.mask != RD_REGMASK_FULL) {
@@ -440,7 +440,7 @@ bool rd_il_del_regval(RDIL* self, const char* regname) {
 
     const char* canonical = regname;
     if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = ctx->processorplugin->get_reg_name(m.reg, ctx->processor);
+        canonical = rd_get_reg_name(ctx, m.reg);
 
     RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
     hmap_del(&self->registers, &key);
@@ -449,28 +449,19 @@ bool rd_il_del_regval(RDIL* self, const char* regname) {
 
 bool rd_il_get_regval_id(const RDIL* self, RDReg id, RDRegValue* value) {
     RDContext* ctx = self->context;
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_il_get_regval(self, regname, value);
 }
 
 bool rd_il_set_regval_id(RDIL* self, RDReg id, RDRegValue value) {
     RDContext* ctx = self->context;
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_il_set_regval(self, regname, value);
 }
 
 bool rd_il_del_regval_id(RDIL* self, RDReg id) {
     RDContext* ctx = self->context;
-    if(!ctx->processorplugin->get_reg_name) return false;
-
-    const char* regname =
-        ctx->processorplugin->get_reg_name(id, ctx->processor);
+    const char* regname = rd_get_reg_name(ctx, id);
     return regname && rd_il_del_regval(self, regname);
 }
 
