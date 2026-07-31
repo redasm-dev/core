@@ -100,9 +100,8 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
 
     if(rd_i_file_exists(dbpath)) remove(dbpath);
 
-    res.context =
-        rd_i_context_create(tr->loaderplugin, pplugin, tr->input_buffer,
-                            workingdir, filename, dbpath);
+    res.context = rd_i_context_create(tr->loaderplugin, tr->input_buffer,
+                                      workingdir, filename, dbpath);
     if(!res.context) goto cleanup;
 
     res.context->min_string =
@@ -110,6 +109,7 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     res.context->addressing = params->addressing;
 
     rd_reader_seek(res.context->input_reader, 0);
+    rd_i_set_processor(res.context, pplugin);
 
     if(res.context->loaderplugin->load(tr->loader, res.context)) {
         res.status = RD_ACCEPT_OK;

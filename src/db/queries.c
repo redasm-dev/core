@@ -753,7 +753,8 @@ bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
 }
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
-    if(tdef->kind == RD_TKIND_PRIM) return;
+    panic_if(tdef->flags & RD_TFLAG_BUILTIN,
+             "builtin type definitions not allowed in DB");
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
         INSERT INTO TypeDefs (name, kind, is_noret, enum_type) \
@@ -799,20 +800,23 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         }
     }
     else if(tdef->kind == RD_TKIND_FUNC) {
-        if(!rd_type_is_void(&tdef->func_.ret)) {
+        if(tdef->func_.ret.has_value &&
+           !rd_type_is_void(&tdef->func_.ret.value)) {
             // return type at member_idx=0 and has no name
             stmt = _rd_db_prepare_set_type_def_params_query(
-                ctx, tdef->name, &tdef->func_.ret, "", 0);
+                ctx, tdef->name, &tdef->func_.ret.value, "", 0);
             _rd_db_step(ctx, stmt);
         }
 
-        // args type at member_idx=1..n
-        const RDParam* p;
-        usize i = 1;
-        vect_each(p, &tdef->func_.args) {
-            stmt = _rd_db_prepare_set_type_def_params_query(
-                ctx, tdef->name, &p->type, p->name, i++);
-            _rd_db_step(ctx, stmt);
+        if(tdef->func_.args.has_value) {
+            // args type at member_idx=1..n
+            const RDParam* p;
+            usize i = 1;
+            vect_each(p, &tdef->func_.args.value) {
+                stmt = _rd_db_prepare_set_type_def_params_query(
+                    ctx, tdef->name, &p->type, p->name, i++);
+                _rd_db_step(ctx, stmt);
+            }
         }
     }
     else

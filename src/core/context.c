@@ -82,14 +82,11 @@ void rd_analyzeritem_select(RDAnalyzerItem* self, bool sel) {
 }
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
-                               const RDProcessorPlugin* pplugin,
                                RDByteBuffer* input, const char* workingdir,
                                const char* filename, const char* dbpath) {
-    assert(pplugin);
     RDContext* self = rd_alloc0(1, sizeof(*self));
 
     self->loaderplugin = lplugin;
-    self->processorplugin = pplugin;
     self->working_dir = rd_strdup(workingdir);
     self->file_name = rd_strdup(filename);
     self->input = input;
@@ -104,12 +101,19 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
 
     rd_i_strpool_init(&self->strings);
     rd_i_engine_init(self);
-    rd_i_register_primitives(self);
+
+    return self;
+}
+
+void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* pplugin) {
+    panic_if(self->processorplugin, "processor already set");
+
+    self->processorplugin = pplugin;
 
     if(self->processorplugin->create)
         self->processor = self->processorplugin->create(self->processorplugin);
 
-    return self;
+    rd_i_register_builtins(self);
 }
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,

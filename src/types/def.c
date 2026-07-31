@@ -10,6 +10,7 @@
     {                                                                          \
         .name = n,                                                             \
         .kind = RD_TKIND_PRIM,                                                 \
+        .flags = RD_TFLAG_STATIC | RD_TFLAG_BUILTIN,                           \
         .size = s,                                                             \
     }
 
@@ -140,16 +141,22 @@ RDParamSlice rd_typedef_get_members(const RDTypeDef* self) {
     return (RDParamSlice){0};
 }
 
-RDParamSlice rd_typedef_get_args(const RDTypeDef* self) {
-    if(self->kind == RD_TKIND_FUNC)
-        return vect_to_slice(RDParamSlice, &self->func_.args);
+bool rd_typedef_get_args(const RDTypeDef* self, RDParamSlice* params) {
+    if(self->kind == RD_TKIND_FUNC) {
+        if(params)
+            *params = vect_to_slice(RDParamSlice, &self->func_.args.value);
+        return true;
+    }
 
-    return (RDParamSlice){0};
+    return false;
 }
 
-RDType rd_typedef_get_ret(const RDTypeDef* self) {
-    if(self->kind == RD_TKIND_FUNC) return self->func_.ret;
-    return (RDType){0};
+bool rd_typedef_get_ret(const RDTypeDef* self, RDType* t) {
+    if(self->kind == RD_TKIND_FUNC && self->func_.ret.has_value) {
+        if(t) *t = self->func_.ret.value;
+        return true;
+    }
+    return false;
 }
 
 const RDTypeDef* rd_typedef_get_base_type(const RDTypeDef* self) {
@@ -207,7 +214,9 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
     RDType t;
     if(!rd_type_init(&t, type, n, mod, ctx)) return false;
 
-    vect_push(&self->func_.args,
+    self->func_.args.has_value = true;
+
+    vect_push(&self->func_.args.value,
               (RDParam){
                   .type = t,
                   .name = rd_i_strpool_intern(&ctx->strings, name),
@@ -223,11 +232,14 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
         return false;
     }
 
+    self->func_.ret.has_value = true;
+
     if(type) {
-        if(!rd_type_init(&self->func_.ret, type, n, mod, ctx)) return false;
+        if(!rd_type_init(&self->func_.ret.value, type, n, mod, ctx))
+            return false;
     }
     else
-        rd_type_init_void(&self->func_.ret);
+        rd_type_init_void(&self->func_.ret.value);
 
     return true;
 }
@@ -284,43 +296,46 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
         }
     }
     else if(self->kind == RD_TKIND_FUNC) {
-        for(usize i = 0; i < vect_length(&self->func_.args); i++) {
-            RDParam* arg1 = vect_at(&self->func_.args, i);
+        if(self->func_.args.has_value) {
+            for(usize i = 0; i < vect_length(&self->func_.args.value); i++) {
+                RDParam* arg1 = vect_at(&self->func_.args.value, i);
 
-            if(!arg1->name) {
-                RD_LOG_FAIL("function '%s': argument %d has no name",
-                            self->name, i + 1);
-                goto fail;
-            }
+                if(!arg1->name) {
+                    RD_LOG_FAIL("function '%s': argument %d has no name",
+                                self->name, i + 1);
+                    goto fail;
+                }
 
-            if(rd_type_is_void(&arg1->type)) {
-                RD_LOG_FAIL("function '%s': argument %d '%s' cannot be void",
-                            self->name, i + 1, arg1->name);
-                goto fail;
-            }
-
-            for(usize j = i + 1; j < vect_length(&self->func_.args); j++) {
-                RDParam* arg2 = vect_at(&self->func_.args, j);
-
-                if(!strcmp(arg1->name, arg2->name)) {
+                if(rd_type_is_void(&arg1->type)) {
                     RD_LOG_FAIL(
-                        "function '%s': argument %d has duplicate name '%s'",
+                        "function '%s': argument %d '%s' cannot be void",
                         self->name, i + 1, arg1->name);
                     goto fail;
                 }
+
+                for(usize j = i + 1; j < vect_length(&self->func_.args.value);
+                    j++) {
+                    RDParam* arg2 = vect_at(&self->func_.args.value, j);
+
+                    if(!strcmp(arg1->name, arg2->name)) {
+                        RD_LOG_FAIL("function '%s': argument %d has duplicate "
+                                    "name '%s'",
+                                    self->name, i + 1, arg1->name);
+                        goto fail;
+                    }
+                }
             }
         }
+
+        if(self->func_.is_noret) rd_i_kb_add_noret(ctx, self->name);
     }
     else if(self->kind != RD_TKIND_PRIM)
         unreachable();
 
-    if(self->kind == RD_TKIND_FUNC && self->func_.is_noret)
-        rd_i_kb_add_noret(ctx, self->name);
-
     rd_i_typedef_measure(ctx, self);
 
-    if(self->kind != RD_TKIND_PRIM) {
-        rd_i_db_set_type_def(ctx, self); // don't save primitives in DB
+    if(!(self->flags & RD_TFLAG_BUILTIN)) {
+        rd_i_db_set_type_def(ctx, self); // don't save builtins in DB
 
         RD_LOG_INFO("%s definition '%s' registered",
                     _rd_typedef_kind_str(self->kind), self->name);
@@ -348,16 +363,15 @@ bool rd_typedef_is_noret(const RDTypeDef* self) {
 }
 
 void rd_typedef_destroy(RDTypeDef* self) {
+    if(self->flags & RD_TFLAG_STATIC) return;
+
     if(rd_i_typedef_is_compound(self))
         vect_destroy(&self->compound_);
     else if(self->kind == RD_TKIND_FUNC) {
-        vect_destroy(&self->func_.args);
+        if(self->func_.args.has_value) vect_destroy(&self->func_.args.value);
     }
-    else if(self->kind == RD_TKIND_ENUM) {
+    else if(self->kind == RD_TKIND_ENUM)
         vect_destroy(&self->enum_);
-    }
-    else if(self->kind == RD_TKIND_PRIM)
-        return;
 
     rd_free(self);
 }
@@ -379,7 +393,7 @@ bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef,
     return false;
 }
 
-void rd_i_register_primitives(RDContext* ctx) {
+void rd_i_register_builtins(RDContext* ctx) {
     rd_typedef_register(&t_prim_bool, ctx);
     rd_typedef_register(&t_prim_u8, ctx);
     rd_typedef_register(&t_prim_u16, ctx);
@@ -391,4 +405,9 @@ void rd_i_register_primitives(RDContext* ctx) {
     rd_typedef_register(&t_prim_i64, ctx);
     rd_typedef_register(&t_prim_char, ctx);
     rd_typedef_register(&t_prim_char16, ctx);
+
+    RDTypeDef* tdef = rd_typedef_create_func("function", ctx);
+    tdef->flags = RD_TFLAG_BUILTIN;
+    tdef->size = rd_get_code_ptr_size(ctx);
+    rd_typedef_register(tdef, ctx);
 }

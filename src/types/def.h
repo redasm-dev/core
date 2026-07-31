@@ -21,15 +21,30 @@ typedef struct RDEnumType {
 } RDEnumType;
 
 typedef struct RDFunctionType {
-    RDType ret;
-    RDParamVect args;
+    struct {
+        RDType value;
+        bool has_value;
+    } ret;
+
+    struct {
+        RDParamVect value;
+        bool has_value;
+    } args;
+
     bool is_noret;
 } RDFunctionType;
+
+typedef enum {
+    RD_TFLAG_NONE = 0,
+    RD_TFLAG_BUILTIN = (1 << 0),
+    RD_TFLAG_STATIC = (1 << 1),
+} RDTypeFlags;
 
 typedef struct RDTypeDef {
     const char* name;
     usize size;
     RDTypeKind kind;
+    RDTypeFlags flags;
 
     union {
         RDParamVect compound_;
@@ -44,7 +59,7 @@ typedef struct RDTypeDefVect {
     usize capacity;
 } RDTypeDefVect;
 
-void rd_i_register_primitives(RDContext* ctx);
+void rd_i_register_builtins(RDContext* ctx);
 void rd_i_typedef_measure(const RDContext* ctx, RDTypeDef* tdef);
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 

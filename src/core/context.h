@@ -112,9 +112,11 @@ void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
                        usize* end);
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
-                               const RDProcessorPlugin* pplugin,
                                RDByteBuffer* input, const char* workingdir,
                                const char* filename, const char* dbpath);
+
+void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* pplugin);
+
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,

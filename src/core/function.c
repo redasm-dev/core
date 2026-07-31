@@ -242,23 +242,29 @@ const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
 
     const RDFunctionType* f_type = &func_def->func_;
 
-    str_append(&ctx->tdef_buf, rd_i_type_to_str(&f_type->ret, t_buf));
-    str_push(&ctx->tdef_buf, ' ');
-    str_append(&ctx->tdef_buf, func_def->name);
-
-    str_push(&ctx->tdef_buf, '(');
-
-    const RDParam* arg;
-    vect_each(arg, &f_type->args) {
-        assert(arg->name);
-        if(arg != vect_first(&f_type->args)) str_push(&ctx->tdef_buf, ',');
-
-        str_append(&ctx->tdef_buf, rd_i_type_to_str(&arg->type, t_buf));
+    if(f_type->ret.has_value) {
+        str_append(&ctx->tdef_buf, rd_i_type_to_str(&f_type->ret.value, t_buf));
         str_push(&ctx->tdef_buf, ' ');
-        str_append(&ctx->tdef_buf, arg->name);
     }
 
-    str_push(&ctx->tdef_buf, ')');
+    str_append(&ctx->tdef_buf, func_def->name);
+
+    if(f_type->args.has_value) {
+
+        str_push(&ctx->tdef_buf, '(');
+        const RDParam* arg;
+        vect_each(arg, &f_type->args.value) {
+            assert(arg->name);
+            if(arg != vect_first(&f_type->args.value))
+                str_push(&ctx->tdef_buf, ',');
+
+            str_append(&ctx->tdef_buf, rd_i_type_to_str(&arg->type, t_buf));
+            str_push(&ctx->tdef_buf, ' ');
+            str_append(&ctx->tdef_buf, arg->name);
+        }
+
+        str_push(&ctx->tdef_buf, ')');
+    }
 
     if(rd_function_is_noret(self)) str_append(&ctx->tdef_buf, " noreturn");
 

@@ -236,13 +236,14 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
                                              RDByteBuffer* input,
                                              RDProjectManifest* manifest,
                                              const RDProjectPaths* paths) {
-    RDContext* ctx = rd_i_context_create(
-        manifest->loaderplugin, manifest->processorplugin, input,
-        paths->working_dir, manifest->file_name, paths->db_path);
+    RDContext* ctx =
+        rd_i_context_create(manifest->loaderplugin, input, paths->working_dir,
+                            manifest->file_name, paths->db_path);
 
     if(!ctx) return NULL;
 
     ctx->min_string = manifest->min_string;
+    rd_i_set_processor(ctx, manifest->processorplugin);
     rd_i_db_load_segments(ctx);
 
     RDCharVect buf = {0};
