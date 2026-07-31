@@ -326,8 +326,6 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                 }
             }
         }
-
-        if(self->func_.is_noret) rd_i_kb_add_noret(ctx, self->name);
     }
     else if(self->kind != RD_TKIND_PRIM)
         unreachable();

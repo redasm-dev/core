@@ -168,15 +168,6 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
     return rd_kbobject_get_str(obj, "name");
 }
 
-static void _rd_kb_apply_noret(RDContext* ctx) {
-    const char** it;
-    vect_each(it, &ctx->kb->noret_names) {
-        RDAddress address;
-        if(!rd_get_address(ctx, *it, &address)) continue;
-        rd_i_set_noret(ctx, address);
-    }
-}
-
 static void _rd_kb_load_dependencies(const RDKBObject* root, RDContext* ctx) {
     const RDKBObject* manifest = rd_kbobject_get_table(root, "manifest");
     if(!manifest) return;
@@ -313,7 +304,6 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
         rd_typedef_register(tdef, ctx);
     }
 
-    _rd_kb_apply_noret(ctx);
     return true;
 }
 
@@ -399,28 +389,8 @@ void rd_i_kb_destroy(RDKB* self) {
     }
 
     vect_destroy(&self->ordinal_modules);
-    vect_destroy(&self->noret_names);
     vect_destroy(&self->files);
     rd_free(self);
-}
-
-void rd_i_kb_add_noret(RDContext* ctx, const char* name) {
-    assert(name);
-
-    usize idx =
-        vect_lower_bound(&ctx->kb->noret_names, name, rd_i_strcmp_key_pred);
-
-    if(idx == vect_length(&ctx->kb->noret_names) ||
-       name != *vect_at(&ctx->kb->noret_names, idx)) {
-        vect_ins(&ctx->kb->noret_names, idx, name);
-    }
-}
-
-bool rd_i_kb_is_noret(const RDContext* ctx, const char* name) {
-    assert(name);
-
-    usize idx = vect_bsearch(&ctx->kb->noret_names, name, rd_i_strcmp_key_pred);
-    return idx < vect_length(&ctx->kb->noret_names);
 }
 
 const char* rd_i_kb_find_ordinal_name(RDContext* ctx, const char* module,

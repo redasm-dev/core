@@ -209,6 +209,7 @@ RD_API bool rd_expect_be16(const RDContext* self, RDAddress address, u16 v);
 RD_API bool rd_expect_be32(const RDContext* self, RDAddress address, u32 v);
 RD_API bool rd_expect_be64(const RDContext* self, RDAddress address, u64 v);
 RD_API bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v);
+RD_API bool rd_read_code_ptr(const RDContext* ctx, RDAddress address, RDAddress* v);
 RD_API bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v);
 RD_API bool rd_write_byte(RDContext* self, RDAddress address, u8 v);
 RD_API bool rd_write_le16(RDContext* self, RDAddress address, u16 v);

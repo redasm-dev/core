@@ -9,11 +9,8 @@
 #define RD_SURFACE_WS_COMMENT 8
 #define RD_SURFACE_WS_REFS 8
 
-static void _rd_render_modifiers(RDRenderer* r, RDAddress address,
-                                 RDThemeKind fg, RDThemeKind bg) {
-    const RDSegmentFull* seg = rd_i_renderer_find_segment(r, address);
-    usize idx = rd_i_address2index(seg, address);
-
+static void _rd_render_modifiers(RDRenderer* r, const RDSegmentFull* seg,
+                                 usize idx, RDThemeKind fg, RDThemeKind bg) {
     if(rd_flagsbuffer_has_imported(seg->flags, idx))
         rd_renderer_text(r, "imported ", fg, bg);
     else if(rd_flagsbuffer_has_exported(seg->flags, idx))
@@ -40,7 +37,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         ptr_type = rd_integral_from_size(PTR_SIZE);
         calc_ptr_size = PTR_SIZE;
     }
-    else if(t->mod == RD_TYPE_CPTR) {
+    else if(t->mod == RD_TYPE_CPTR || t->def->kind == RD_TKIND_FUNC) {
         ptr_type = rd_integral_from_size(CPTR_SIZE);
         calc_ptr_size = CPTR_SIZE;
     }
@@ -157,8 +154,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
 
     if(t->count > 0) return; // non-string array, ignore
 
-    // numeric primitive
-    u64 v;
+    u64 v; // numeric primitive
     if(rd_i_buffer_read_primitive(flags, idx, t->def->name, is_be, &v)) {
         unsigned int sz =
             (unsigned int)rd_i_size_of(r->context, t->def->name, 0, t->mod);
@@ -288,7 +284,7 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
         return;
     }
 
-    _rd_render_modifiers(r, address, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+    _rd_render_modifiers(r, seg, idx, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
     const char* func_str = f ? rd_i_function_to_str(f, r->context) : NULL;
 
     if(func_str) {
@@ -340,7 +336,7 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         return;
     }
 
-    _rd_render_modifiers(r, address, RD_THEME_TYPE, RD_THEME_BACKGROUND);
+    _rd_render_modifiers(r, seg, idx, RD_THEME_TYPE, RD_THEME_BACKGROUND);
 
     RDType t = res->field.type;
     const char* name = res->field.name;
@@ -351,14 +347,25 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
     // Named members never show the index - the index belongs to the
     // element's own row, wherever that renders
     bool is_element = res->item_idx.has_value && !name;
-    bool skip_type_name = is_element && tdef->kind == RD_TKIND_PRIM;
+    bool skip_type_name = (is_element && tdef->kind == RD_TKIND_PRIM) ||
+                          tdef->kind == RD_TKIND_FUNC;
 
-    // 1. struct/union keyword for compound heads
+    // 1a. struct/union keyword for compound heads
     if(t.mod == RD_TYPE_NONE && t.count == 0) {
         if(tdef->kind == RD_TKIND_STRUCT)
             rd_renderer_text(r, "struct ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
         else if(tdef->kind == RD_TKIND_UNION)
             rd_renderer_text(r, "union ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
+    }
+
+    // 1b. function keyword
+    if(tdef->kind == RD_TKIND_FUNC) {
+        if(tdef->func_.is_noret) {
+            rd_renderer_text(r, "noreturn ", RD_THEME_TYPE,
+                             RD_THEME_BACKGROUND);
+        }
+
+        rd_renderer_text(r, "function ", RD_THEME_TYPE, RD_THEME_BACKGROUND);
     }
 
     if(!skip_type_name) {
@@ -396,8 +403,10 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         rd_renderer_norm(r, "]");
     }
 
-    // 6. value (only for primitives and pointers, not compound heads)
-    if(tdef->kind == RD_TKIND_PRIM || rd_type_is_ptr(&res->field.type)) {
+    // 6. value
+    // (only for primitives, functions and pointers, not compound heads)
+    if(tdef->kind == RD_TKIND_PRIM || tdef->kind == RD_TKIND_FUNC ||
+       rd_type_is_ptr(&res->field.type)) {
         rd_renderer_ws(r, 1);
         rd_renderer_norm(r, "=");
         rd_renderer_ws(r, 1);
@@ -658,6 +667,11 @@ RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
     panic_if(rd_flagsbuffer_has_tail(seg->flags, idx),
              "tail detected @ %" PRIx64 ", sub_line %zu",
              seg->base.start_address + idx, sub_line);
+
+    if(seg->base.start_address + idx == 0x00402000) {
+        int zzz = 0;
+        zzz++;
+    }
 
     if(rd_flagsbuffer_has_unknown(seg->flags, idx))
         return _rd_render_item_unknown(r, seg, idx, sub_line);

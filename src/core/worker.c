@@ -77,13 +77,36 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
     RDTypeDef** it;
     vect_each(it, &ctx->typedefs) {
         const RDTypeDef* tdef = *it;
-        if(tdef->kind != RD_TKIND_FUNC) continue;
+
+        if(tdef->kind != RD_TKIND_FUNC || tdef->flags & RD_TFLAG_BUILTIN)
+            continue;
 
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
 
-        RDFunction* f = rd_i_find_function(ctx, address);
-        if(f) rd_i_function_set_type_def(f, tdef);
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+        if(!seg) continue;
+
+        usize idx = rd_i_address2index(seg, address);
+
+        if(rd_flagsbuffer_has_func(seg->flags, idx)) {
+            RDFunction* f = rd_i_find_function(ctx, address);
+            if(!f || f->type_def == tdef) continue;
+
+            if(f->type_def && !(f->type_def->flags & RD_TFLAG_BUILTIN))
+                continue;
+
+            rd_i_function_set_type_def(f, tdef);
+        }
+        else if(rd_flagsbuffer_has_type(seg->flags, idx)) {
+            RDTypeFull t;
+            if(!rd_i_get_type(ctx, address, &t) || t.base.def == tdef) continue;
+            if(t.base.count > 0 || t.base.def->kind != RD_TKIND_FUNC) continue;
+            if(!(t.base.def->flags & RD_TFLAG_BUILTIN)) continue;
+
+            rd_i_set_type(ctx, address, tdef->name, 0, t.base.mod,
+                          RD_CONFIDENCE_LIBRARY);
+        }
     }
 }
 

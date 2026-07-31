@@ -132,12 +132,7 @@ void rd_i_db_load(RDContext* ctx) {
 
     // restore NORET status in KB
     RDTypeDef** it;
-    vect_each(it, &ctx->typedefs) {
-        rd_i_typedef_measure(ctx, *it);
-
-        if((*it)->kind == RD_TKIND_FUNC && (*it)->func_.is_noret)
-            rd_i_kb_add_noret(ctx, (*it)->name);
-    }
+    vect_each(it, &ctx->typedefs) { rd_i_typedef_measure(ctx, *it); }
 
     _rd_i_db_query_get_all_functions(ctx, &ctx->functions);
     _rd_i_db_query_get_all_sregval(ctx, &ctx->db->segment_regs,

@@ -4,12 +4,12 @@
 /*
  * RDFlags: 32 bits per address.
  *
- * 31     27 26          22 21 20 19    17 16          9 8 7        0
+ * 31     27 26          21 20 19 18    16 15          9 8 7        0
  * ┌────────┬──────────────┬─────┬────────┬────────────┬─┬──────────┐
  * │  free  │  structure   │class│arrival │  preserve  │V│  value   │
  * └────────┴──────────────┴─────┴────────┴────────────┴─┴──────────┘
- *  └───── cleared by clear ─────┘ └────── survives clear ─────────┘
- *  └────── cleared by undefine ──────────┘ └─ survives undefine ──┘
+ *           └─ cleared by clear ─┘└──────── survives clear ────────┘
+ *           └──── cleared by undefine ────┘└─ survives undefine ───┘
  *
  * Ordering is forced by the masks: a flag survives an operation if it sits
  * BELOW that operation's cut. Both masks cut below the class bits, so both
@@ -18,15 +18,16 @@
  *
  * The three tiers, by who owns the truth:
  *   preserve   knowledge: users, loaders, DB rows. Class-agnostic and
- *              head-only: FL_NORET marks an instruction, a function EP or an
- *              IAT slot alike, exactly like FL_IMPORTED. Never retracted
- *              implicitly.
+ *              head-only. Never retracted implicitly.
  *   arrival    how control REACHES here (call/jump/fall-through). Owned by the
  *              referrer, not by this cell's decode: a byte change here does not
  *              invalidate them, so they survive clear + re-decode. Dropped by
  *              undefine ("means nothing") or by becoming a TAIL ("cannot live
  *              mid-item").
  *   structure  what these bytes DECODE TO. Re-derived on every decode.
+ *              FL_NORET lives here: it means "this instruction terminates
+ *              flow", derived from the callee's type (RDFunctionType.is_noret),
+ *              NOT "the symbol here never returns" - that lives in the type.
  *
  * FL_FLOW and FL_FUNC are mutually exclusive, enforced symmetrically by both
  * setters so the outcome does not depend on discovery order.
@@ -35,7 +36,7 @@
  *
  * FL_FLOW: set on the DESTINATION instruction:
  * - means "reached by fall-through from the previous instruction".
- * - never set on function entries (FL_FUNC) or noreturn functions (FL_NORET)
+ * - never set on function entries (FL_FUNC)
  * - both clear FL_FLOW automatically in their set functions.
  */
 
@@ -51,23 +52,22 @@ static const RDFlags FL_XREFOUT = 1U << 12;
 static const RDFlags FL_XREFIN = 1U << 13;
 static const RDFlags FL_EXPORTED = 1U << 14;
 static const RDFlags FL_IMPORTED = 1U << 15;
-static const RDFlags FL_NORET = 1U << 16;
 
 // covers bits 0-15 (NOTE: always add the last flag above)
-#define FL_UNDEFINE_MASK ((RDFlags)((FL_NORET << 1) - 1))
+#define FL_UNDEFINE_MASK ((RDFlags)((FL_IMPORTED << 1) - 1))
 #define FL_HAS_INFO                                                            \
     ((RDFlags)(FL_UNDEFINE_MASK & ~(FL_VALUE | FL_PATCH | 0xFF)))
 
 // [ARRIVAL]
-static const RDFlags FL_FLOW = 1U << 17;
-static const RDFlags FL_JMPDST = 1U << 18;
-static const RDFlags FL_FUNC = 1U << 19;
+static const RDFlags FL_FLOW = 1U << 16;
+static const RDFlags FL_JMPDST = 1U << 17;
+static const RDFlags FL_FUNC = 1U << 18;
 
-// covers bits 0-17 (NOTE: always add the last flag above)
+// covers bits 0-18 (NOTE: always add the last flag above)
 #define FL_CLEAR_MASK ((RDFlags)((FL_FUNC << 1) - 1))
 
-// [CLASS]: 2-bit field, bits 20-21
-#define FL_CLASS_SHIFT 20
+// [CLASS]: 2-bit field, bits 19-20
+#define FL_CLASS_SHIFT 19
 #define FL_CLASS_MASK ((RDFlags)(3U << FL_CLASS_SHIFT))
 
 typedef enum {
@@ -78,9 +78,9 @@ typedef enum {
 } RDFlagsClass;
 
 // [STRUCTURE] CODE
-// kind: 2-bit field, bits 22-23.
+// kind: 2-bit field, bits 21-22.
 // JUMP/CALL are mutually exclusive.
-#define FL_KIND_SHIFT 22
+#define FL_KIND_SHIFT 21
 #define FL_KIND_MASK ((RDFlags)(3U << FL_KIND_SHIFT))
 
 typedef enum {
@@ -89,14 +89,15 @@ typedef enum {
     FL_KI_CALL,
 } RDFlagsKind;
 
+static const RDFlags FL_NORET = 1U << 23;
 static const RDFlags FL_COND = 1U << 24;
 static const RDFlags FL_DSLOT = 1U << 25;
 static const RDFlags FL_OPOVER = 1U << 26;
 
 // [STRUCTURE] DATA
-static const RDFlags FL_TYPE = 1U << 22;
-static const RDFlags FL_FIELD = 1U << 23;
-static const RDFlags FL_ITEM = 1U << 24;
+static const RDFlags FL_TYPE = 1U << 23;
+static const RDFlags FL_FIELD = 1U << 24;
+static const RDFlags FL_ITEM = 1U << 25;
 
 static RDFlagsClass _rd_flags_class(RDFlags self) {
     return (RDFlagsClass)((self & FL_CLASS_MASK) >> FL_CLASS_SHIFT);
@@ -145,7 +146,9 @@ bool rd_i_flags_has_call(RDFlags self) {
     return _rd_flags_kind(self) == FL_KI_CALL;
 }
 
-bool rd_i_flags_has_noret(RDFlags self) { return self & FL_NORET; }
+bool rd_i_flags_has_noret(RDFlags self) {
+    return rd_i_flags_has_code(self) && (self & FL_NORET);
+}
 
 bool rd_i_flags_has_cond(RDFlags self) {
     return rd_i_flags_has_code(self) && (self & FL_COND);
@@ -238,7 +241,10 @@ void rd_i_flags_set_func(RDFlags* self) {
     *self &= ~FL_FLOW; // function entries break flow
 }
 
-void rd_i_flags_set_noret(RDFlags* self) { *self |= FL_NORET; }
+void rd_i_flags_set_noret(RDFlags* self) {
+    assert(rd_i_flags_has_code(*self));
+    *self |= FL_NORET;
+}
 
 void rd_i_flags_set_cond(RDFlags* self) {
     assert(rd_i_flags_has_jump(*self) || rd_i_flags_has_call(*self));

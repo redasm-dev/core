@@ -45,6 +45,54 @@ static void _rd_teardown_range(RDContext* self, const RDSegmentFull* seg,
     }
 }
 
+static bool _rd_read_ptr(const RDContext* ctx, unsigned int ptr_size,
+                         RDAddress address, RDAddress* v) {
+    bool is_be = ctx->processorplugin->flags & RD_PF_BE;
+
+    switch(ptr_size) {
+        case sizeof(u8): {
+            u8 ptr_v;
+            if(!rd_read_byte(ctx, address, &ptr_v)) return false;
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u16): {
+            u16 ptr_v;
+            if(is_be ? !rd_read_be16(ctx, address, &ptr_v)
+                     : !rd_read_le16(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u32): {
+            u32 ptr_v;
+            if(is_be ? !rd_read_be32(ctx, address, &ptr_v)
+                     : !rd_read_le32(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        case sizeof(u64): {
+            u64 ptr_v;
+            if(is_be ? !rd_read_be64(ctx, address, &ptr_v)
+                     : !rd_read_le64(ctx, address, &ptr_v))
+                return false;
+
+            *v = (RDAddress)ptr_v;
+            return true;
+        }
+
+        default: break;
+    }
+
+    return false;
+}
+
 void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
                        usize* end) {
     assert(start && end);
@@ -724,50 +772,11 @@ bool rd_read_be64(const RDContext* self, RDAddress address, u64* v) {
 }
 
 bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
-    bool is_be = ctx->processorplugin->flags & RD_PF_BE;
+    return _rd_read_ptr(ctx, rd_get_ptr_size(ctx), address, v);
+}
 
-    switch(ctx->processorplugin->ptr_size) {
-        case sizeof(u8): {
-            u8 ptr_v;
-            if(!rd_read_byte(ctx, address, &ptr_v)) return false;
-            *v = (RDAddress)ptr_v;
-            return true;
-        }
-
-        case sizeof(u16): {
-            u16 ptr_v;
-            if(is_be ? !rd_read_be16(ctx, address, &ptr_v)
-                     : !rd_read_le16(ctx, address, &ptr_v))
-                return false;
-
-            *v = (RDAddress)ptr_v;
-            return true;
-        }
-
-        case sizeof(u32): {
-            u32 ptr_v;
-            if(is_be ? !rd_read_be32(ctx, address, &ptr_v)
-                     : !rd_read_le32(ctx, address, &ptr_v))
-                return false;
-
-            *v = (RDAddress)ptr_v;
-            return true;
-        }
-
-        case sizeof(u64): {
-            u64 ptr_v;
-            if(is_be ? !rd_read_be64(ctx, address, &ptr_v)
-                     : !rd_read_le64(ctx, address, &ptr_v))
-                return false;
-
-            *v = (RDAddress)ptr_v;
-            return true;
-        }
-
-        default: break;
-    }
-
-    return false;
+bool rd_read_code_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
+    return _rd_read_ptr(ctx, rd_get_code_ptr_size(ctx), address, v);
 }
 
 bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
