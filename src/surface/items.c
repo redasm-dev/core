@@ -668,11 +668,6 @@ RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
              "tail detected @ %" PRIx64 ", sub_line %zu",
              seg->base.start_address + idx, sub_line);
 
-    if(seg->base.start_address + idx == 0x00402000) {
-        int zzz = 0;
-        zzz++;
-    }
-
     if(rd_flagsbuffer_has_unknown(seg->flags, idx))
         return _rd_render_item_unknown(r, seg, idx, sub_line);
 
