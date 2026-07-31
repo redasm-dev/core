@@ -231,23 +231,21 @@ void rd_i_function_rebuild_graph(RDFunction* self,
 }
 
 const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
-    RDName n;
-    if(!rd_i_get_name(ctx, self->address, false, &n)) return NULL;
-
-    const RDTypeDef* func_def = rd_i_typedef_find(ctx, n.value);
-    if(!func_def || func_def->kind != RD_TKIND_FUNC) return NULL;
-
     RDCharVect* t_buf = &ctx->type_buf;
     str_clear(&ctx->tdef_buf);
 
-    const RDFunctionType* f_type = &func_def->func_;
+    const RDFunctionType* f_type = &self->type_def->func_;
 
     if(f_type->ret.has_value) {
         str_append(&ctx->tdef_buf, rd_i_type_to_str(&f_type->ret.value, t_buf));
         str_push(&ctx->tdef_buf, ' ');
     }
 
-    str_append(&ctx->tdef_buf, func_def->name);
+    RDName n; // try to get the name
+    if(rd_i_get_name(ctx, self->address, false, &n))
+        str_append(&ctx->tdef_buf, n.value);
+    else
+        str_append(&ctx->tdef_buf, self->type_def->name);
 
     if(f_type->args.has_value) {
 
@@ -294,7 +292,11 @@ RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
     *self = (RDFunction){
         .context = ctx,
         .address = address,
+        .type_def = rd_i_typedef_find(ctx, "function"),
     };
+
+    assert(self->type_def);
+    assert(self->type_def->kind == RD_TKIND_FUNC);
 
     return self;
 }
