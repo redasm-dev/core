@@ -14,3 +14,4 @@ typedef struct RDVersion {
 RD_API RDVersion rd_version(void);
 RD_API const char* rd_version_string(void);
 RD_API const char* rd_version_build(void);
+RD_API bool rd_version_parse(const char* s, RDVersion* v);

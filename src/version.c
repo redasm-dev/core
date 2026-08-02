@@ -1,4 +1,4 @@
-#include "version.h"
+#include <redasm/version.h>
 #include <stdio.h>
 
 #if !defined(RD_VERSION)
@@ -11,7 +11,7 @@
 
 RDVersion rd_version(void) {
     RDVersion v = {0};
-    bool ok = rd_i_version_parse(RD_VERSION, &v);
+    bool ok = rd_version_parse(RD_VERSION, &v);
     assert(ok && "invalid version string");
     return v;
 }
@@ -19,7 +19,7 @@ RDVersion rd_version(void) {
 const char* rd_version_string(void) { return RD_VERSION; }
 const char* rd_version_build(void) { return RD_BUILD_VERSION; }
 
-bool rd_i_version_parse(const char* s, RDVersion* v) {
+bool rd_version_parse(const char* s, RDVersion* v) {
     if(!s || !v) return false;
 
     int major, minor, rev;

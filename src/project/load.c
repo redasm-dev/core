@@ -4,10 +4,10 @@
 #include "project.h"
 #include "support/containers.h"
 #include "support/tomlschema.h"
-#include "version.h"
 #include <inttypes.h>
 #include <miniz.h>
 #include <redasm/support/logging.h>
+#include <redasm/version.h>
 #include <tomlc17.h>
 
 typedef struct RDProjectManifest {
@@ -141,7 +141,7 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
 
     const char* ver = toml_seek(out->toml.toptab, "format.version").u.s;
 
-    if(!rd_i_version_parse(ver, &out->version)) {
+    if(!rd_version_parse(ver, &out->version)) {
         RD_LOG_FAIL("invalid formatting for version '%s'", ver);
         return false;
     }
