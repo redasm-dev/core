@@ -20,7 +20,6 @@ static const RDProcessorPlugin BUILTIN_NULL = {
     .id = RD_NULL_PROCESSOR_ID,
     .flags = RD_PF_LAST,
     .name = "Null",
-    .int_size = sizeof(intmax_t),
     .ptr_size = sizeof(ptrdiff_t),
     .decode = _null_decode,
     .emulate = _null_emulate,

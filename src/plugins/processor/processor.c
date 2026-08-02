@@ -122,11 +122,6 @@ unsigned int rd_get_code_ptr_size(const RDContext* ctx) {
                : ctx->processorplugin->ptr_size;
 }
 
-unsigned int rd_get_int_size(const RDContext* ctx) {
-    assert(ctx->processorplugin);
-    return ctx->processorplugin->int_size;
-}
-
 bool rd_register_processor(const RDProcessorPlugin* p) {
     if(!rd_i_validate_plugin_with_name(p->level, p->id, p->name, "processor"))
         return false;
@@ -143,11 +138,6 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
 
     if(!p->ptr_size) {
         RD_LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
-        return false;
-    }
-
-    if(!p->int_size) {
-        RD_LOG_FAIL("invalid integer-size for processor '%s'", p->id);
         return false;
     }
 

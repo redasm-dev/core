@@ -23,7 +23,6 @@ typedef struct RDProcessorPlugin {
     const char* operand_sep;
     unsigned int code_ptr_size;
     unsigned int ptr_size;
-    unsigned int int_size;
 
     RDProcessor* (*create)(const struct RDProcessorPlugin*);
     void (*destroy)(RDProcessor*);
@@ -49,4 +48,3 @@ RD_API bool rd_register_processor(const RDProcessorPlugin* p);
 RD_API const char* rd_get_reg_name(const RDContext* ctx, RDReg r);
 RD_API unsigned int rd_get_ptr_size(const RDContext* ctx);
 RD_API unsigned int rd_get_code_ptr_size(const RDContext* ctx);
-RD_API unsigned int rd_get_int_size(const RDContext* ctx);

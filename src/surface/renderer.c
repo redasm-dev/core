@@ -234,8 +234,8 @@ RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
         rd_renderer_norm(self, seg->base.name);
         rd_renderer_norm(self, ":");
 
-        const unsigned int INT_SIZE = rd_get_int_size(self->context);
-        const char* address_str = rd_i_to_hex((i64)address, INT_SIZE);
+        const unsigned int PTR_SIZE = rd_get_ptr_size(self->context);
+        const char* address_str = rd_i_to_hex((i64)address, PTR_SIZE);
 
         rd_renderer_norm(self, address_str);
 
