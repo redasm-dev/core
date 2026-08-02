@@ -6,36 +6,49 @@
 #include <stdint.h>
 #include <string.h>
 
-#define RD_PRIMITIVE(n, s)                                                     \
+#define RD_PRIMITIVE(n, s, f)                                                  \
     {                                                                          \
         .name = n,                                                             \
         .kind = RD_TKIND_PRIM,                                                 \
-        .flags = RD_TFLAG_STATIC | RD_TFLAG_BUILTIN,                           \
+        .flags = RD_TFLAGS_STATIC | RD_TFLAGS_BUILTIN | (f),                   \
         .size = s,                                                             \
     }
 
-static RDTypeDef t_prim_bool = RD_PRIMITIVE("bool", sizeof(bool));
-static RDTypeDef t_prim_u8 = RD_PRIMITIVE("u8", sizeof(u8));
-static RDTypeDef t_prim_u16 = RD_PRIMITIVE("u16", sizeof(u16));
-static RDTypeDef t_prim_u32 = RD_PRIMITIVE("u32", sizeof(u32));
-static RDTypeDef t_prim_u64 = RD_PRIMITIVE("u64", sizeof(u64));
-static RDTypeDef t_prim_i8 = RD_PRIMITIVE("i8", sizeof(i8));
-static RDTypeDef t_prim_i16 = RD_PRIMITIVE("i16", sizeof(i16));
-static RDTypeDef t_prim_i32 = RD_PRIMITIVE("i32", sizeof(i32));
-static RDTypeDef t_prim_i64 = RD_PRIMITIVE("i64", sizeof(i64));
-static RDTypeDef t_prim_char = RD_PRIMITIVE("char", sizeof(i8));
-static RDTypeDef t_prim_char16 = RD_PRIMITIVE("char16", sizeof(i16));
+// clang-format off
+static RDTypeDef t_prim_bool = RD_PRIMITIVE("bool", sizeof(bool), RD_TFLAGS_NONE);
+static RDTypeDef t_prim_u8 = RD_PRIMITIVE("u8", sizeof(u8), RD_TFLAGS_NONE);
+static RDTypeDef t_prim_u16 = RD_PRIMITIVE("u16", sizeof(u16), RD_TFLAGS_NONE);
+static RDTypeDef t_prim_u32 = RD_PRIMITIVE("u32", sizeof(u32), RD_TFLAGS_NONE);
+static RDTypeDef t_prim_u64 = RD_PRIMITIVE("u64", sizeof(u64), RD_TFLAGS_NONE);
+static RDTypeDef t_prim_i8 = RD_PRIMITIVE("i8", sizeof(i8), RD_TFLAGS_SIGNED);
+static RDTypeDef t_prim_i16 = RD_PRIMITIVE("i16", sizeof(i16), RD_TFLAGS_SIGNED);
+static RDTypeDef t_prim_i32 = RD_PRIMITIVE("i32", sizeof(i32), RD_TFLAGS_SIGNED);
+static RDTypeDef t_prim_i64 = RD_PRIMITIVE("i64", sizeof(i64), RD_TFLAGS_SIGNED);
+static RDTypeDef t_prim_char = RD_PRIMITIVE("char", sizeof(i8), RD_TFLAGS_SIGNED);
+static RDTypeDef t_prim_char16 = RD_PRIMITIVE("char16", sizeof(i16), RD_TFLAGS_SIGNED);
+// clang-format on
 
 static bool _rd_typedef_enum_in_range(const RDTypeDef* tdef, i64 val) {
-    if(!strcmp(tdef->name, "u8")) return val >= 0 && val <= UINT8_MAX;
-    if(!strcmp(tdef->name, "u16")) return val >= 0 && val <= UINT16_MAX;
-    if(!strcmp(tdef->name, "u32")) return val >= 0 && val <= UINT32_MAX;
-    if(!strcmp(tdef->name, "u64"))
-        return val >= 0; // i64 can't hold full u64 range
-    if(!strcmp(tdef->name, "i8")) return val >= INT8_MIN && val <= INT8_MAX;
-    if(!strcmp(tdef->name, "i16")) return val >= INT16_MIN && val <= INT16_MAX;
-    if(!strcmp(tdef->name, "i32")) return val >= INT32_MIN && val <= INT32_MAX;
-    if(!strcmp(tdef->name, "i64")) return true;
+    bool is_signed = tdef->flags & RD_TFLAGS_SIGNED;
+
+    switch(tdef->size) {
+        case 1:
+            return is_signed ? (val >= INT8_MIN && val <= INT8_MAX)
+                             : (val >= 0 && val <= UINT8_MAX);
+
+        case 2:
+            return is_signed ? (val >= INT16_MIN && val <= INT16_MAX)
+                             : (val >= 0 && val <= UINT16_MAX);
+
+        case 4:
+            return is_signed ? (val >= INT32_MIN && val <= INT32_MAX)
+                             : (val >= 0 && val <= UINT32_MAX);
+
+        case 8: return is_signed || val >= 0; // i64 can't hold full u64 range
+
+        default: break;
+    }
+
     return false;
 }
 
@@ -332,7 +345,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
 
     rd_i_typedef_measure(ctx, self);
 
-    if(!(self->flags & RD_TFLAG_BUILTIN)) {
+    if(!(self->flags & RD_TFLAGS_BUILTIN)) {
         rd_i_db_set_type_def(ctx, self); // don't save builtins in DB
 
         RD_LOG_INFO("%s definition '%s' registered",
@@ -361,7 +374,7 @@ bool rd_typedef_is_noret(const RDTypeDef* self) {
 }
 
 void rd_typedef_destroy(RDTypeDef* self) {
-    if(self->flags & RD_TFLAG_STATIC) return;
+    if(self->flags & RD_TFLAGS_STATIC) return;
 
     if(rd_i_typedef_is_compound(self))
         vect_destroy(&self->compound_);
@@ -404,8 +417,18 @@ void rd_i_register_builtins(RDContext* ctx) {
     rd_typedef_register(&t_prim_char, ctx);
     rd_typedef_register(&t_prim_char16, ctx);
 
-    RDTypeDef* tdef = rd_typedef_create_func("function", ctx);
-    tdef->flags = RD_TFLAG_BUILTIN;
-    tdef->size = rd_get_code_ptr_size(ctx);
-    rd_typedef_register(tdef, ctx);
+    RDTypeDef* tdef_usize = _rd_typedef_create("usize", RD_TKIND_PRIM, ctx);
+    tdef_usize->flags = RD_TFLAGS_BUILTIN;
+    tdef_usize->size = rd_get_ptr_size(ctx);
+    rd_typedef_register(tdef_usize, ctx);
+
+    RDTypeDef* tdef_isize = _rd_typedef_create("isize", RD_TKIND_PRIM, ctx);
+    tdef_isize->flags = RD_TFLAGS_BUILTIN | RD_TFLAGS_SIGNED;
+    tdef_isize->size = rd_get_ptr_size(ctx);
+    rd_typedef_register(tdef_isize, ctx);
+
+    RDTypeDef* tdef_func = rd_typedef_create_func("function", ctx);
+    tdef_func->flags = RD_TFLAGS_BUILTIN;
+    tdef_func->size = rd_get_code_ptr_size(ctx);
+    rd_typedef_register(tdef_func, ctx);
 }

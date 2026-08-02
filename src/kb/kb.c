@@ -116,7 +116,6 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
         return "";
     }
 
-    bool is_type_size = !strcmp(tname, "size");
     bool is_type_cptr = !strcmp(tname, "cptr");
     bool is_type_ptr = !strcmp(tname, "ptr");
 
@@ -144,11 +143,6 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
         t->def = rd_integral_typedef_from_size(rd_get_ptr_size(ctx), ctx);
         panic_if(!t->def, "cannot get pointer size");
         t->mod = RD_TYPE_PTR;
-    }
-
-    if(is_type_size) {
-        t->def = rd_integral_typedef_from_size(rd_get_int_size(ctx), ctx);
-        panic_if(!t->def, "cannot get integer size");
     }
 
     if(t->mod == RD_TYPE_NONE) {

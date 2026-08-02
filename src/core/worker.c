@@ -78,7 +78,7 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
     vect_each(it, &ctx->typedefs) {
         const RDTypeDef* tdef = *it;
 
-        if(tdef->kind != RD_TKIND_FUNC || tdef->flags & RD_TFLAG_BUILTIN)
+        if(tdef->kind != RD_TKIND_FUNC || tdef->flags & RD_TFLAGS_BUILTIN)
             continue;
 
         RDAddress address;
@@ -93,7 +93,7 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
             RDFunction* f = rd_i_find_function(ctx, address);
             if(!f || f->type_def == tdef) continue;
 
-            if(f->type_def && !(f->type_def->flags & RD_TFLAG_BUILTIN))
+            if(f->type_def && !(f->type_def->flags & RD_TFLAGS_BUILTIN))
                 continue;
 
             rd_i_function_set_type_def(f, tdef);
@@ -102,7 +102,7 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
             RDTypeFull t;
             if(!rd_i_get_type(ctx, address, &t) || t.base.def == tdef) continue;
             if(t.base.count > 0 || t.base.def->kind != RD_TKIND_FUNC) continue;
-            if(!(t.base.def->flags & RD_TFLAG_BUILTIN)) continue;
+            if(!(t.base.def->flags & RD_TFLAGS_BUILTIN)) continue;
 
             rd_i_set_type(ctx, address, tdef->name, 0, t.base.mod,
                           RD_CONFIDENCE_LIBRARY);

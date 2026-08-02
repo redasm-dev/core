@@ -35,9 +35,10 @@ typedef struct RDFunctionType {
 } RDFunctionType;
 
 typedef enum {
-    RD_TFLAG_NONE = 0,
-    RD_TFLAG_BUILTIN = (1 << 0),
-    RD_TFLAG_STATIC = (1 << 1),
+    RD_TFLAGS_NONE = 0,
+    RD_TFLAGS_BUILTIN = (1 << 0),
+    RD_TFLAGS_STATIC = (1 << 1),
+    RD_TFLAGS_SIGNED = (1 << 2), // RD_TKIND_PRIM only
 } RDTypeFlags;
 
 typedef struct RDTypeDef {

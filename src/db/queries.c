@@ -750,7 +750,7 @@ bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
 }
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
-    panic_if(tdef->flags & RD_TFLAG_BUILTIN,
+    panic_if(tdef->flags & RD_TFLAGS_BUILTIN,
              "builtin type definitions not allowed in DB");
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
