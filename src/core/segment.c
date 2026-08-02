@@ -26,8 +26,8 @@ const RDFlagsBuffer* rd_segment_get_flags(const RDSegment* self) {
 }
 
 RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
-                                   RDAddress addr, RDAddress endaddr, u32 perm,
-                                   u32 unit) {
+                                   RDAddress addr, RDAddress endaddr,
+                                   u32 perm) {
     assert(name);
 
     if(addr >= endaddr) {
@@ -44,7 +44,6 @@ RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
                 .start_address = addr,
                 .end_address = endaddr,
                 .perm = perm,
-                .unit = unit,
             },
 
         .flags = rd_i_flagsbuffer_create(endaddr - addr),

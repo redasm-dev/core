@@ -8,7 +8,6 @@ typedef struct RDSegment {
     RDAddress start_address;
     RDAddress end_address;
     u32 perm;
-    u32 unit;
 } RDSegment;
 
 typedef struct RDSegmentSlice {

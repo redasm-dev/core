@@ -342,7 +342,7 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
     }
 
     // FIXME: unit argument is missing
-    RDSegmentFull* s = rd_i_segment_create(self, name, addr, endaddr, perm, 0);
+    RDSegmentFull* s = rd_i_segment_create(self, name, addr, endaddr, perm);
     if(!s) return false;
 
     if(rd_i_db_add_segment(self, s)) {

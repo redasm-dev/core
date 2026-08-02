@@ -582,9 +582,8 @@ bool rd_i_render_segment_item(RDRenderer* r, const RDSegmentFull* seg) {
         p->render_segment(r, (const RDSegment*)seg, r->context->processor);
     }
     else {
-        const unsigned int INT_SIZE = r->context->processorplugin->int_size;
-        const unsigned int B = seg->base.unit ? seg->base.unit : INT_SIZE;
-        const unsigned int F = B * 2;
+        const unsigned int INT_SIZE = rd_get_ptr_size(r->context);
+        const unsigned int F = INT_SIZE * 2;
 
         rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
         rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT,

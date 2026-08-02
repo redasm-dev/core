@@ -134,7 +134,7 @@ static sqlite3_stmt* _rd_db_prepare_get_type_enum_params(RDContext* ctx,
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_SEGMENT, "\
         INSERT INTO Segments \
-        VALUES (:name, :startaddr, :endaddr, :unit, :perm) \
+        VALUES (:name, :startaddr, :endaddr, :perm) \
     ");
 
     _rd_db_bind_param_str(ctx, stmt, ":name", s->base.name);
@@ -142,7 +142,6 @@ void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
                           (sqlite3_int64)s->base.start_address);
     _rd_db_bind_param_int(ctx, stmt, ":endaddr",
                           (sqlite3_int64)s->base.end_address);
-    _rd_db_bind_param_int(ctx, stmt, ":unit", s->base.unit);
     _rd_db_bind_param_int(ctx, stmt, ":perm", s->base.perm);
     _rd_db_step(ctx, stmt);
 }
@@ -150,7 +149,7 @@ void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
 RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
                                                    RDSegmentFullVect* v) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_SEGMENTS, "\
-        SELECT name, start_address, end_address, unit, perm \
+        SELECT name, start_address, end_address, perm \
         FROM Segments \
         ORDER BY start_address \
     ");
@@ -159,11 +158,9 @@ RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
         const char* name = (const char*)sqlite3_column_text(stmt, 0);
         RDAddress start = (RDAddress)sqlite3_column_int64(stmt, 1);
         RDAddress end = (RDAddress)sqlite3_column_int64(stmt, 2);
-        u32 unit = (u32)sqlite3_column_int(stmt, 3);
-        u32 perm = (u32)sqlite3_column_int(stmt, 4);
+        u32 perm = (u32)sqlite3_column_int(stmt, 3);
 
-        RDSegmentFull* s =
-            rd_i_segment_create(ctx, name, start, end, perm, unit);
+        RDSegmentFull* s = rd_i_segment_create(ctx, name, start, end, perm);
 
         panic_if(!s, "segment '%s' loading failed", name);
         vect_push(v, s);

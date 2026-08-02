@@ -18,8 +18,7 @@ usize rd_i_address2index(const RDSegmentFull* seg, RDAddress addr);
 RDAddress rd_i_index2address(const RDSegmentFull* seg, usize idx);
 
 RDSegmentFull* rd_i_segment_create(RDContext* ctx, const char* name,
-                                   RDAddress addr, RDAddress endaddr, u32 perm,
-                                   u32 unit);
+                                   RDAddress addr, RDAddress endaddr, u32 perm);
 
 void rd_i_segment_destroy(RDSegmentFull* self);
 

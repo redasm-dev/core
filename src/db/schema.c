@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS Segments ( \
     name          TEXT NOT NULL, \
     start_address INTEGER NOT NULL, \
     end_address   INTEGER NOT NULL, \
-    unit          INTEGER NOT NULL, \
     perm          INTEGER NOT NULL \
 ); \
 CREATE TABLE IF NOT EXISTS InputMappings ( \
