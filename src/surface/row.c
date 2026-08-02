@@ -70,19 +70,13 @@ void rd_i_rowvect_destroy(RDRowVect* self) {
     }
 }
 
-void rd_i_rowvect_push(RDContext* ctx, RDRowVect* self, usize sub_line,
-                       RDAddress address) {
+void rd_i_rowvect_push(RDRowVect* self, usize sub_line, RDAddress address) {
     RDRow r = {
         .address = address,
         .sub_line = sub_line,
         .curr_data = rd_i_default_cell_data(),
     };
 
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-    panic_if(!seg, "segment not found @ %" PRIx64, address);
-    usize idx = rd_i_address2index(seg, address);
-
-    r.curr_data.is_instruction = rd_flagsbuffer_has_code(seg->flags, idx);
     vect_push(self, r);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "io/buffer.h"
+#include <redasm/io/flags.h>
 
 typedef struct RDFlagsBuffer {
     RDBuffer base;

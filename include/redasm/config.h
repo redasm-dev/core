@@ -44,4 +44,3 @@ typedef intptr_t iptr;
 
 typedef u64 RDAddress;
 typedef u64 RDOffset;
-typedef u32 RDFlags;

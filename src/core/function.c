@@ -118,7 +118,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             RDFlags flags = rd_i_flagsbuffer_get(seg->flags, idx);
 
             // stop at non-code or tail bytes
-            if(!rd_i_flags_has_code(flags) || rd_i_flags_has_tail(flags)) break;
+            if(!rd_flags_has_code(flags) || rd_flags_has_tail(flags)) break;
 
             usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
             if(!len) break;
@@ -128,7 +128,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
 
             RDAddress nextaddr = addr + len;
 
-            if(rd_i_flags_has_jump(flags)) {
+            if(rd_flags_has_jump(flags)) {
                 rd_i_get_xrefs_from_ex(ctx, addr, RD_CR_JUMP, &refs);
 
                 // consume all delay slot instructions into current block
@@ -147,7 +147,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     nextaddr += slotlen;
                 }
 
-                if(rd_i_flags_has_cond(flags)) {
+                if(rd_flags_has_cond(flags)) {
                     // true edge(s): jump targets from refs
                     const RDXRef* r;
                     vect_each(r, &refs) {
@@ -196,7 +196,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             RDFlags nextflags = rd_i_flagsbuffer_get(seg->flags, nextidx);
 
             if(!rd_i_flags_has_flow(nextflags)) {
-                if(rd_i_flags_has_noret(flags)) {
+                if(rd_flags_has_noret(flags)) {
                     self->n_norets++;
                     has_noret = true;
                 }
@@ -206,7 +206,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             }
 
             // someone references here: forced split, add flow edge
-            if(rd_i_flags_has_xref_in(nextflags)) {
+            if(rd_flags_has_xref_in(nextflags)) {
                 RDGraphNode dst = _rd_function_get_or_add_block(
                     ctx, g, nextaddr, self, &w, chunks);
                 if(dst) rd_graph_add_edge(g, src, dst);

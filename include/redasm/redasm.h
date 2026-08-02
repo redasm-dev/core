@@ -6,6 +6,9 @@
 #include <redasm/graph/graph.h>
 #include <redasm/graph/layout.h>
 #include <redasm/hooks.h>
+#include <redasm/io/buffer.h>
+#include <redasm/io/flags.h>
+#include <redasm/io/reader.h>
 #include <redasm/kb.h>
 #include <redasm/mapping.h>
 #include <redasm/plugins/analyzer.h>

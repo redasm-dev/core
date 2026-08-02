@@ -1,4 +1,6 @@
 #include "flags.h"
+#include "db/db.h"
+#include "io/flagsbuffer.h"
 #include <assert.h>
 
 /*
@@ -103,78 +105,78 @@ static RDFlagsClass _rd_flags_class(RDFlags self) {
     return (RDFlagsClass)((self & FL_CLASS_MASK) >> FL_CLASS_SHIFT);
 }
 
-bool rd_i_flags_has_unknown(RDFlags self) {
+bool rd_flags_has_unknown(RDFlags self) {
     return _rd_flags_class(self) == FL_CL_UNKNOWN;
 }
 
-bool rd_i_flags_has_code(RDFlags self) {
+bool rd_flags_has_code(RDFlags self) {
     return _rd_flags_class(self) == FL_CL_CODE;
 }
 
-bool rd_i_flags_has_data(RDFlags self) {
+bool rd_flags_has_data(RDFlags self) {
     return _rd_flags_class(self) == FL_CL_DATA;
 }
 
-bool rd_i_flags_has_tail(RDFlags self) {
+bool rd_flags_has_tail(RDFlags self) {
     return _rd_flags_class(self) == FL_CL_TAIL;
 }
 
 // arrival: no class gate, must read while cleared
 bool rd_i_flags_has_flow(RDFlags self) { return self & FL_FLOW; }
 bool rd_i_flags_has_jmpdst(RDFlags self) { return self & FL_JMPDST; }
-bool rd_i_flags_has_func(RDFlags self) { return self & FL_FUNC; }
+bool rd_flags_has_func(RDFlags self) { return self & FL_FUNC; }
 
 static RDFlagsKind _rd_flags_kind(RDFlags s) {
-    if(!rd_i_flags_has_code(s)) return FL_KI_NORMAL;
+    if(!rd_flags_has_code(s)) return FL_KI_NORMAL;
     return (RDFlagsKind)((s & FL_KIND_MASK) >> FL_KIND_SHIFT);
 }
 
 bool rd_i_flags_has_info(RDFlags self) { return self & FL_HAS_INFO; }
-bool rd_i_flags_has_name(RDFlags self) { return self & FL_NAME; }
-bool rd_i_flags_has_patch(RDFlags self) { return self & FL_PATCH; }
-bool rd_i_flags_has_comment(RDFlags self) { return self & FL_COMMENT; }
-bool rd_i_flags_has_xref_out(RDFlags self) { return self & FL_XREFOUT; }
-bool rd_i_flags_has_xref_in(RDFlags self) { return self & FL_XREFIN; }
-bool rd_i_flags_has_imported(RDFlags self) { return self & FL_IMPORTED; }
-bool rd_i_flags_has_exported(RDFlags self) { return self & FL_EXPORTED; }
+bool rd_flags_has_name(RDFlags self) { return self & FL_NAME; }
+bool rd_flags_has_patch(RDFlags self) { return self & FL_PATCH; }
+bool rd_flags_has_comment(RDFlags self) { return self & FL_COMMENT; }
+bool rd_flags_has_xref_out(RDFlags self) { return self & FL_XREFOUT; }
+bool rd_flags_has_xref_in(RDFlags self) { return self & FL_XREFIN; }
+bool rd_flags_has_imported(RDFlags self) { return self & FL_IMPORTED; }
+bool rd_flags_has_exported(RDFlags self) { return self & FL_EXPORTED; }
 
-bool rd_i_flags_has_jump(RDFlags self) {
+bool rd_flags_has_jump(RDFlags self) {
     return _rd_flags_kind(self) == FL_KI_JUMP;
 }
 
-bool rd_i_flags_has_call(RDFlags self) {
+bool rd_flags_has_call(RDFlags self) {
     return _rd_flags_kind(self) == FL_KI_CALL;
 }
 
-bool rd_i_flags_has_noret(RDFlags self) {
-    return rd_i_flags_has_code(self) && (self & FL_NORET);
+bool rd_flags_has_noret(RDFlags self) {
+    return rd_flags_has_code(self) && (self & FL_NORET);
 }
 
-bool rd_i_flags_has_cond(RDFlags self) {
-    return rd_i_flags_has_code(self) && (self & FL_COND);
+bool rd_flags_has_cond(RDFlags self) {
+    return rd_flags_has_code(self) && (self & FL_COND);
 }
 
 bool rd_i_flags_has_dslot(RDFlags self) {
-    return rd_i_flags_has_code(self) && (self & FL_DSLOT);
+    return rd_flags_has_code(self) && (self & FL_DSLOT);
 }
 
 bool rd_i_flags_has_op_over(RDFlags self) {
-    return rd_i_flags_has_code(self) && (self & FL_OPOVER);
+    return rd_flags_has_code(self) && (self & FL_OPOVER);
 }
 
-bool rd_i_flags_has_type(RDFlags self) {
-    return rd_i_flags_has_data(self) && (self & FL_TYPE);
+bool rd_flags_has_type(RDFlags self) {
+    return rd_flags_has_data(self) && (self & FL_TYPE);
 }
 
 bool rd_i_flags_has_field(RDFlags self) {
-    return rd_i_flags_has_data(self) && (self & FL_FIELD);
+    return rd_flags_has_data(self) && (self & FL_FIELD);
 }
 
 bool rd_i_flags_has_item(RDFlags self) {
-    return rd_i_flags_has_data(self) && (self & FL_ITEM);
+    return rd_flags_has_data(self) && (self & FL_ITEM);
 }
 
-bool rd_i_flags_get_value(RDFlags self, u8* b) {
+bool rd_flags_get_value(RDFlags self, u8* b) {
     if(self & FL_VALUE) {
         if(b) *b = self & 0xFF;
         return true;
@@ -212,105 +214,105 @@ void rd_i_flags_set_tail(RDFlags* self) {
 }
 
 void rd_i_flags_set_jump(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     _rd_flags_set_kind(self, FL_KI_JUMP);
 }
 
 void rd_i_flags_set_call(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     _rd_flags_set_kind(self, FL_KI_CALL);
 }
 
 void rd_i_flags_set_flow(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
 
     // FL_FUNC breaks flow by definition (function entries are not fallthrough)
-    if(rd_i_flags_has_func(*self)) return;
+    if(rd_flags_has_func(*self)) return;
 
     *self |= FL_FLOW;
 }
 
 void rd_i_flags_set_jmpdst(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_JMPDST;
 }
 
 void rd_i_flags_set_func(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_FUNC;
     *self &= ~FL_FLOW; // function entries break flow
 }
 
 void rd_i_flags_set_noret(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     *self |= FL_NORET;
 }
 
 void rd_i_flags_set_cond(RDFlags* self) {
-    assert(rd_i_flags_has_jump(*self) || rd_i_flags_has_call(*self));
+    assert(rd_flags_has_jump(*self) || rd_flags_has_call(*self));
     *self |= FL_COND;
 }
 
 void rd_i_flags_set_dslot(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     *self |= FL_DSLOT;
 }
 
 void rd_i_flags_set_op_over(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     *self |= FL_OPOVER;
 }
 
 void rd_i_flags_set_type(RDFlags* self) {
-    assert(rd_i_flags_has_data(*self));
+    assert(rd_flags_has_data(*self));
     assert(!rd_i_flags_has_field(*self));
     *self |= FL_TYPE;
 }
 
 void rd_i_flags_set_field(RDFlags* self) {
-    assert(rd_i_flags_has_data(*self));
-    assert(!rd_i_flags_has_type(*self));
+    assert(rd_flags_has_data(*self));
+    assert(!rd_flags_has_type(*self));
     *self |= FL_FIELD;
 }
 
 void rd_i_flags_set_item(RDFlags* self) {
-    assert(rd_i_flags_has_data(*self));
-    assert(!rd_i_flags_has_type(*self));
+    assert(rd_flags_has_data(*self));
+    assert(!rd_flags_has_type(*self));
     *self |= FL_ITEM;
 }
 
 void rd_i_flags_set_name(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_NAME;
 }
 
 void rd_i_flags_set_patch(RDFlags* self) {
-    assert(rd_i_flags_get_value(*self, NULL));
+    assert(rd_flags_get_value(*self, NULL));
     *self |= FL_PATCH;
 }
 
 void rd_i_flags_set_comment(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_COMMENT;
 }
 
 void rd_i_flags_set_xref_out(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_XREFOUT;
 }
 
 void rd_i_flags_set_xref_in(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_XREFIN;
 }
 
 void rd_i_flags_set_imported(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_IMPORTED;
 }
 
 void rd_i_flags_set_exported(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self |= FL_EXPORTED;
 }
 
@@ -318,41 +320,53 @@ void rd_i_flags_undefine(RDFlags* self) { *self &= FL_UNDEFINE_MASK; }
 void rd_i_flags_clear(RDFlags* self) { *self &= FL_CLEAR_MASK; }
 
 void rd_i_flags_clear_name(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_NAME;
 }
 
 void rd_i_flags_clear_patch(RDFlags* self) {
-    assert(rd_i_flags_get_value(*self, NULL));
+    assert(rd_flags_get_value(*self, NULL));
     *self &= ~FL_PATCH;
 }
 
 void rd_i_flags_clear_func(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_FUNC;
 }
 
 void rd_i_flags_clear_comment(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_COMMENT;
 }
 
 void rd_i_flags_clear_xref_out(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_XREFOUT;
 }
 
 void rd_i_flags_clear_xref_in(RDFlags* self) {
-    assert(!rd_i_flags_has_tail(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_XREFIN;
 }
 
 void rd_i_flags_clear_flow(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     *self &= ~FL_FLOW;
 }
 
 void rd_i_flags_clear_op_over(RDFlags* self) {
-    assert(rd_i_flags_has_code(*self));
+    assert(rd_flags_has_code(*self));
     *self &= ~FL_OPOVER;
+}
+
+bool rd_get_flags(const RDContext* self, RDAddress address, RDFlags* f) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    if(f) {
+        usize idx = rd_i_address2index(seg, address);
+        *f = rd_i_flagsbuffer_get(seg->flags, idx);
+    }
+
+    return true;
 }

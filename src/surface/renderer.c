@@ -227,7 +227,7 @@ RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
     RDAddress address = seg->base.start_address + idx;
 
     _rd_renderer_calc_auto_column(self);
-    rd_i_rowvect_push(self->context, &self->rows_back, sub_line, address);
+    rd_i_rowvect_push(&self->rows_back, sub_line, address);
     rd_i_row_reserve(vect_last(&self->rows_back), RD_SURFACE_ROW_INITIAL_SIZE);
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
