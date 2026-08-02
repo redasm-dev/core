@@ -598,7 +598,7 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
         return true;
     }
 
-    if(cmt) {
+    if(cmt && *cmt) {
         rd_i_flagsbuffer_set_comment(seg->flags, idx);
         rd_i_db_set_comment(self, address, cmt);
         return true;
