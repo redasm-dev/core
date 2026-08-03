@@ -196,12 +196,12 @@ static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegmentFull* seg,
 }
 
 static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
-    status->reconcile = false;
+    if(status) status->reconcile = false;
     ctx->engine.step++;
 }
 
 static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
-    status->reconcile = true;
+    if(status) status->reconcile = true;
 
     RDEngineItem* item;
     queue_each(item, &ctx->engine.qdirty) {
