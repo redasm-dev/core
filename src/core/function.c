@@ -313,6 +313,9 @@ void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg,
     usize func_idx =
         vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
     vect_ins(&ctx->functions, func_idx, self);
+    vect_ins(&ctx->functions.addresses, func_idx, address);
+    assert(vect_length(&ctx->functions) ==
+           vect_length(&ctx->functions.addresses));
 }
 
 void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
@@ -336,6 +339,9 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
 
     // remove from the vector FIRST
     vect_del(&ctx->functions, i, 1);
+    vect_del(&ctx->functions.addresses, i, 1);
+    assert(vect_length(&ctx->functions) ==
+           vect_length(&ctx->functions.addresses));
     rd_i_function_destroy(f);
 }
 
@@ -467,6 +473,7 @@ void rd_i_function_rebuild(RDFunction* self) {
 
 void rd_i_functionvect_destroy(RDFunctionVect* self) {
     rd_i_functionchunk_destroy(&self->chunks);
+    vect_destroy(&self->addresses);
 
     RDFunction** f;
     vect_each(f, self) { rd_i_function_destroy(*f); }

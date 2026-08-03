@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/segment.h"
+#include "db/types.h"
 #include "support/utils.h"
 #include "types/def.h"
 #include <redasm/function.h>
@@ -23,6 +24,7 @@ typedef struct RDFunctionChunkVect {
 
 typedef struct RDFunctionVect {
     RDFunctionChunkVect chunks;
+    RDAddressVect addresses;
 
     RDFunction** data;
     usize length;
