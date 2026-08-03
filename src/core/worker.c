@@ -195,9 +195,14 @@ static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegmentFull* seg,
     }
 }
 
-static void _rd_worker_step_init(RDContext* ctx) { ctx->engine.step++; }
+static void _rd_worker_step_init(RDContext* ctx, RDWorkerStatus* status) {
+    status->reconcile = false;
+    ctx->engine.step++;
+}
 
-static void _rd_worker_step_reconcile(RDContext* ctx) {
+static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
+    status->reconcile = true;
+
     RDEngineItem* item;
     queue_each(item, &ctx->engine.qdirty) {
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, item->address);
@@ -316,9 +321,10 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
     }
 
     if(is_busy) {
+        // clang-format off
         switch(self->engine.step) {
-            case RD_WS_INIT: _rd_worker_step_init(self); break;
-            case RD_WS_RECONCILE: _rd_worker_step_reconcile(self); break;
+            case RD_WS_INIT: _rd_worker_step_init(self, status); break;
+            case RD_WS_RECONCILE: _rd_worker_step_reconcile(self, status); break;
 
             case RD_WS_EMULATE1:
             case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
@@ -332,6 +338,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
             case RD_WS_FINALIZE: _rd_worker_step_finalize(self); break;
             default: unreachable();
         }
+        // clang-format on
     }
 
     return is_busy;

@@ -69,6 +69,7 @@ typedef struct RDProblemSlice {
 
 typedef struct RDWorkerStatus {
     bool is_busy;
+    bool reconcile;
     const char* step;
     const RDSegment* segment;
     usize pending_calls;
