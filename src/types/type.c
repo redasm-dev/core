@@ -263,9 +263,14 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
     usize startidx_exp = idx, endidx_exp = startidx_exp + sz;
     rd_i_expand_range(ctx, seg, &startidx_exp, &endidx_exp);
 
-    if(rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
-                                   endidx_exp - startidx_exp))
+    // an AUTO/LIBRARY caller must not silently reinterpret code as data:
+    // that's the classic misclassification.
+    // A USER asking for it is a deliberate override.
+    if(c < RD_CONFIDENCE_USER &&
+       rd_i_flagsbuffer_has_code_n(seg->flags, startidx_exp,
+                                   endidx_exp - startidx_exp)) {
         return false;
+    }
 
     if(!rd_i_undefine_n(ctx, address, sz, c)) return false;
 
