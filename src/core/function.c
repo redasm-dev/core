@@ -245,46 +245,6 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     if(oldgraph) rd_graph_destroy(oldgraph);
 }
 
-const char* rd_i_function_to_str(const RDFunction* self, RDContext* ctx) {
-    RDCharVect* t_buf = &ctx->type_buf;
-    str_clear(&ctx->tdef_buf);
-
-    const RDFunctionType* f_type = &self->type_def->func_;
-
-    if(f_type->ret.has_value) {
-        str_append(&ctx->tdef_buf, rd_i_type_to_str(&f_type->ret.value, t_buf));
-        str_push(&ctx->tdef_buf, ' ');
-    }
-
-    if(rd_function_is_noret(self)) str_append(&ctx->tdef_buf, "noreturn ");
-
-    RDName n; // try to get the name
-    if(rd_i_get_name(ctx, self->address, false, &n))
-        str_append(&ctx->tdef_buf, n.value);
-    else
-        str_append(&ctx->tdef_buf, self->type_def->name);
-
-    if(f_type->args.has_value) {
-
-        str_push(&ctx->tdef_buf, '(');
-        const RDParam* arg;
-        vect_each(arg, &f_type->args.value) {
-            assert(arg->name);
-            if(arg != vect_first(&f_type->args.value))
-                str_push(&ctx->tdef_buf, ',');
-
-            str_append(&ctx->tdef_buf, rd_i_type_to_str(&arg->type, t_buf));
-            str_push(&ctx->tdef_buf, ' ');
-            str_append(&ctx->tdef_buf, arg->name);
-        }
-
-        str_push(&ctx->tdef_buf, ')');
-    }
-
-    assert(!vect_is_empty(&ctx->tdef_buf));
-    return ctx->tdef_buf.data;
-}
-
 void rd_i_functionchunk_sort(RDFunctionChunkVect* self) {
     vect_sort(self, _rd_functionchunk_cmp_pred);
 }

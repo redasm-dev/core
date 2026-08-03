@@ -82,6 +82,7 @@ RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags) {
 void rd_i_renderer_destroy(RDRenderer* self) {
     vect_destroy(&self->xrefs);
     vect_destroy(&self->comment_buf);
+    vect_destroy(&self->type_buf);
     vect_destroy(&self->text_buf);
     vect_destroy(&self->word_buf);
     rd_i_rowvect_destroy(&self->rows_back);

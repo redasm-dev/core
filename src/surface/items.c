@@ -285,24 +285,55 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
     }
 
     _rd_render_modifiers(r, seg, idx, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    const char* func_str = f ? rd_i_function_to_str(f, r->context) : NULL;
 
-    if(func_str) {
-        rd_renderer_text(r, func_str, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-        return;
+    if(f) {
+        const RDFunctionType* f_type = &f->type_def->func_;
+
+        if(f_type->ret.has_value) {
+            rd_renderer_text(r,
+                             rd_i_type_to_str(&f_type->ret.value, &r->type_buf),
+                             RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+            rd_renderer_ws(r, 1);
+        }
+
+        if(rd_function_is_noret(f)) {
+            rd_renderer_text(r, "noreturn ", RD_THEME_FUNCTION,
+                             RD_THEME_BACKGROUND);
+        }
+    }
+
+    if(!f || (f->type_def->flags & RD_TFLAGS_BUILTIN)) {
+        rd_renderer_text(r, "function ", RD_THEME_FUNCTION,
+                         RD_THEME_BACKGROUND);
     }
 
     RDName n;
     bool hasname = rd_i_get_name(r->context, address, true, &n);
     assert(hasname);
-
-    rd_renderer_text(r, "function ", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
     rd_renderer_text(r, n.value, RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, "()", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
 
-    if(f && rd_function_is_noret(f)) {
-        rd_renderer_text(r, " noreturn", RD_THEME_FUNCTION,
-                         RD_THEME_BACKGROUND);
+    if(f) {
+        const RDFunctionType* f_type = &f->type_def->func_;
+
+        if(f_type->args.has_value) {
+            rd_renderer_text(r, "(", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+
+            const RDParam* arg;
+            vect_each(arg, &f_type->args.value) {
+                assert(arg->name);
+                if(arg != vect_first(&f_type->args.value))
+                    rd_renderer_text(r, ",", RD_THEME_FUNCTION,
+                                     RD_THEME_BACKGROUND);
+
+                rd_renderer_text(r, rd_i_type_to_str(&arg->type, &r->type_buf),
+                                 RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+                rd_renderer_ws(r, 1);
+                rd_renderer_text(r, arg->name, RD_THEME_FUNCTION,
+                                 RD_THEME_BACKGROUND);
+            }
+
+            rd_renderer_text(r, ")", RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
+        }
     }
 }
 

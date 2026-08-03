@@ -20,6 +20,7 @@ typedef struct RDRenderer {
     RDCharVect comment_buf;
     RDCharVect word_buf;
     RDCharVect text_buf;
+    RDCharVect type_buf;
     RDXRefVect xrefs;
     RDInstructionVect instr_buf;
     char* hl_word;
