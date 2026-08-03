@@ -373,6 +373,10 @@ bool rd_typedef_is_noret(const RDTypeDef* self) {
     return self->kind == RD_TKIND_FUNC && self->func_.is_noret;
 }
 
+bool rd_typedef_is_builtin(const RDTypeDef* self) {
+    return self->flags & RD_TFLAGS_BUILTIN;
+}
+
 void rd_typedef_destroy(RDTypeDef* self) {
     if(self->flags & RD_TFLAGS_STATIC) return;
 

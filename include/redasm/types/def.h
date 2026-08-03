@@ -16,6 +16,7 @@ RD_API const char* rd_typedef_name(const RDTypeDef* self);
 RD_API RDTypeKind rd_typedef_kind(const RDTypeDef* self);
 RD_API usize rd_typedef_size(const RDTypeDef* self);
 RD_API bool rd_typedef_is_noret(const RDTypeDef* self);
+RD_API bool rd_typedef_is_builtin(const RDTypeDef* self);
 RD_API void rd_typedef_destroy(RDTypeDef* self);
 RD_API bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef, usize offset, const RDParam** m);
 RD_API bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char* name, usize n, RDTypeModifier mod, RDContext* ctx);
