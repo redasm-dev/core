@@ -154,6 +154,7 @@ RD_API const char* rd_to_dec(i64 v);
 RD_API const char* rd_to_hex(i64 v);
 RD_API const char* rd_to_hexaddr(const RDContext* self, usize v);
 RD_API const char* rd_render_text(RDContext* self, RDAddress address);
+RD_API bool rd_make_code(RDContext* self, RDAddress address);
 RD_API bool rd_auto_undefine(RDContext* self, RDAddress address);
 RD_API bool rd_library_undefine(RDContext* self, RDAddress address);
 RD_API bool rd_user_undefine(RDContext* self, RDAddress address);

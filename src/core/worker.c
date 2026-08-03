@@ -207,23 +207,27 @@ static void _rd_worker_step_reconcile(RDContext* ctx) {
         usize end_idx = start_idx + item->n;
         rd_i_expand_range(ctx, seg, &start_idx, &end_idx);
 
-        if(!rd_flagsbuffer_has_code(seg->flags, start_idx)) {
-            // data: refresh what the old bytes derived.
-            // unknown: nothing.
-            // neither needs decoding, so the item is done
-            if(rd_flagsbuffer_has_data(seg->flags, start_idx))
-                _rd_worker_reconcile_data(ctx, seg, start_idx, end_idx);
+        if(item->kind == RD_EI_CODE) goto keep;
 
-            item->kind = RD_EI_NONE;
-            hmap_destroy(&item->registers);
-            continue;
+        if(rd_flagsbuffer_has_code(seg->flags, start_idx)) {
+            rd_i_clear_n(ctx, item->address, item->n);
+            goto keep;
         }
 
+        if(rd_flagsbuffer_has_data(seg->flags, start_idx))
+            _rd_worker_reconcile_data(ctx, seg, start_idx, end_idx);
+
+        // data or unknown: nothing left for EMULATE
+        hmap_destroy(&item->registers);
+        item->kind = RD_EI_NONE;
+        continue;
+
+    keep:
+        // decode from the ITEM HEAD
+        // a mid-item patch must not decode from the patched byte
         item->address = seg->base.start_address + start_idx;
         item->from = item->address;
         item->n = end_idx - start_idx;
-
-        rd_i_clear_n(ctx, item->address, item->n);
     }
 
     ctx->engine.step = RD_WS_EMULATE1;

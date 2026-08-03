@@ -8,6 +8,27 @@
 
 #define RD_ENGINE_QUEUE_SIZE 8192
 
+static inline bool _rd_engine_is_dirty_kind(RDEngineItemKind k) {
+    return k == RD_EI_DIRTY || k == RD_EI_CODE;
+}
+
+static inline void _rd_engine_enqueue_dirty(RDContext* ctx, RDAddress address,
+                                            usize n, RDEngineItemKind kind) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    if(!seg) return;
+
+    RDEngineItem item = {
+        .kind = kind,
+        .address = address,
+        .from = address,
+        .n = n,
+    };
+
+    rd_i_registermap_init(&item.registers);
+    queue_push(&ctx->engine.qdirty, item);
+    rd_i_engine_mark_dirty(ctx);
+}
+
 static void _rd_engine_queue_drain(RDEngineQueue* q) {
     while(!queue_is_empty(q)) {
         RDEngineItem item;
@@ -223,19 +244,11 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
 }
 
 void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
-    if(!seg) return;
+    _rd_engine_enqueue_dirty(ctx, address, n, RD_EI_DIRTY);
+}
 
-    RDEngineItem item = {
-        .kind = RD_EI_DIRTY,
-        .address = address,
-        .from = address,
-        .n = n,
-    };
-
-    rd_i_registermap_init(&item.registers);
-    queue_push(&ctx->engine.qdirty, item);
-    rd_i_engine_mark_dirty(ctx);
+void rd_i_engine_enqueue_code(RDContext* ctx, RDAddress address, usize n) {
+    _rd_engine_enqueue_dirty(ctx, address, n, RD_EI_CODE);
 }
 
 bool rd_i_engine_mark_dirty(RDContext* ctx) {
@@ -309,7 +322,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
     // something already re-decoded this range (eg. flow from a neighbour,
     // or a duplicate mark) there is nothing left to do
-    if(ctx->engine.current.kind == RD_EI_DIRTY &&
+    if(_rd_engine_is_dirty_kind(ctx->engine.current.kind) &&
        !rd_flagsbuffer_has_unknown(ctx->engine.segment->flags, idx))
         return 0;
 
@@ -400,38 +413,6 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 done:
     if(ctx->engine.current.name) rd_free(ctx->engine.current.name);
     return instr.length;
-}
-
-void rd_i_engine_reconcile_tick(RDContext* ctx) {
-    if(queue_is_empty(&ctx->engine.qdirty)) return;
-
-    // RDDirtyRange d;
-    // queue_pop(&ctx->engine.qdirty, &d);
-    //
-    // const RDSegmentFull* seg = rd_i_db_find_segment(ctx, d.address);
-    // if(!seg) return; // no segment: nothing to reconcile
-    //
-    // usize start_idx = rd_i_address2index(seg, d.address);
-    // usize end_idx = start_idx + d.n;
-    //
-    // // clamp: ranges never cross segments
-    // if(end_idx > rd_flagsbuffer_get_length(seg->flags))
-    //     end_idx = rd_flagsbuffer_get_length(seg->flags);
-    //
-    // // snap both ends outward to item boundaries
-    // rd_i_flagsbuffer_expand_range(seg->flags, &start_idx, &end_idx);
-    //
-    // switch(_rd_engine_reconcile_kind(seg, start_idx, d.hint)) {
-    //     case RD_DIRTY_CODE:
-    //         _rd_engine_reconcile_code(ctx, seg, start_idx, end_idx);
-    //         break;
-    //
-    //     case RD_DIRTY_DATA:
-    //         _rd_engine_reconcile_data(ctx, seg, start_idx, end_idx);
-    //         break;
-    //
-    //     default: break;
-    // }
 }
 
 void rd_flow(RDContext* ctx, RDAddress address) {

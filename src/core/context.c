@@ -508,6 +508,33 @@ done:
     return self->str_buf.data;
 }
 
+bool rd_make_code(RDContext* self, RDAddress address) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    if(!(seg->base.perm & RD_SP_X)) {
+        RD_LOG_FAIL("cannot make code @ %" PRIx64 ", non-executable segment",
+                    address);
+        return false;
+    }
+
+    usize idx = rd_i_address2index(seg, address);
+
+    // already code is not a no-op there: it re-derives xrefs and flow.
+    // That's exactly RD_EI_DIRTY
+    if(rd_flagsbuffer_has_code(seg->flags, idx)) {
+        rd_i_engine_enqueue_dirty(self, address, 1);
+        return true;
+    }
+
+    // tails/data/unknown: retract the old interpretation first.
+    // The gate refuses if something higher-confidence lives here.
+    if(!rd_i_undefine_n(self, address, 1, RD_CONFIDENCE_USER)) return false;
+
+    rd_i_engine_enqueue_code(self, address, 1);
+    return true;
+}
+
 bool rd_auto_undefine(RDContext* self, RDAddress address) {
     return rd_i_undefine(self, address, RD_CONFIDENCE_AUTO);
 }
@@ -981,6 +1008,10 @@ RDAddressSlice rd_get_all_address_by_type(const RDContext* self,
         RDAddressSlice,
         rd_i_db_get_all_address_by_type(
             (RDContext*)self, (RDAddressVect*)&self->addr_type_buf, filter));
+}
+
+RDAddressSlice rd_get_all_functions_address(const RDContext* self) {
+    return vect_to_slice(RDAddressSlice, &self->functions.addresses);
 }
 
 RDFunctionSlice rd_get_all_functions(const RDContext* self) {
