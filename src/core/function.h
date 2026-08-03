@@ -31,10 +31,11 @@ typedef struct RDFunctionVect {
     usize capacity;
 } RDFunctionVect;
 
-RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_destroy(RDFunction* self);
 
-void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg, usize idx);
+void rd_i_function_create_if(RDContext* ctx, const RDSegmentFull* seg,
+                             usize idx);
+RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address);
 void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
                              usize idx);
 

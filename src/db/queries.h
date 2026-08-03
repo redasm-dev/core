@@ -46,7 +46,7 @@ enum {
     RD_QUERY_GET_ROOT_TYPE,
 
     RD_QUERY_SET_FUNCTION,
-    RD_QUERY_GET_ALL_FUNCTIONS,
+    RD_QUERY_LOAD_ALL_FUNCTIONS,
 
     RD_QUERY_ADD_SEGMENT,
     RD_QUERY_GET_ALL_SEGMENTS,
@@ -60,7 +60,7 @@ enum {
     RD_QUERY_GET_ALL_EXTERNALS,
 
     RD_QUERY_SET_SREGVAL,
-    RD_QUERY_GET_ALL_SREGVAL,
+    RD_QUERY_LOAD_ALL_SREGVAL,
 
     RD_QUERY_SET_OVR_OPERAND,
     RD_QUERY_DEL_OVR_OPERAND,
@@ -135,8 +135,7 @@ bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
                                   RDType* t);
 
 void _rd_i_db_query_set_function(RDContext* ctx, const RDFunction* f);
-RDFunctionVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
-                                                 RDFunctionVect* v);
+void _rd_i_db_query_load_all_functions(RDContext* ctx);
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
@@ -153,9 +152,7 @@ bool _rd_i_db_query_get_userdata(RDContext* ctx, const char* key, uptr* ud);
 void _rd_i_db_query_set_userdata(RDContext* ctx, const char* key, uptr ud);
 
 void _rd_i_db_query_set_sregval(RDContext* ctx, const RDSegmentReg* sreg);
-RDSegmentRegsVect* _rd_i_db_query_get_all_sregval(RDContext* ctx,
-                                                  RDSegmentRegsVect* v,
-                                                  RDSegmentRegNameVect* names);
+void _rd_i_db_query_load_all_sregval(RDContext* ctx);
 
 void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address, int idx);
 void _rd_i_db_query_del_ovr_operand(RDContext* ctx, RDAddress address, int idx);

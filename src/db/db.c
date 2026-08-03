@@ -134,9 +134,8 @@ void rd_i_db_load(RDContext* ctx) {
     RDTypeDef** it;
     vect_each(it, &ctx->typedefs) { rd_i_typedef_measure(ctx, *it); }
 
-    _rd_i_db_query_get_all_functions(ctx, &ctx->functions);
-    _rd_i_db_query_get_all_sregval(ctx, &ctx->db->segment_regs,
-                                   &ctx->db->segment_reg_names);
+    _rd_i_db_query_load_all_functions(ctx);
+    _rd_i_db_query_load_all_sregval(ctx);
 }
 
 bool rd_i_db_export(RDContext* ctx, const char* filepath) {

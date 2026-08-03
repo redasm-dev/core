@@ -86,6 +86,21 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
     return n;
 }
 
+static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address) {
+    RDFunction* self = rd_alloc(sizeof(*self));
+
+    *self = (RDFunction){
+        .context = ctx,
+        .address = address,
+        .type_def = rd_i_typedef_find(ctx, "function"),
+    };
+
+    assert(self->type_def);
+    assert(self->type_def->kind == RD_TKIND_FUNC);
+
+    return self;
+}
+
 void rd_i_function_rebuild_graph(RDFunction* self,
                                  RDFunctionChunkVect* chunks) {
     RDContext* ctx = self->context;
@@ -286,29 +301,16 @@ void rd_i_functionchunk_destroy(RDFunctionChunkVect* self) {
     vect_destroy(self);
 }
 
-RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
-    RDFunction* self = rd_alloc(sizeof(*self));
-
-    *self = (RDFunction){
-        .context = ctx,
-        .address = address,
-        .type_def = rd_i_typedef_find(ctx, "function"),
-    };
-
-    assert(self->type_def);
-    assert(self->type_def->kind == RD_TKIND_FUNC);
-
-    return self;
-}
-
-void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg,
-                           usize idx) {
+void rd_i_function_create_if(RDContext* ctx, const RDSegmentFull* seg,
+                             usize idx) {
     if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
+    rd_i_function_create(ctx, seg->base.start_address + idx);
+}
 
-    RDAddress address = seg->base.start_address + idx;
-    RDFunction* self = rd_i_function_create(ctx, address);
+RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
+    RDFunction* self = _rd_function_create(ctx, address);
 
     usize func_idx =
         vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
@@ -316,6 +318,8 @@ void rd_i_function_declare(RDContext* ctx, const RDSegmentFull* seg,
     vect_ins(&ctx->functions.addresses, func_idx, address);
     assert(vect_length(&ctx->functions) ==
            vect_length(&ctx->functions.addresses));
+
+    return self;
 }
 
 void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,

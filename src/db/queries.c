@@ -950,16 +950,15 @@ void _rd_i_db_query_set_function(RDContext* ctx, const RDFunction* f) {
     _rd_db_step(ctx, stmt);
 }
 
-RDFunctionVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
-                                                 RDFunctionVect* v) {
+void _rd_i_db_query_load_all_functions(RDContext* ctx) {
     sqlite3_stmt* stmt =
-        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_FUNCTIONS, "\
+        _rd_db_prepare_query(ctx, RD_QUERY_LOAD_ALL_FUNCTIONS, "\
         SELECT address, type_name \
         FROM Functions  \
         ORDER BY address \
     ");
 
-    rd_i_functionvect_destroy(v);
+    assert(vect_is_empty(&ctx->functions));
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
@@ -975,10 +974,7 @@ RDFunctionVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
         }
 
         rd_i_function_rebuild(f);
-        vect_push(v, f);
     }
-
-    return v;
 }
 
 void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p) {
@@ -1016,15 +1012,15 @@ void _rd_i_db_query_set_sregval(RDContext* ctx, const RDSegmentReg* sreg) {
     _rd_db_step(ctx, stmt);
 }
 
-RDSegmentRegsVect* _rd_i_db_query_get_all_sregval(RDContext* ctx,
-                                                  RDSegmentRegsVect* v,
-                                                  RDSegmentRegNameVect* names) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_SREGVAL, "\
+void _rd_i_db_query_load_all_sregval(RDContext* ctx) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_LOAD_ALL_SREGVAL, "\
         SELECT address, reg, value, confidence \
         FROM SegmentRegisters  \
         ORDER BY address \
     ");
 
+    RDSegmentRegsVect* v = &ctx->db->segment_regs;
+    RDSegmentRegNameVect* names = &ctx->db->segment_reg_names;
     assert(vect_is_empty(v));
     assert(vect_is_empty(names));
 
@@ -1051,8 +1047,6 @@ RDSegmentRegsVect* _rd_i_db_query_get_all_sregval(RDContext* ctx,
                                  .confidence = c,
                              });
     }
-
-    return v;
 }
 
 void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address,
