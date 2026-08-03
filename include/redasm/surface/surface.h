@@ -41,6 +41,7 @@ RD_API bool rd_surface_select(RDSurface* self, int row, int col);
 RD_API bool rd_surface_select_word(RDSurface* self, int row, int col);
 RD_API bool rd_surface_go_back(RDSurface* self);
 RD_API bool rd_surface_go_forward(RDSurface* self);
+RD_API bool rd_surface_get_selected_range(const RDSurface* self, RDAddress* start, RDAddress* end);
 RD_API bool rd_surface_get_current_address(const RDSurface* self, RDAddress* address);
 RD_API bool rd_surface_get_address_under_pos(const RDSurface* self, const RDSurfacePos* pos, RDAddress* address);
 RD_API bool rd_surface_get_address_under_cursor(const RDSurface* self, RDAddress* address);

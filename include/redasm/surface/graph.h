@@ -25,6 +25,7 @@ RD_API bool rd_surfacegraph_go_forward(RDSurfaceGraph* self);
 RD_API bool rd_surfacegraph_can_go_back(const RDSurfaceGraph* self);
 RD_API bool rd_surfacegraph_can_go_forward(const RDSurfaceGraph* self);
 RD_API bool rd_surfacegraph_has_selection(const RDSurfaceGraph* self);
+RD_API bool rd_surfacegraph_get_selected_range(const RDSurfaceGraph* self, RDAddress* start, RDAddress* end);
 RD_API bool rd_surfacegraph_get_current_address(const RDSurfaceGraph* self, RDAddress* address);
 RD_API bool rd_surfacegraph_get_address_under_cursor(RDSurfaceGraph* self, RDAddress* address);
 RD_API bool rd_surfacegraph_get_cell_data_under_cursor(const RDSurfaceGraph* self, RDCellData* cd);

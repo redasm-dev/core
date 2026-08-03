@@ -223,6 +223,33 @@ bool rd_surfacegraph_get_current_address(const RDSurfaceGraph* self,
     return rd_i_renderer_get_address(self->renderer, self->state.pos, address);
 }
 
+bool rd_surfacegraph_get_selected_range(const RDSurfaceGraph* self,
+                                        RDAddress* start, RDAddress* end) {
+    if(!rd_surfacegraph_has_selection(self)) return false;
+
+    if(start) {
+        RDSurfacePos start_pos =
+            rd_i_surfacestate_get_start_selection(&self->state);
+
+        if((usize)start_pos.row >= vect_length(&self->renderer->rows_front))
+            return false;
+
+        *start = vect_at(&self->renderer->rows_front, start_pos.row)->address;
+    }
+
+    if(end) {
+        RDSurfacePos end_pos =
+            rd_i_surfacestate_get_end_selection(&self->state);
+
+        if((usize)end_pos.row >= vect_length(&self->renderer->rows_front))
+            return false;
+
+        *end = vect_at(&self->renderer->rows_front, end_pos.row)->address;
+    }
+
+    return true;
+}
+
 const char* rd_surfacegraph_get_word_under_pos(const RDSurfaceGraph* self,
                                                const RDSurfacePos* pos) {
     return rd_i_renderer_get_word_under_pos(self->renderer, pos);
