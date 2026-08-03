@@ -246,6 +246,8 @@ const char* rd_type_to_str(const RDType* self, RDContext* ctx) {
 
 bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier mod, RDConfidence c) {
+    if(!name || !(*name)) return false;
+
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
