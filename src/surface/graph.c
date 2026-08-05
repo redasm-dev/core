@@ -1,7 +1,6 @@
 #include "graphs/graph.h"
 #include "core/context.h"
 #include "io/flagsbuffer.h"
-#include "redasm/context.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "surface/items.h"
@@ -13,7 +12,6 @@
 typedef struct RDSurfaceGraph {
     RDRenderer* renderer;
     RDSurfaceState state;
-    const RDFunction* function;
 } RDSurfaceGraph;
 
 static void _rd_surfacegraph_render_finalize(RDSurfaceGraph* self) {
@@ -94,16 +92,18 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
 
 void rd_surfacegraph_render(RDSurfaceGraph* self) {
     rd_i_renderer_clear(self->renderer);
-    if(!self->function || !self->function->graph) return;
 
-    const RDNodeVect* nodes = rd_i_graph_get_nodes(self->function->graph);
+    const RDFunction* f = rd_surfacegraph_get_function(self);
+    if(!f || !f->graph) return;
+
+    const RDNodeVect* nodes = rd_i_graph_get_nodes(f->graph);
 
     RDFunctionChunkVect chunks = {0};
     vect_reserve(&chunks, vect_length(nodes));
 
     const RDGraphNode* n;
     vect_each(n, nodes) {
-        RDFunctionChunk* chunk = rd_i_function_get_chunk(self->function, *n);
+        RDFunctionChunk* chunk = rd_i_function_get_chunk(f, *n);
         assert(chunk && "node without chunk");
         vect_push(&chunks, chunk);
     }
@@ -123,9 +123,7 @@ bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     const RDFunction* f = rd_i_find_function(ctx, address);
     if(!f) return false;
 
-    if(f != self->function) {
-        self->function = f;
-
+    if(f->address != self->state.start) {
         rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
         vect_clear(&self->state.fwd_history);
         self->state.start = f->address; // the anchor IS the entry address
@@ -160,22 +158,12 @@ bool rd_surfacegraph_select_word(RDSurfaceGraph* self, int row, int col) {
 
 bool rd_surfacegraph_go_back(RDSurfaceGraph* self) {
     if(!rd_i_surfacestate_go_back(&self->state)) return false;
-
-    // start is the function's entry address: recover it directly
-    const RDContext* ctx = self->renderer->context;
-    self->function = rd_i_find_function(ctx, self->state.start);
-
     rd_surfacegraph_render(self);
     return true;
 }
 
 bool rd_surfacegraph_go_forward(RDSurfaceGraph* self) {
     if(!rd_i_surfacestate_go_forward(&self->state)) return false;
-
-    // start is the function's entry address: recover it directly
-    const RDContext* ctx = self->renderer->context;
-    self->function = rd_i_find_function(ctx, self->state.start);
-
     rd_surfacegraph_render(self);
     return true;
 }
@@ -306,10 +294,10 @@ void rd_surfacegraph_set_highlight_word(RDSurfaceGraph* self,
 }
 
 const RDFunction* rd_surfacegraph_get_function(const RDSurfaceGraph* self) {
-    return self->function;
+    return rd_i_find_function(self->renderer->context, self->state.start);
 }
 
 RDGraph* rd_surfacegraph_get_graph(const RDSurfaceGraph* self) {
-    if(self->function) return self->function->graph;
-    return NULL;
+    const RDFunction* f = rd_surfacegraph_get_function(self);
+    return f ? f->graph : NULL;
 }
