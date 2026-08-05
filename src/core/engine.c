@@ -33,7 +33,6 @@ static void _rd_engine_queue_drain(RDEngineQueue* q) {
     while(!queue_is_empty(q)) {
         RDEngineItem item;
         queue_pop(q, &item);
-        rd_free(item.name);            // NULL-safe
         hmap_destroy(&item.registers); // tolerates zeroed
     }
 
@@ -100,8 +99,6 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
     //   visible to branch emulate
     RDAddress saved_address = ctx->engine.current.address;
     RDEngineItemKind saved_kind = ctx->engine.current.kind;
-    RDConfidence saved_conf = ctx->engine.current.confidence;
-    char* saved_name = ctx->engine.current.name;
     const RDSegmentFull* saved_seg = ctx->engine.segment;
 
     ctx->engine.dslot_info.instr = *instr;
@@ -133,8 +130,6 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
     // restore outer tick identity: flow deliberately excluded
     ctx->engine.current.address = saved_address;
     ctx->engine.current.kind = saved_kind;
-    ctx->engine.current.confidence = saved_conf;
-    ctx->engine.current.name = saved_name;
     ctx->engine.segment = saved_seg;
 
     // reinstate the correct continuation, suppressing what emulate set
@@ -209,15 +204,12 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
     return false;
 }
 
-bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
-                              const char* name, RDConfidence c) {
+bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address) {
     if(_rd_engine_accept_address(ctx, address, &ctx->engine.qcall)) {
         RDEngineItem item = {
             .kind = RD_EI_CALL,
-            .confidence = c,
             .address = address,
             .from = ctx->engine.current.address,
-            .name = name ? rd_strdup(name) : NULL,
         };
 
         hmap_dup(&item.registers, &ctx->engine.current.registers);
@@ -234,7 +226,6 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
     if((seg->base.perm & RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
         rd_i_function_create_if(ctx, seg, dstidx);
-        if(name) rd_i_set_name(ctx, address, name, c);
     }
 
     if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
@@ -276,8 +267,6 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     if(ctx->engine.flow.has_value) {
         ctx->engine.current.address = optional_take(&ctx->engine.flow);
         ctx->engine.current.kind = RD_EI_FLOW;
-        ctx->engine.current.confidence = RD_CONFIDENCE_AUTO;
-        ctx->engine.current.name = NULL;
         assert(ctx->engine.segment && "flow tick with no current segment");
     }
     else {
@@ -402,16 +391,9 @@ u16 rd_i_engine_tick(RDContext* ctx) {
             rd_i_function_create_if(ctx, ctx->engine.segment, idx);
         else if(ctx->engine.current.kind == RD_EI_JUMP)
             rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
-
-        if(ctx->engine.current.name) {
-            rd_i_set_name(ctx, ctx->engine.current.address,
-                          ctx->engine.current.name,
-                          ctx->engine.current.confidence);
-        }
     }
 
 done:
-    if(ctx->engine.current.name) rd_free(ctx->engine.current.name);
     return instr.length;
 }
 

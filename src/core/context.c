@@ -559,23 +559,6 @@ bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n) {
     return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_USER);
 }
 
-bool rd_placeholder_function(RDContext* self, RDAddress address,
-                             const char* name) {
-    return rd_i_set_function(self, address, name, RD_CONFIDENCE_PLACEHOLDER);
-}
-
-bool rd_auto_function(RDContext* self, RDAddress address, const char* name) {
-    return rd_i_set_function(self, address, name, RD_CONFIDENCE_AUTO);
-}
-
-bool rd_library_function(RDContext* self, RDAddress address, const char* name) {
-    return rd_i_set_function(self, address, name, RD_CONFIDENCE_LIBRARY);
-}
-
-bool rd_user_function(RDContext* self, RDAddress address, const char* name) {
-    return rd_i_set_function(self, address, name, RD_CONFIDENCE_USER);
-}
-
 bool rd_placeholder_name(RDContext* self, RDAddress address, const char* name) {
     return rd_i_set_name(self, address, name, RD_CONFIDENCE_PLACEHOLDER);
 }
@@ -675,8 +658,7 @@ void rd_i_clear_n(RDContext* self, RDAddress address, usize n) {
     rd_i_flagsbuffer_clear(seg->flags, startidx, endidx);
 }
 
-bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
-                       RDConfidence c) {
+bool rd_set_function(RDContext* self, RDAddress address) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg || !(seg->base.perm & RD_SP_X)) return false;
 
@@ -686,7 +668,7 @@ bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
     if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
     if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
 
-    if(rd_i_engine_enqueue_call(self, address, name, c)) {
+    if(rd_i_engine_enqueue_call(self, address)) {
         rd_fire_address_hook(self, "redasm.function_found", address);
         return true;
     }
@@ -1233,7 +1215,7 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 
             if(!isreftotail) {
                 rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
-                rd_i_engine_enqueue_call(self, toaddr, NULL, c);
+                rd_i_engine_enqueue_call(self, toaddr);
             }
 
             break;
@@ -1313,18 +1295,19 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
                          "redefining entry point");
     }
 
-    const char* n = name;
-
-    if(!n || !(*n)) {
+    if(name && *name) { // name comes from outside
+        rd_library_name(self, address, name);
+    }
+    else {
         const RDLoaderPlugin* ldr = self->loaderplugin;
         assert(ldr && "invalid loader plugin");
-        n = rd_i_format(&self->name_buf, "%s_entry_point_%llx", ldr->id,
-                        address);
+        name = rd_i_format(&self->name_buf, "%s_entry_point_%llx", ldr->id,
+                           address);
+        assert(name && "invalid entry point name");
+        rd_placeholder_name(self, address, name);
     }
 
-    assert(n && "invalid entry point name");
-
-    rd_library_function(self, address, n);
+    rd_set_function(self, address);
 
     // don't override existing exports
     if(!rd_flagsbuffer_has_exported(seg->flags, idx))

@@ -124,8 +124,6 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c);
-bool rd_i_set_function(RDContext* self, RDAddress address, const char* name,
-                       RDConfidence c);
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c);
 bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,

@@ -18,14 +18,8 @@ typedef struct RDEngineItem {
     RDEngineItemKind kind;
     RDAddress from;
     RDAddress address;
-
-    union {
-        RDConfidence confidence;
-        usize n;
-    };
-
+    usize n;
     RDRegisterHMap registers;
-    char* name;
 } RDEngineItem;
 
 typedef struct RDEngineFlow {
@@ -41,8 +35,7 @@ typedef struct RDEngineQueue {
 } RDEngineQueue;
 
 bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address);
-bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
-                              const char* name, RDConfidence c);
+bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address);
 void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n);
 void rd_i_engine_enqueue_code(RDContext* ctx, RDAddress address, usize n);
 bool rd_i_engine_mark_dirty(RDContext* ctx);
