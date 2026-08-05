@@ -118,20 +118,6 @@ void rd_surfacegraph_render(RDSurfaceGraph* self) {
     _rd_surfacegraph_render_finalize(self);
 }
 
-bool rd_surfacegraph_jump_to_ep(RDSurfaceGraph* self) {
-    bool res = false;
-
-    rd_i_surfacestate_with_locked_history(&self->state, {
-        const RDContext* ctx = self->renderer->context;
-
-        RDAddress ep;
-        res = rd_get_entry_point(ctx, &ep);
-        if(res) res = rd_surfacegraph_jump_to(self, ep);
-    });
-
-    return res;
-}
-
 bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     RDContext* ctx = self->renderer->context;
     const RDFunction* f = rd_i_find_function(ctx, address);

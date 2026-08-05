@@ -15,7 +15,6 @@ RD_API void rd_surfacegraph_clear_selection(RDSurfaceGraph* self);
 RD_API void rd_surfacegraph_set_mode(RDSurfaceGraph* self, RDRenderMode m);
 RD_API void rd_surfacegraph_set_cursor_visible(RDSurfaceGraph* self, bool b);
 RD_API void rd_surfacegraph_set_highlight_word(RDSurfaceGraph* self, const char* word);
-RD_API bool rd_surfacegraph_jump_to_ep(RDSurfaceGraph* self);
 RD_API bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address);
 RD_API bool rd_surfacegraph_set_pos(RDSurfaceGraph* self, int row, int col);
 RD_API bool rd_surfacegraph_select(RDSurfaceGraph* self, int row, int col);
