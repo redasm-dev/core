@@ -245,7 +245,11 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m) {
     if(m.offset >= endoff || m.start_address >= m.end_address) return false;
 
     usize n = m.end_address - m.start_address;
-    if(m.offset + n > ctx->input->base.length) return false;
+    if(m.offset + n > ctx->input->base.length) {
+        rd_i_add_problem(ctx, m.start_address, m.start_address,
+                         "trying to map past end of input buffer");
+        return false;
+    }
 
     // segment must exist and mapping must not cross boundary
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, m.start_address);
