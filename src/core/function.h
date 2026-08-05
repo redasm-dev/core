@@ -7,6 +7,8 @@
 #include <redasm/function.h>
 
 typedef struct RDFunction {
+    u32 gen;
+
     const RDTypeDef* type_def;
     RDContext* context;
     RDAddress address;

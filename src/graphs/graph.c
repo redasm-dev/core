@@ -410,6 +410,10 @@ void rd_graph_set_edge_arrow(RDGraph* self, const RDGraphEdge* e,
         vect_push(&ea->arrow, poly[i]);
 }
 
+bool rd_graph_is_same(const RDGraph* self, const RDGraph* g) {
+    return (self && g) && self->gen == g->gen;
+}
+
 u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
                       void* userdata) {
     rd_graph_generate_dot((RDGraph*)self, cb, userdata);

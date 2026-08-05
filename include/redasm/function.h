@@ -18,6 +18,7 @@ typedef struct RDFunctionChunk {
     bool has_noret;
 } RDFunctionChunk;
 
+RD_API bool rd_function_is_same(const RDFunction* self, const RDFunction* f);
 RD_API RDGraph* rd_function_get_graph(const RDFunction* self);
 RD_API RDAddress rd_function_get_address(const RDFunction* self);
 RD_API usize rd_function_get_n_instructions(const RDFunction* self);

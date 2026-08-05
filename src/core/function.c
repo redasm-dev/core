@@ -108,6 +108,8 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     RDFunctionWorkVect w = {0};
     RDXRefVect refs = {0};
 
+    g->gen = ++ctx->graph_gen;
+
     self->n_instructions = 0;
     self->n_norets = 0;
 
@@ -271,6 +273,7 @@ void rd_i_function_create_if(RDContext* ctx, const RDSegmentFull* seg,
 
 RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
     RDFunction* self = _rd_function_create(ctx, address);
+    self->gen = ++ctx->func_gen;
 
     usize func_idx =
         vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
@@ -348,6 +351,10 @@ bool rd_function_is_noret(const RDFunction* self) {
     }
 
     return true;
+}
+
+bool rd_function_is_same(const RDFunction* self, const RDFunction* f) {
+    return (self && f) && self->gen == f->gen;
 }
 
 RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }

@@ -35,6 +35,7 @@ typedef struct RDEdgeAttributes {
 } RDEdgeAttributes;
 
 typedef struct RDGraph {
+    u32 gen;
     RDCharVect dot_buf;
 
     RDGraphNode node_id;

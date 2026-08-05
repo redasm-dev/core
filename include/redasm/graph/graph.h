@@ -35,6 +35,7 @@ typedef const char* (*RDGraphPropCallback)(const RDGraph* self, RDGraphNode n,
 
 RD_API RDGraph* rd_graph_create(void);
 RD_API void rd_graph_destroy(RDGraph* self);
+RD_API bool rd_graph_is_same(const RDGraph* self, const RDGraph* g);
 RD_API u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
                              void* userdata);
 RD_API const char* rd_graph_generate_dot(const RDGraph* self,

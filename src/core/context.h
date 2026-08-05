@@ -59,6 +59,9 @@ typedef struct RDContext {
     RDInstructionVect lift_buf;
     RDSymbolVect symbols;
 
+    u32 func_gen;
+    u32 graph_gen;
+
     char* working_dir;
     char* file_name;
 
