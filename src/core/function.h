@@ -42,7 +42,6 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
 void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef);
 void rd_i_function_rebuild(RDFunction* self);
 void rd_i_function_rebuild_graph(RDFunction* self, RDFunctionChunkVect* chunks);
-usize rd_i_function_get_terminal_count(const RDFunction* self);
 RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);
 
 void rd_i_functionchunk_sort(RDFunctionChunkVect* self);

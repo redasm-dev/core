@@ -350,23 +350,6 @@ bool rd_function_is_noret(const RDFunction* self) {
     return true;
 }
 
-usize rd_i_function_get_terminal_count(const RDFunction* self) {
-    const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);
-
-    usize res = 0;
-
-    RDGraphNode* n;
-    vect_each(n, nodes) {
-        const RDEdgeVect* outgoing =
-            rd_i_graph_get_outgoing_edges(self->graph, *n);
-
-        usize n_outgoing = vect_length(outgoing);
-        if(!n_outgoing) res++;
-    }
-
-    return res;
-}
-
 RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }
 
 RDAddress rd_function_get_address(const RDFunction* self) {
