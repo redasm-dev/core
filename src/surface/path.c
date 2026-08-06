@@ -158,6 +158,11 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
                     rd_i_db_find_segment(ctx, r->address);
                 if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
 
+                // ignore jumps to tail locations: can happen during plugin
+                // development or simply bugs in Processor plugin
+                usize ridx = rd_i_address2index(rseg, r->address);
+                if(rd_flagsbuffer_has_tail(rseg->flags, ridx)) continue;
+
                 int torow =
                     _rd_surfacepath_calculate_row(rows, ctx, r->address);
                 _rd_surfacepath_insert(self, ctx, rows, (int)i, torow);
