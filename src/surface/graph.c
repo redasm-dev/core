@@ -61,8 +61,10 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
     panic_if(!seg, "chunk start outside any segment @ %" PRIx64, start);
 
+    // 'endidx' is calculated manually because
+    // it can trigger rd_i_address2index assertion if is EXACTLY at end
     usize idx = rd_i_address2index(seg, start);
-    usize endidx = rd_i_address2index(seg, end);
+    usize endidx = seg->base.start_address + end;
     usize len = rd_flagsbuffer_get_length(seg->flags);
     if(endidx > len) endidx = len; // chunks never cross segments
 
