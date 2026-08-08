@@ -148,11 +148,12 @@ void rd_fire_func_hook(RDContext* ctx, const char* name, const RDFunction* f,
                        usize index) {
     if(!f) return;
 
-    _rd_fire_hook(ctx, &(RDHookEvent){
-                           .kind = RD_HOOK_FUNC,
-                           .name = name,
-                           .func = {.f = f, .index = index},
-                       });
+    _rd_fire_hook(ctx,
+                  &(RDHookEvent){
+                      .kind = RD_HOOK_FUNC,
+                      .name = name,
+                      .func = {.address = f->address, .f = f, .index = index},
+                  });
 }
 
 void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,

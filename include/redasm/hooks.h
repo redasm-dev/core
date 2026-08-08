@@ -28,7 +28,7 @@ typedef struct RDHookEvent {
         struct { RDAddress address; } addr;
         struct { RDAddress address; const char* s; usize n; } str;
         struct { RDAddress from, to; RDXRefType type; } xref;
-        struct { const RDFunction* f; usize index; } func;
+        struct { RDAddress address; const RDFunction* f; usize index; } func;
         struct { RDRenderer* renderer; const RDInstruction* instr; } render_mnemonic;
         struct { RDRenderer* renderer; const RDInstruction* instr; usize idx; } render_operand;
     };
