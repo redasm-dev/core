@@ -442,7 +442,7 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
     if(!p) p = &RD_BASE_DEFAULTS;
     panic_if(p->base < 2 || p->base > 36, "base %d is not valid", p->base);
 
-    static const char DIGITS[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static const char DIGITS[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     // Max bits in isize (64) in base 2 = 64 digits
     // + 1 negative sign + 2 prefix (0x/0b/0o) + 1 NUL = 68

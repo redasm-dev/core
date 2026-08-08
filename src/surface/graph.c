@@ -59,7 +59,7 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
     RDContext* ctx = self->renderer->context;
 
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
-    panic_if(!seg, "chunk start outside any segment @ %" PRIx64, start);
+    panic_if(!seg, "chunk start outside any segment @ %" PRIX64, start);
 
     // 'endidx' is calculated manually because
     // it can trigger rd_i_address2index assertion if is EXACTLY at end

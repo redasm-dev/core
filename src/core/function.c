@@ -52,7 +52,7 @@ static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
     assert(c);
 
     return rd_i_format(&self->fmt_buf,
-                       "[label=\"0x%" PRIx64 " (%zu)\", noret = %s]", c->start,
+                       "[label=\"0x%" PRIX64 " (%zu)\", noret = %s]", c->start,
                        c->n_instructions, c->has_noret ? "true" : "false");
 }
 
@@ -315,7 +315,7 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
     // one without the other is a bug, not a tolerable state
     panic_if(func_idx >= vect_length(&ctx->functions) ||
                  (*vect_at(&ctx->functions, func_idx))->address != address,
-             "FL_FUNC set with no record @ %" PRIx64, address);
+             "FL_FUNC set with no record @ %" PRIX64, address);
 
     RDFunction* f = *vect_at(&ctx->functions, func_idx);
     rd_fire_func_hook(ctx, "redasm.func_removing", f, func_idx);

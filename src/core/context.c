@@ -107,7 +107,7 @@ void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
         RDAddress address = seg->base.start_address + i;
 
         RDTypeFull t;
-        panic_if(!rd_i_get_type(self, address, &t), "type not found @ %" PRIx64,
+        panic_if(!rd_i_get_type(self, address, &t), "type not found @ %" PRIX64,
                  address);
 
         usize tend = i + rd_type_size(&t.base, self);
@@ -201,11 +201,11 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                 }
             }
             else if(ext.module) {
-                s = rd_i_format(&self->name_buf, "%s_%s_%" PRIx64, kind_prefix,
+                s = rd_i_format(&self->name_buf, "%s_%s_%" PRIX64, kind_prefix,
                                 ext.module, address);
             }
             else {
-                s = rd_i_format(&self->name_buf, "%s_%" PRIx64, kind_prefix,
+                s = rd_i_format(&self->name_buf, "%s_%" PRIX64, kind_prefix,
                                 address);
             }
         }
@@ -230,10 +230,10 @@ bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
             s = "loc";
 
         assert(s && "invalid name prefix");
-        rd_i_format(&self->name_buf, "%s_%" PRIx64, s, address);
+        rd_i_format(&self->name_buf, "%s_%" PRIX64, s, address);
     }
 
-    n->value = rd_i_tolower(self->name_buf.data);
+    n->value = self->name_buf.data;
     return true;
 }
 
@@ -511,7 +511,7 @@ bool rd_make_code(RDContext* self, RDAddress address) {
     if(!seg) return false;
 
     if(!(seg->base.perm & RD_SP_X)) {
-        RD_LOG_FAIL("cannot make code @ %" PRIx64 ", non-executable segment",
+        RD_LOG_FAIL("cannot make code @ %" PRIX64 ", non-executable segment",
                     address);
         return false;
     }
@@ -1463,7 +1463,7 @@ bool rd_fill_nops(RDContext* self, RDAddress address, usize n) {
     bool res = false;
 
     if(!rd_encode(self, address, NULL, buf) || rd_scratch_is_empty(buf)) {
-        RD_LOG_WARN("cannot encode NOP at %" PRIx64 ", %zu byte(s) left stale",
+        RD_LOG_WARN("cannot encode NOP at %" PRIX64 ", %zu byte(s) left stale",
                     address, n);
         goto out;
     }
@@ -1472,7 +1472,7 @@ bool rd_fill_nops(RDContext* self, RDAddress address, usize n) {
 
     while(n >= noplen) {
         if(rd_patch(self, address, rd_scratch_data(buf), noplen) != noplen) {
-            RD_LOG_WARN("failed to write NOP at %" PRIx64, address);
+            RD_LOG_WARN("failed to write NOP at %" PRIX64, address);
             goto out;
         }
 
@@ -1481,7 +1481,7 @@ bool rd_fill_nops(RDContext* self, RDAddress address, usize n) {
     }
 
     if(n) {
-        RD_LOG_WARN("%zu byte(s) at %" PRIx64 " left unfilled "
+        RD_LOG_WARN("%zu byte(s) at %" PRIX64 " left unfilled "
                     "(smaller than one NOP unit)",
                     n, address);
         goto out;
@@ -1499,7 +1499,7 @@ bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
 
     if(!seg || !(seg->base.perm & RD_SP_X)) {
-        RD_LOG_FAIL("cannot patch non-executable address %" PRIx64, address);
+        RD_LOG_FAIL("cannot patch non-executable address %" PRIX64, address);
         return false;
     }
 
@@ -1539,13 +1539,13 @@ bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
     for(i = start + 1; i < end; i++) {
         if(!rd_flagsbuffer_has_func(seg->flags, i)) continue;
 
-        RD_LOG_FAIL("patch at %" PRIx64 " would overlap function %" PRIx64,
+        RD_LOG_FAIL("patch at %" PRIX64 " would overlap function %" PRIX64,
                     head, rd_i_index2address(seg, i));
         goto done;
     }
 
     if(rd_patch(self, head, rd_scratch_data(buf), len) != len) {
-        RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIx64, len, head);
+        RD_LOG_FAIL("failed to write %zu byte(s) at %" PRIX64, len, head);
         goto done;
     }
 

@@ -695,7 +695,7 @@ bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
 RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
                                     usize idx, usize sub_line) {
     panic_if(rd_flagsbuffer_has_tail(seg->flags, idx),
-             "tail detected @ %" PRIx64 ", sub_line %zu",
+             "tail detected @ %" PRIX64 ", sub_line %zu",
              seg->base.start_address + idx, sub_line);
 
     if(rd_flagsbuffer_has_unknown(seg->flags, idx))

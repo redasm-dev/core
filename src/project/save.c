@@ -40,7 +40,7 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
     str_append(v, "]\n");
 
     if(ctx->entry_point.has_value)
-        str_append(v, rd_i_format(&buf, "entry_point = 0x%" PRIx64 "\n", ctx->entry_point.value));
+        str_append(v, rd_i_format(&buf, "entry_point = 0x%" PRIX64 "\n", ctx->entry_point.value));
     // clang-format on
 
     vect_destroy(&buf);
@@ -108,7 +108,7 @@ static bool _rd_export_patched_input(RDContext* self, const char* filepath) {
     const RDInputMapping* m;
     vect_each(m, mappings) { // only mapped portions can be serialized
         const RDSegmentFull* seg = rd_i_db_find_segment(self, m->start_address);
-        panic_if(!seg, "cannot find segment %" PRIx64, m->start_address);
+        panic_if(!seg, "cannot find segment %" PRIX64, m->start_address);
 
         usize map_size = m->end_address - m->start_address;
         usize idx = rd_i_address2index(seg, m->start_address);
@@ -122,7 +122,7 @@ static bool _rd_export_patched_input(RDContext* self, const char* filepath) {
 
             u8 v;
             bool has_value = rd_flagsbuffer_get_value(seg->flags, i, &v);
-            panic_if(!has_value, "patch @ %" PRIx64 " has not value",
+            panic_if(!has_value, "patch @ %" PRIX64 " has not value",
                      m->start_address + i);
 
             input[dst_offset] = v;
@@ -225,7 +225,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
         RDSegmentFull* seg = *it;
 
         const char* flagsname =
-            rd_i_format(&buf, "flags/%" PRIx64, seg->base.start_address);
+            rd_i_format(&buf, "flags/%" PRIX64, seg->base.start_address);
 
         _rd_project_add_file_buf(&zip, flagsname, (const char*)seg->flags->data,
                                  rd_i_buffer_get_length((RDBuffer*)seg->flags) *

@@ -251,7 +251,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
     RDSegmentFull** seg;
     vect_each(seg, &ctx->db->segments) {
         const char* flagsname =
-            rd_i_format(&buf, "flags/%" PRIx64, (*seg)->base.start_address);
+            rd_i_format(&buf, "flags/%" PRIX64, (*seg)->base.start_address);
 
         size_t n = 0;
         char* flags =
