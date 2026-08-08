@@ -2,7 +2,6 @@
 #include "core/engine.h"
 #include "core/mapping.h"
 #include "core/segment.h"
-#include "hooks.h"
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
 #include "io/reader.h"
@@ -140,7 +139,6 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
     self->input = input;
     self->input_reader = rd_i_reader_create((RDBuffer*)input);
     self->reader = rd_i_reader_create_flags(self);
-    self->hooks = rd_i_hooks_create();
     self->db = rd_i_db_create(dbpath);
     self->kb = rd_i_kb_create();
 
@@ -668,12 +666,7 @@ bool rd_set_function(RDContext* self, RDAddress address) {
     if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
     if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
 
-    if(rd_i_engine_enqueue_call(self, address)) {
-        rd_fire_address_hook(self, "redasm.function_found", address);
-        return true;
-    }
-
-    return false;
+    return rd_i_engine_enqueue_call(self, address);
 }
 
 void rd_destroy(RDContext* self) {
@@ -699,10 +692,10 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->chunk_buf);
     vect_destroy(&self->externals);
+    vect_destroy(&self->hooks);
     hmap_destroy(&self->engine.current.registers);
     rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
     rd_i_functionvect_destroy(&self->functions);
-    rd_i_hooks_destroy(self->hooks);
     rd_i_engine_destroy(self);
     rd_i_kb_destroy(self->kb);
     rd_i_db_destroy(self->db);
@@ -1247,6 +1240,8 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     if(!rd_i_db_has_xrefs_to(self, toaddr))
         rd_i_flagsbuffer_clear_xref_in(toseg->flags, toidx);
 
+    rd_fire_xref_hook(self, "redasm.xref_removed", fromaddr, toaddr,
+                      RD_XR_NONE);
     return true;
 }
 

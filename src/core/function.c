@@ -101,6 +101,19 @@ static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address) {
     return self;
 }
 
+static void _rd_function_destroy(RDFunction* self) {
+    if(!self) return;
+
+    if(self->graph && !rd_graph_is_empty(self->graph)) {
+        vect_del_if(&self->context->functions.chunks, self,
+                    _rd_functionchunks_del_if_pred);
+    }
+
+    vect_destroy(&self->fmt_buf);
+    rd_graph_destroy(self->graph);
+    rd_free(self);
+}
+
 void rd_i_function_rebuild_graph(RDFunction* self,
                                  RDFunctionChunkVect* chunks) {
     RDContext* ctx = self->context;
@@ -263,25 +276,29 @@ void rd_i_functionchunk_destroy(RDFunctionChunkVect* self) {
     vect_destroy(self);
 }
 
-void rd_i_function_create_if(RDContext* ctx, const RDSegmentFull* seg,
-                             usize idx) {
+void rd_i_function_declare_if(RDContext* ctx, const RDSegmentFull* seg,
+                              usize idx) {
     if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
-    rd_i_function_create(ctx, seg->base.start_address + idx);
+    rd_i_function_declare(ctx, seg->base.start_address + idx);
 }
 
-RDFunction* rd_i_function_create(RDContext* ctx, RDAddress address) {
+RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address) {
     RDFunction* self = _rd_function_create(ctx, address);
     self->gen = ++ctx->func_gen;
 
     usize func_idx =
         vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
+
+    rd_fire_func_hook(ctx, "redasm.func_adding", self, func_idx);
+
     vect_ins(&ctx->functions, func_idx, self);
     vect_ins(&ctx->functions.addresses, func_idx, address);
     assert(vect_length(&ctx->functions) ==
            vect_length(&ctx->functions.addresses));
 
+    rd_fire_func_hook(ctx, "redasm.func_added", self, func_idx);
     return self;
 }
 
@@ -289,40 +306,36 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
                              usize idx) {
     if(!rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
-    rd_i_flagsbuffer_clear_func(seg->flags, idx);
-
     RDAddress address = seg->base.start_address + idx;
 
-    usize i =
+    usize func_idx =
         vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
 
     // FL_FUNC and ctx->functions are set together by rd_i_function_declare:
     // one without the other is a bug, not a tolerable state
-    panic_if(i >= vect_length(&ctx->functions) ||
-                 (*vect_at(&ctx->functions, i))->address != address,
+    panic_if(func_idx >= vect_length(&ctx->functions) ||
+                 (*vect_at(&ctx->functions, func_idx))->address != address,
              "FL_FUNC set with no record @ %" PRIx64, address);
 
-    RDFunction* f = *vect_at(&ctx->functions, i);
+    RDFunction* f = *vect_at(&ctx->functions, func_idx);
+    rd_fire_func_hook(ctx, "redasm.func_removing", f, func_idx);
+
+    // Defensive: the handler is untrusted plugin code and may re-enter
+    // and undeclare this same function itself:
+    //   - if that already happened, f is freed.
+    //   - never trust func_idx/f past the hook without recheck.
+    if(!rd_flagsbuffer_has_func(seg->flags, idx)) return;
+
+    rd_i_flagsbuffer_clear_func(seg->flags, idx);
 
     // remove from the vector FIRST
-    vect_del(&ctx->functions, i, 1);
-    vect_del(&ctx->functions.addresses, i, 1);
+    vect_del(&ctx->functions, func_idx, 1);
+    vect_del(&ctx->functions.addresses, func_idx, 1);
     assert(vect_length(&ctx->functions) ==
            vect_length(&ctx->functions.addresses));
-    rd_i_function_destroy(f);
-}
 
-void rd_i_function_destroy(RDFunction* self) {
-    if(!self) return;
-
-    if(self->graph && !rd_graph_is_empty(self->graph)) {
-        vect_del_if(&self->context->functions.chunks, self,
-                    _rd_functionchunks_del_if_pred);
-    }
-
-    vect_destroy(&self->fmt_buf);
-    rd_graph_destroy(self->graph);
-    rd_free(self);
+    rd_fire_func_hook(ctx, "redasm.func_removed", f, func_idx);
+    _rd_function_destroy(f);
 }
 
 void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef) {
@@ -430,7 +443,7 @@ void rd_i_functionvect_destroy(RDFunctionVect* self) {
     vect_destroy(&self->addresses);
 
     RDFunction** f;
-    vect_each(f, self) { rd_i_function_destroy(*f); }
+    vect_each(f, self) { _rd_function_destroy(*f); }
     vect_destroy(self);
 }
 

@@ -225,7 +225,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address) {
 
     if((seg->base.perm & RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
-        rd_i_function_create_if(ctx, seg, dstidx);
+        rd_i_function_declare_if(ctx, seg, dstidx);
     }
 
     if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
@@ -388,7 +388,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         if(ctx->engine.current.kind == RD_EI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
         else if(ctx->engine.current.kind == RD_EI_CALL)
-            rd_i_function_create_if(ctx, ctx->engine.segment, idx);
+            rd_i_function_declare_if(ctx, ctx->engine.segment, idx);
         else if(ctx->engine.current.kind == RD_EI_JUMP)
             rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
     }

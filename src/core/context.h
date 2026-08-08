@@ -4,6 +4,7 @@
 #include "core/segment.h"
 #include "core/symbol.h"
 #include "db/db.h"
+#include "hooks.h"
 #include "io/buffer.h"
 #include "kb/kb.h"
 #include "plugins/analyzer.h"
@@ -77,7 +78,7 @@ typedef struct RDContext {
     RDKB* kb;
     RDFunctionVect functions;
     RDExternalVect externals;
-    RDHooks* hooks;
+    RDHookItemVect hooks;
 
     RDTypeDefVect typedefs;
     RDPendingRenameVect pending_renames;

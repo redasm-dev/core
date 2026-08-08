@@ -963,7 +963,7 @@ void _rd_i_db_query_load_all_functions(RDContext* ctx) {
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
         const char* type_name = (const char*)sqlite3_column_text(stmt, 1);
-        RDFunction* f = rd_i_function_create(ctx, address);
+        RDFunction* f = rd_i_function_declare(ctx, address);
 
         if(type_name) {
             const RDTypeDef* tdef = rd_i_typedef_find(ctx, type_name);
