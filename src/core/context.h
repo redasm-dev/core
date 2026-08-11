@@ -33,6 +33,12 @@ typedef struct RDPendingRenameVect {
     usize capacity;
 } RDPendingRenameVect;
 
+typedef struct RDStringTerminatorVect {
+    u8* data;
+    usize length;
+    usize capacity;
+} RDStringTerminatorVect;
+
 typedef struct RDContext {
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
@@ -82,6 +88,7 @@ typedef struct RDContext {
 
     RDTypeDefVect typedefs;
     RDPendingRenameVect pending_renames;
+    RDStringTerminatorVect string_terminators;
 
     struct {
         RDAddress value;

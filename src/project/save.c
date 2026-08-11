@@ -22,6 +22,18 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
 
     str_append(v, "\n[analysis]\n");
     str_append(v, rd_i_format(&buf, "min_string = %d\n", ctx->min_string));
+
+    str_append(v, "string_terminators = [");
+
+    for(usize i = 0; i < vect_length(&ctx->string_terminators); i++) {
+        if(i) str_push(v, ',');
+
+        const u8* t = vect_at(&ctx->string_terminators, i);
+        str_append(v, rd_i_format(&buf, "%" PRIu8, t));
+    }
+
+    str_append(v, "]\n");
+
     str_append(v, rd_i_format(&buf, "loader = \"%s\"\n", ctx->loaderplugin->id));
     str_append(v, rd_i_format(&buf, "processor = \"%s\"\n", ctx->processorplugin->id));
     str_append(v, "analyzers = [");

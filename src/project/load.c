@@ -24,6 +24,7 @@ typedef struct RDProjectManifest {
         bool has_value;
     } entry_point;
 
+    RDStringTerminatorVect string_terminators;
     RDAnalyzerItemVect analyzers;
 
     toml_result_t toml;
@@ -54,6 +55,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
     {.key = "format.file_name", .type = TOML_STRING},
 
     {.key = "analysis.min_string", .type = TOML_INT64},
+    {.key = "analysis.string_terminators", .type = TOML_ARRAY, .array_type = &(RDTomlSchema){.type = TOML_INT64}},
     {.key = "analysis.loader", .type = TOML_STRING},
     {.key = "analysis.processor", .type = TOML_STRING},
     {.key = "analysis.analyzers", .type = TOML_ARRAY, .array_type = ANALYZER_SCHEMA},
@@ -65,6 +67,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
 
 static void _rd_project_manifest_destroy(RDProjectManifest* m) {
     rd_i_analyzeritemvect_destroy(&m->analyzers);
+    vect_destroy(&m->string_terminators);
     toml_free(m->toml);
     rd_free(m->raw);
 }
@@ -157,6 +160,17 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
 
     out->min_string =
         (int)toml_seek(out->toml.toptab, "analysis.min_string").u.int64;
+
+    toml_datum_t string_terminators =
+        toml_seek(out->toml.toptab, "analysis.string_terminators");
+
+    vect_reserve(&out->string_terminators,
+                 (usize)string_terminators.u.arr.size);
+
+    for(int i = 0; i < string_terminators.u.arr.size; i++) {
+        toml_datum_t elem = string_terminators.u.arr.elem[i];
+        vect_push(&out->string_terminators, (u8)elem.u.int64);
+    }
 
     const char* loader_id = toml_seek(out->toml.toptab, "analysis.loader").u.s;
     assert(loader_id);
@@ -274,6 +288,9 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
     ctx->entry_point.has_value = manifest->entry_point.has_value;
     ctx->entry_point.value = manifest->entry_point.value;
+
+    mem_swap(RDStringTerminatorVect, &ctx->string_terminators,
+             &manifest->string_terminators);
     mem_swap(RDAnalyzerItemVect, &ctx->analyzerplugins, &manifest->analyzers);
 
     ctx->engine.step = RD_WS_DONE;

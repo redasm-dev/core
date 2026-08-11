@@ -142,6 +142,8 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
     self->db = rd_i_db_create(dbpath);
     self->kb = rd_i_kb_create();
 
+    vect_push(&self->string_terminators, 0); // default string terminator
+
     assert(self->working_dir);
     assert(self->file_name);
 
@@ -692,6 +694,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->chunk_buf);
     vect_destroy(&self->externals);
+    vect_destroy(&self->string_terminators);
     vect_destroy(&self->hooks);
     hmap_destroy(&self->engine.current.registers);
     rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
@@ -1402,6 +1405,16 @@ RDLoadAddressing rd_get_load_addressing(const RDContext* self) {
 }
 
 void rd_set_min_string(RDContext* self, int l) { self->min_string = l; }
+
+void rd_set_string_terminators(RDContext* ctx, const u8* terms, usize n) {
+    if(!terms || !n) return;
+
+    vect_reserve(&ctx->string_terminators, n);
+    vect_clear(&ctx->string_terminators);
+
+    for(usize i = 0; i < n; i++)
+        vect_push(&ctx->string_terminators, terms[i]);
+}
 
 bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
     if(index >= RD_MAX_OPERANDS) return false;

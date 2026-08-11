@@ -43,6 +43,15 @@ static void _rd_i_strings_init(void) {
     }
 }
 
+static bool _rd_is_string_terminator(const RDContext* ctx, u8 v) {
+    u8* it;
+    vect_each(it, &ctx->string_terminators) {
+        if(*it == v) return true;
+    }
+
+    return false;
+}
+
 static bool _rd_strings_check_format(const char* s, int len) {
     assert(len > 0);
 
@@ -81,6 +90,12 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
 
 static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
                                   RDCharVect* fmt_buf) {
+    if(vect_is_empty(&ctx->string_terminators)) {
+        RD_LOG_WARN(
+            "no string terminator(s) provided, skipping string detection...");
+        return;
+    }
+
     const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     RDSegmentFull** it;
@@ -104,7 +119,7 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
                 continue;
             }
 
-            if(v == 0) {
+            if(_rd_is_string_terminator(ctx, v)) {
                 vect_push(str, 0); // add null terminator
                 _rd_strings_try_classify(ctx, seg, startidx, "char", str,
                                          fmt_buf);
