@@ -8,6 +8,20 @@ static const char* rd_kb_mod_values[] = {
     NULL,
 };
 
+static const char* rd_kb_mod_external[] = {
+    "imported",
+    "exported",
+    NULL,
+};
+
+// clang-format off
+static const RDTomlSchema RD_KB_SCHEMA_TYPE[] = {
+    {.key = "name", .type = TOML_STRING},
+    {.key = "count", .type = TOML_INT64, .optional = true},
+    {.key = "mod", .type = TOML_STRING, .optional = true, .string_values = rd_kb_mod_values},
+    {0},
+};
+
 static const RDTomlSchema RD_KB_SCHEMA_ENUM_PARAM[] = {
     {.key = "name", .type = TOML_STRING},
     {.key = "value", .type = TOML_INT64},
@@ -18,13 +32,7 @@ static const RDTomlSchema RD_KB_SCHEMA_PARAM[] = {
     {.key = "type", .type = TOML_STRING},
     {.key = "name", .type = TOML_STRING},
     {.key = "count", .type = TOML_INT64, .optional = true},
-
-    {
-        .key = "mod",
-        .type = TOML_STRING,
-        .optional = true,
-        .string_values = rd_kb_mod_values,
-    },
+    {.key = "mod", .type = TOML_STRING, .optional = true, .string_values = rd_kb_mod_values},
     {0},
 };
 
@@ -34,42 +42,36 @@ static const RDTomlSchema RD_KB_SCHEMA_COMPOUND[] = {
 };
 
 static const RDTomlSchema RD_KB_SCHEMA_ENUM[] = {
-    {
-        .key = "base_type",
-        .type = TOML_STRING,
-    },
-    {
-        .key = "members",
-        .type = TOML_ARRAY,
-        .array_type = RD_KB_SCHEMA_ENUM_PARAM,
-    },
+    {.key = "base_type", .type = TOML_STRING},
+    {.key = "members", .type = TOML_ARRAY, .array_type = RD_KB_SCHEMA_ENUM_PARAM},
     {0},
 };
 
 static const RDTomlSchema RD_KB_SCHEMA_RET[] = {
     {.key = "type", .type = TOML_STRING},
     {.key = "count", .type = TOML_INT64, .optional = true},
-
-    {
-        .key = "mod",
-        .type = TOML_STRING,
-        .optional = true,
-        .string_values = rd_kb_mod_values,
-    },
+    {.key = "mod", .type = TOML_STRING, .optional = true, .string_values = rd_kb_mod_values},
     {0},
 };
 
 static const RDTomlSchema RD_KB_SCHEMA_FUNCTION[] = {
     {.key = "cc", .type = TOML_STRING, .optional = true},
     {.key = "noret", .type = TOML_BOOLEAN, .optional = true},
-    {
-        .key = "ret",
-        .type = TOML_TABLE,
-        .table_type = RD_KB_SCHEMA_RET,
-    },
+    {.key = "ret", .type = TOML_TABLE, .table_type = RD_KB_SCHEMA_RET},
     {.key = "args", .type = TOML_ARRAY, .array_type = RD_KB_SCHEMA_PARAM},
     {0},
 };
+
+static const RDTomlSchema RD_KB_SCHEMA_SYMBOL[] = {
+    {.key = "address", .type = TOML_INT64},
+    {.key = "module", .type = TOML_STRING, .optional = true},
+    {.key = "external", .type = TOML_STRING, .string_values = rd_kb_mod_external, .optional = true},
+    {.key = "function", .type = TOML_BOOLEAN, .optional = true},
+    {.key = "type", .type = TOML_TABLE, .table_type = RD_KB_SCHEMA_TYPE, .optional = true},
+    {.key = "comment", .type = TOML_STRING, .optional = true},
+    {0},
+};
+// clang-format off
 
 bool rd_i_kb_validate_function(const RDKBObject* obj) {
     const toml_datum_t* d = rd_i_kb_to_datum(obj);
@@ -87,4 +89,10 @@ bool rd_i_kb_validate_enum(const RDKBObject* obj) {
     const toml_datum_t* d = rd_i_kb_to_datum(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_ENUM);
+}
+
+bool rd_i_kb_validate_symbol(const RDKBObject* obj) {
+    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+    assert(d);
+    return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_SYMBOL);
 }

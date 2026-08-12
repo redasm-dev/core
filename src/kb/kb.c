@@ -301,6 +301,68 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
     return true;
 }
 
+static bool _rd_kb_load_symbols(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* symbols = rd_kbobject_get_table(root, "symbols");
+    if(!symbols) return false;
+
+    const char* name;
+    const RDKBObject* sym;
+    rd_kbobject_each_pair(name, sym, symbols) {
+        if(!rd_i_kb_validate_symbol(sym)) continue;
+
+        i64 addr_v;
+        rd_kbobject_get_int(sym, "address", &addr_v);
+
+        RDAddress address = (RDAddress)addr_v;
+
+        bool is_func;
+        bool has_func = rd_kbobject_get_bool(sym, "function", &is_func);
+        const RDKBObject* type = rd_kbobject_get_table(sym, "type");
+        const char* module = rd_kbobject_get_str(sym, "module");
+        const char* external = rd_kbobject_get_str(sym, "external");
+
+        if(has_func && type) {
+            RD_LOG_FAIL(
+                "symbol '%s' @ %llx: 'function' and 'type' are mutually "
+                "exclusive, skipping entry",
+                name, address);
+            continue;
+        }
+
+        rd_library_name(ctx, address, name);
+
+        if(!strcmp(external, "imported"))
+            rd_set_external(ctx, address, module, RD_EXT_IMPORTED);
+        else if(!strcmp(external, "exported"))
+            rd_set_external(ctx, address, module, RD_EXT_EXPORTED);
+
+        if(has_func) {
+            if(is_func) rd_set_function(ctx, address);
+        }
+        else if(type) {
+            const char* type_name = rd_kbobject_get_str(type, "name");
+            const char* type_mod = rd_kbobject_get_str(type, "mod");
+
+            RDTypeModifier mod = RD_TYPE_NONE;
+
+            if(type_mod) {
+                if(!strcmp(type_mod, "ptr"))
+                    mod = RD_TYPE_PTR;
+                else if(!strcmp(type_mod, "cptr"))
+                    mod = RD_TYPE_CPTR;
+            }
+
+            i64 type_count;
+            bool has_count = rd_kbobject_get_int(type, "count", &type_count);
+
+            rd_library_type(ctx, address, type_name,
+                            has_count ? (usize)type_count : 0, mod);
+        }
+    }
+
+    return true;
+}
+
 static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
     const RDKBObject* ordinals = rd_kbobject_get_table(root, "ordinals");
     if(!ordinals) return false;
@@ -434,6 +496,7 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     _rd_kb_load_compound(kbfile->root, ctx, "structs");
     _rd_kb_load_enums(kbfile->root, ctx);
     _rd_kb_load_functions(kbfile->root, ctx);
+    _rd_kb_load_symbols(kbfile->root, ctx);
     _rd_kb_load_ordinals(kbfile->root, ctx);
 
     return kbfile->root;
