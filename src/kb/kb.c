@@ -331,10 +331,12 @@ static bool _rd_kb_load_symbols(const RDKBObject* root, RDContext* ctx) {
 
         rd_library_name(ctx, address, name);
 
-        if(!strcmp(external, "imported"))
-            rd_set_external(ctx, address, module, RD_EXT_IMPORTED);
-        else if(!strcmp(external, "exported"))
-            rd_set_external(ctx, address, module, RD_EXT_EXPORTED);
+        if(external) {
+            if(!strcmp(external, "imported"))
+                rd_set_external(ctx, address, module, RD_EXT_IMPORTED);
+            else if(!strcmp(external, "exported"))
+                rd_set_external(ctx, address, module, RD_EXT_EXPORTED);
+        }
 
         if(has_func) {
             if(is_func) rd_set_function(ctx, address);
