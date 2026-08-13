@@ -660,7 +660,16 @@ void rd_i_clear_n(RDContext* self, RDAddress address, usize n) {
 
 bool rd_set_function(RDContext* self, RDAddress address) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
-    if(!seg || !(seg->base.perm & RD_SP_X)) return false;
+    if(!seg) return false;
+
+    if(!(seg->base.perm & RD_SP_X)) {
+        rd_i_add_problem(
+            self, address, address,
+            "trying to create a function in non executable segment '%s'",
+            seg->base.name);
+
+        return false;
+    }
 
     usize index = rd_i_address2index(seg, address);
 
