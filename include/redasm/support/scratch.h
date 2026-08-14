@@ -21,3 +21,9 @@ RD_API const char* rd_scratch_data(const RDScratchBuffer* self);
 RD_API usize rd_scratch_length(const RDScratchBuffer* self);
 RD_API usize rd_scratch_capacity(const RDScratchBuffer* self);
 // clang-format on
+
+#define rd_scratch_each(it, self)                                              \
+    for((it) = rd_scratch_data(self);                                          \
+        rd_scratch_data(self) &&                                               \
+        ((it) < rd_scratch_data(self) + rd_scratch_length(self));              \
+        (it)++)
