@@ -11,6 +11,7 @@ typedef enum {
     RD_CONFIDENCE_MAX, // internal use
 } RDConfidence;
 
+#define RD_MIN_STRING_LENGTH 4
 #define RD_UNUSED(x) (void)(x)
 #define rd_count_of(x) (sizeof(x) / sizeof(*(x)))
 
@@ -25,5 +26,3 @@ typedef enum {
 #define rd_slice_each(it, self)                                                \
     for((it) = (self).data;                                                    \
         (self).data && ((it) < (self).data + (self).length); (it)++)
-
-#define RD_MIN_STRING_LENGTH 4
