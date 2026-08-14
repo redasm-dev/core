@@ -7,6 +7,7 @@ typedef struct RDReader RDReader;
 RD_API void rd_reader_save(RDReader* self);
 RD_API u64 rd_reader_restore(RDReader* self);
 RD_API void rd_reader_seek(RDReader* self, u64 pos);
+RD_API void rd_reader_skip(RDReader* self, usize n);
 RD_API u64 rd_reader_tell(const RDReader* self);
 RD_API u64 rd_reader_get_length(const RDReader* self);
 RD_API bool rd_reader_has_error(const RDReader* self);

@@ -66,7 +66,7 @@ void rd_i_reader_destroy(RDReader* self) {
     if(!self) return;
 
     if(!vect_is_empty(&self->stack))
-        RD_LOG_WARN("reader stack is not empty (begin/end mismatch)");
+        RD_LOG_WARN("reader stack is not empty (save/restore mismatch)");
 
     vect_destroy(&self->stack);
     rd_free(self);
@@ -77,12 +77,17 @@ void rd_reader_save(RDReader* self) {
 }
 
 u64 rd_reader_restore(RDReader* self) {
-    panic_if(vect_is_empty(&self->stack), "reader begin/end mismatch");
+    panic_if(vect_is_empty(&self->stack), "reader save/restore mismatch");
     rd_reader_seek(self, vect_pop_last(&self->stack));
     return rd_reader_tell(self);
 }
 
 void rd_reader_seek(RDReader* self, u64 pos) { self->seek(self, pos); }
+
+void rd_reader_skip(RDReader* self, usize n) {
+    rd_reader_seek(self, rd_reader_tell(self) + n);
+}
+
 usize rd_reader_tell(const RDReader* self) { return self->tell(self); }
 u64 rd_reader_get_length(const RDReader* self) { return self->buffer->length; }
 bool rd_reader_has_error(const RDReader* self) { return self->error; }
