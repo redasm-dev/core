@@ -11,7 +11,7 @@ enum {
 typedef struct RDSegmentFull {
     RDSegment base;
     RDFlagsBuffer* flags;
-    u32* ovl_flags;
+    u8* ovl_flags;
 } RDSegmentFull;
 
 usize rd_i_address2index(const RDSegmentFull* seg, RDAddress addr);
