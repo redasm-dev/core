@@ -3,13 +3,19 @@
 #include "support/utils.h"
 #include <redasm/io/buffer.h>
 
+#define RD_STRING_CHUNK_SIZE 256
+
+// clang-format off
 typedef struct RDBuffer {
     usize length;
     RDCharVect str_buf;
-    bool (*get_byte)(const struct RDBuffer* self, usize idx, u8* b);
-    bool (*set_byte)(struct RDBuffer* self, usize idx, u8 b);
+    char str_chunk[RD_STRING_CHUNK_SIZE];
+
+    usize (*read_bytes)(const struct RDBuffer* self, usize idx, void* dst, usize n);
+    usize (*write_bytes)(struct RDBuffer* self, usize idx, const void* src, usize n);
     void (*destroy)(struct RDBuffer* self);
 } RDBuffer;
+// clang-format on
 
 typedef struct RDByteBuffer {
     RDBuffer base;

@@ -13,22 +13,20 @@ static inline const RDByteBuffer* _rd_as_bytebuffer_c(const RDBuffer* self) {
     return (const RDByteBuffer*)self;
 }
 
-static bool _rd_bytebuffer_get_byte(const RDBuffer* self, usize idx, u8* b) {
-    if(idx < self->length) {
-        if(b) *b = _rd_as_bytebuffer_c(self)->data[idx];
-        return true;
-    }
-
-    return false;
+static usize _rd_bytebuffer_read_bytes(const RDBuffer* self, usize idx,
+                                       void* dst, usize n) {
+    if(!dst || idx >= self->length) return 0;
+    n = rd_i_min(n, self->length - idx);
+    memcpy(dst, _rd_as_bytebuffer_c(self)->data + idx, n);
+    return n;
 }
 
-static bool _rd_bytebuffer_set_byte(RDBuffer* self, usize idx, u8 b) {
-    if(idx < self->length) {
-        _rd_as_bytebuffer(self)->data[idx] = b;
-        return true;
-    }
-
-    return false;
+static usize _rd_bytebuffer_write_bytes(RDBuffer* self, usize idx,
+                                        const void* src, usize n) {
+    if(!src || idx >= self->length) return 0;
+    n = rd_i_min(n, self->length - idx);
+    memmove(_rd_as_bytebuffer(self)->data + idx, src, n);
+    return n;
 }
 
 static void _rd_bytebuffer_destroy(RDBuffer* self) {
@@ -38,8 +36,8 @@ static void _rd_bytebuffer_destroy(RDBuffer* self) {
 
 RDByteBuffer* rd_i_buffer_create(usize n) {
     RDByteBuffer* self = rd_alloc0(1, sizeof(*self));
-    self->base.get_byte = _rd_bytebuffer_get_byte;
-    self->base.set_byte = _rd_bytebuffer_set_byte;
+    self->base.read_bytes = _rd_bytebuffer_read_bytes;
+    self->base.write_bytes = _rd_bytebuffer_write_bytes;
     self->base.destroy = _rd_bytebuffer_destroy;
     self->base.length = n;
     self->data = rd_alloc0(n, sizeof(*self->data));
@@ -61,81 +59,88 @@ const char* rd_i_buffer_read_str(RDBuffer* self, usize idx, usize* len) {
 
     vect_clear(&self->str_buf);
     vect_reserve(&self->str_buf, RD_STR_BUF_MIN_CAPACITY);
-    usize i = idx;
+    usize total = 0;
 
-    for(; i < self->length; i++) {
-        u8 b;
-        if(!self->get_byte(self, i, &b)) break;
+    for(;;) {
+        usize got = self->read_bytes(self, idx + total, self->str_chunk,
+                                     sizeof(self->str_chunk));
+        if(!got) return NULL; // unmapped/invalid before any terminator
 
-        vect_push(&self->str_buf, (char)b);
+        const char* nul = memchr(self->str_chunk, 0, got);
+        usize take = nul ? (usize)(nul - self->str_chunk) + 1 : got;
 
-        if(!b) {
-            if(len) *len = i - idx;
+        for(usize i = 0; i < take; i++)
+            vect_push(&self->str_buf, self->str_chunk[i]);
+        total += take;
+
+        if(nul) {
+            if(len) *len = total - 1; // length excludes terminator
             return self->str_buf.data;
         }
+
+        // short read, no terminator
+        if(got < sizeof(self->str_chunk)) break;
     }
 
     return NULL;
 }
 
 usize rd_i_buffer_read(const RDBuffer* self, usize idx, void* ptr, usize n) {
-    if(!ptr) return 0;
-
-    usize i = 0;
-
-    for(; i < n; i++) {
-        if(!self->get_byte(self, idx + i, (u8*)ptr + i)) break;
-    }
-
-    return i;
+    return self->read_bytes(self, idx, ptr, n);
 }
 
 bool rd_i_buffer_read_byte(const RDBuffer* self, usize idx, u8* v) {
-    return self->get_byte(self, idx, v);
+    u8 b;
+    if(self->read_bytes(self, idx, &b, 1) != sizeof(b)) return false;
+
+    if(v) *v = b;
+    return true;
 }
 
 bool rd_i_buffer_read_le16(const RDBuffer* self, usize idx, u16* v) {
-    uint8_t b[2];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u16)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
     if(v) *v = (u16)(((u16)b[0] << 0) | ((u16)b[1] << 8));
     return true;
 }
 
 bool rd_i_buffer_read_le32(const RDBuffer* self, usize idx, u32* v) {
-    uint8_t b[4];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u32)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
-    if(v)
+    if(v) {
         *v = ((u32)b[0] << 0) | ((u32)b[1] << 8) | ((u32)b[2] << 16) |
              ((u32)b[3] << 24);
+    }
 
     return true;
 }
 
 bool rd_i_buffer_read_le64(const RDBuffer* self, usize idx, u64* v) {
-    uint8_t b[8];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u64)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
-    if(v)
+    if(v) {
         *v = ((u64)b[0] << 0) | ((u64)b[1] << 8) | ((u64)b[2] << 16) |
              ((u64)b[3] << 24) | ((u64)b[4] << 32) | ((u64)b[5] << 40) |
              ((u64)b[6] << 48) | ((u64)b[7] << 56);
+    }
 
     return true;
 }
 
 bool rd_i_buffer_read_be16(const RDBuffer* self, usize idx, u16* v) {
-    uint8_t b[2];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u16)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
     if(v) *v = (u16)(((u16)b[0] << 8) | ((u16)b[1] << 0));
     return true;
 }
 
 bool rd_i_buffer_read_be32(const RDBuffer* self, usize idx, u32* v) {
-    uint8_t b[4];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u32)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
     if(v)
         *v = ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) |
@@ -145,8 +150,8 @@ bool rd_i_buffer_read_be32(const RDBuffer* self, usize idx, u32* v) {
 }
 
 bool rd_i_buffer_read_be64(const RDBuffer* self, usize idx, u64* v) {
-    uint8_t b[8];
-    if(!rd_i_buffer_read(self, idx, b, sizeof(b))) return false;
+    u8 b[sizeof(u64)];
+    if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
 
     if(v)
         *v = ((u64)b[0] << 56) | ((u64)b[1] << 48) | ((u64)b[2] << 40) |
@@ -232,56 +237,71 @@ bool rd_i_buffer_read_primitive(const RDBuffer* self, usize idx,
 }
 
 usize rd_i_buffer_write(RDBuffer* self, usize idx, const void* ptr, usize n) {
-    if(!ptr || idx >= self->length) return false;
-
-    u8* p = (u8*)ptr;
-    usize i = 0;
-
-    for(; i < n; i++) {
-        if(!self->set_byte(self, idx + i, p[i])) break;
-    }
-
-    return i;
+    return self->write_bytes(self, idx, ptr, n);
 }
 
 bool rd_i_buffer_write_u8(RDBuffer* self, usize idx, u8 v) {
-    return self->set_byte(self, idx, v);
+    return self->write_bytes(self, idx, &v, 1) == sizeof(u8);
 }
 
 bool rd_i_buffer_write_le16(RDBuffer* self, usize idx, u16 v) {
-    u8 b[2] = {(u8)(v >> 0), (u8)(v >> 8)};
-    return rd_i_buffer_write(self, idx, b, 2);
+    u8 b[sizeof(u16)] = {(u8)(v >> 0), (u8)(v >> 8)};
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_le32(RDBuffer* self, usize idx, u32 v) {
-    u8 b[4] = {(u8)(v >> 0), (u8)(v >> 8), (u8)(v >> 16), (u8)(v >> 24)};
-    return rd_i_buffer_write(self, idx, b, 4);
+    u8 b[sizeof(u32)] = {
+        (u8)(v >> 0),
+        (u8)(v >> 8),
+        (u8)(v >> 16),
+        (u8)(v >> 24),
+    };
+
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_le64(RDBuffer* self, usize idx, u64 v) {
-    u8 b[8] = {
+    u8 b[sizeof(u64)] = {
         (u8)(v >> 0),  (u8)(v >> 8),  (u8)(v >> 16), (u8)(v >> 24),
         (u8)(v >> 32), (u8)(v >> 40), (u8)(v >> 48), (u8)(v >> 56),
     };
 
-    return rd_i_buffer_write(self, idx, b, 8);
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be16(RDBuffer* self, usize idx, u16 v) {
-    u8 b[2] = {(u8)(v >> 8), (u8)(v >> 0)};
-    return rd_i_buffer_write(self, idx, b, 2);
+    u8 b[sizeof(u16)] = {(u8)(v >> 8), (u8)(v >> 0)};
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be32(RDBuffer* self, usize idx, u32 v) {
-    u8 b[4] = {(u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8), (u8)(v >> 0)};
-    return rd_i_buffer_write(self, idx, b, 4);
+    u8 b[sizeof(u32)] = {
+        (u8)(v >> 24),
+        (u8)(v >> 16),
+        (u8)(v >> 8),
+        (u8)(v >> 0),
+    };
+
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be64(RDBuffer* self, usize idx, u64 v) {
-    u8 b[8] = {
+    u8 b[sizeof(u64)] = {
         (u8)(v >> 56), (u8)(v >> 48), (u8)(v >> 40), (u8)(v >> 32),
         (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8),  (u8)(v >> 0),
     };
 
-    return rd_i_buffer_write(self, idx, b, 8);
+    if(idx + sizeof(b) > self->length) return false;
+
+    return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }

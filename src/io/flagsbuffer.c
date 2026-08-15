@@ -10,18 +10,33 @@ static inline const RDFlagsBuffer* _rd_as_flagsbuffer_c(const RDBuffer* self) {
     return (const RDFlagsBuffer*)self;
 }
 
-static bool _rd_flagsbuffer_get_byte(const RDBuffer* self, usize idx, u8* b) {
-    return idx < self->length &&
-           rd_flags_get_value(_rd_as_flagsbuffer_c(self)->data[idx], b);
+static usize _rd_flagsbuffer_read_bytes(const RDBuffer* self, usize idx,
+                                        void* dst, usize n) {
+    if(idx >= self->length) return 0;
+    n = rd_i_min(n, self->length - idx);
+
+    const RDFlags* d = _rd_as_flagsbuffer_c(self)->data + idx;
+    u8* out = dst;
+    usize i = 0;
+    for(; i < n; i++) {
+        if(!rd_flags_get_value(d[i], &out[i])) break;
+    }
+    return i;
 }
 
-static bool _rd_flagsbuffer_set_byte(RDBuffer* self, usize idx, u8 b) {
-    if(idx < self->length) {
-        rd_i_flags_set_value(&_rd_as_flagsbuffer(self)->data[idx], b);
-        return true;
-    }
+static usize _rd_flagsbuffer_write_bytes(RDBuffer* self, usize idx,
+                                         const void* src, usize n) {
+    if(!src || idx >= self->length) return 0;
+    n = rd_i_min(n, self->length - idx);
 
-    return false;
+    RDFlags* d = _rd_as_flagsbuffer(self)->data + idx;
+    const u8* p = src;
+
+    // cannot fail per-element: set_value only writes the value plane,
+    // validity is a property of having been written at all
+    for(usize i = 0; i < n; i++)
+        rd_i_flags_set_value(&d[i], p[i]);
+    return n;
 }
 
 static void _rd_flagsbuffer_destroy(RDBuffer* self) {
@@ -31,8 +46,8 @@ static void _rd_flagsbuffer_destroy(RDBuffer* self) {
 
 RDFlagsBuffer* rd_i_flagsbuffer_create(usize n) {
     RDFlagsBuffer* self = rd_alloc0(1, sizeof(*self));
-    self->base.get_byte = _rd_flagsbuffer_get_byte;
-    self->base.set_byte = _rd_flagsbuffer_set_byte;
+    self->base.read_bytes = _rd_flagsbuffer_read_bytes;
+    self->base.write_bytes = _rd_flagsbuffer_write_bytes;
     self->base.destroy = _rd_flagsbuffer_destroy;
     self->base.length = n;
     self->data = rd_alloc0(n, sizeof(*self->data));
