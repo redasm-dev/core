@@ -14,7 +14,7 @@ typedef struct RDRegisterHMap {
     RDRegister* data;
     usize length;
     usize capacity;
-
+    usize tombstones;
     HMapHash hash;
     HMapEqual equal;
 } RDRegisterHMap;

@@ -3,7 +3,10 @@
 const char DB_SCHEMA[] = " \
 PRAGMA synchronous = OFF; \
 PRAGMA journal_mode = MEMORY; \
-PRAGMA foreign_keys = ON; \
+PRAGMA cache_size = -65536; \
+PRAGMA page_size = 8192; \
+PRAGMA foreign_keys = OFF; \
+PRAGMA temp_store = MEMORY; \
 \
 CREATE TABLE IF NOT EXISTS Segments ( \
     name          TEXT NOT NULL, \
@@ -39,7 +42,7 @@ CREATE TABLE IF NOT EXISTS TypeDefs( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS TypeParams ( \
-    owner      TEXT NOT NULL REFERENCES TypeDefs(name), \
+    owner      TEXT NOT NULL, \
     type       TEXT NOT NULL, \
     name       TEXT NOT NULL, \
     count      INTEGER NOT NULL, \
@@ -49,7 +52,7 @@ CREATE TABLE IF NOT EXISTS TypeParams ( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS TypeEnum ( \
-    owner TEXT NOT NULL REFERENCES TypeDefs(name), \
+    owner TEXT NOT NULL, \
     name  TEXT NOT NULL, \
     value INTEGER NOT NULL, \
     PRIMARY KEY(owner, name) \

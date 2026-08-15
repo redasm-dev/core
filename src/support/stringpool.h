@@ -12,6 +12,7 @@ typedef struct RDStringPool {
     RDStringPoolEntry* data;
     usize length;
     usize capacity;
+    usize tombstones;
     HMapHash hash;
     HMapEqual equal;
 } RDStringPool;

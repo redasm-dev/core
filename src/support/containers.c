@@ -13,6 +13,43 @@
 #define HMAP_LOAD_FACTOR_NUM 3
 #define HMAP_LOAD_FACTOR_DEN 4
 
+static size_t _hmap_min_capacity(size_t entries) {
+    return (entries * HMAP_LOAD_FACTOR_DEN / HMAP_LOAD_FACTOR_NUM) + 1;
+}
+
+// unconditional rebuild; drops tombstones, grows only if needed
+static void _hmap_rebuild(void** data, size_t* capacity, size_t* tombstones,
+                          size_t mincapacity, size_t length, size_t elem_size) {
+    size_t new_cap = *capacity ? *capacity : HMAP_INIT_CAPACITY;
+    while(new_cap < mincapacity)
+        new_cap *= 2;
+
+    void* new_data = calloc(new_cap, elem_size); // HMAP_FREE == 0
+    assert(new_data);
+
+    char* old = (char*)*data;
+    size_t reinserted = 0;
+
+    for(size_t i = 0; i < *capacity && reinserted < length; i++) {
+        char* entry = old + (i * elem_size);
+        HMapHeader* hdr = (HMapHeader*)entry;
+        if(hdr->state != HMAP_OCCUPIED) continue;
+
+        size_t slot = hdr->hash % new_cap;
+        while(((HMapHeader*)((char*)new_data + (slot * elem_size)))->state ==
+              HMAP_OCCUPIED)
+            slot = (slot + 1) % new_cap;
+
+        memcpy((char*)new_data + (slot * elem_size), entry, elem_size);
+        reinserted++;
+    }
+
+    free(*data);
+    *data = new_data;
+    *capacity = new_cap;
+    *tombstones = 0;
+}
+
 void _vect_grow(void** data, size_t* cap, size_t len, size_t elem_size) {
     if(len < *cap) return;
     *cap = *cap ? *cap * 2 : RD_VECTOR_CAPACITY;
@@ -208,37 +245,11 @@ size_t _vect_idx(const void* p, const void* data, size_t length,
     return (size_t)(q - b) / elem_size;
 }
 
-void _hmap_rehash(void** data, size_t* capacity, size_t newcapacity,
-                  size_t length, size_t elem_size) {
-    size_t new_cap = *capacity ? *capacity * 2 : HMAP_INIT_CAPACITY;
-    while(new_cap < newcapacity)
-        new_cap *= 2;
-
-    void* new_data =
-        calloc(new_cap, elem_size); // HMAP_FREE = 0, calloc handles it
-    assert(new_data);
-
-    char* old = (char*)*data;
-    size_t reinserted = 0; // try to leave when length is reached
-
-    for(size_t i = 0; i < *capacity && reinserted < length; i++) {
-        char* entry = old + (i * elem_size);
-        HMapHeader* hdr = (HMapHeader*)entry;
-        if(hdr->state != HMAP_OCCUPIED) continue;
-
-        size_t slot = hdr->hash % new_cap;
-
-        while(((HMapHeader*)((char*)new_data + (slot * elem_size)))->state ==
-              HMAP_OCCUPIED)
-            slot = (slot + 1) % new_cap;
-
-        memcpy((char*)new_data + (slot * elem_size), entry, elem_size);
-        reinserted++;
-    }
-
-    free(*data);
-    *data = new_data;
-    *capacity = new_cap;
+void _hmap_rehash(void** data, size_t* capacity, size_t* tombstones,
+                  size_t entries, size_t length, size_t elem_size) {
+    size_t need = _hmap_min_capacity(entries);
+    if(need <= *capacity) return;
+    _hmap_rebuild(data, capacity, tombstones, need, length, elem_size);
 }
 
 void* _hmap_get(void* data, size_t capacity, const void* entry,
@@ -263,11 +274,14 @@ void* _hmap_get(void* data, size_t capacity, const void* entry,
     return NULL;
 }
 
-void _hmap_set(void** data, size_t* capacity, size_t* length, const void* entry,
-               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn) {
-    // rehash if needed
-    if(*length >= (*capacity) * HMAP_LOAD_FACTOR_NUM / HMAP_LOAD_FACTOR_DEN)
-        _hmap_rehash(data, capacity, *capacity * 2, *length, elem_size);
+void _hmap_set(void** data, size_t* capacity, size_t* length,
+               size_t* tombstones, const void* entry, size_t elem_size,
+               HMapHash hash_fn, HMapEqual eq_fn) {
+    if(*length + *tombstones >=
+       (*capacity) * HMAP_LOAD_FACTOR_NUM / HMAP_LOAD_FACTOR_DEN) {
+        _hmap_rebuild(data, capacity, tombstones,
+                      _hmap_min_capacity(*length + 1), *length, elem_size);
+    }
 
     size_t h = hash_fn(entry);
     size_t slot = h % *capacity;
@@ -312,8 +326,9 @@ void _hmap_set(void** data, size_t* capacity, size_t* length, const void* entry,
     }
 }
 
-void _hmap_del(void* data, size_t capacity, size_t* length, const void* entry,
-               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn) {
+void _hmap_del(void* data, size_t capacity, size_t* length, size_t* tombstones,
+               const void* entry, size_t elem_size, HMapHash hash_fn,
+               HMapEqual eq_fn) {
     if(!capacity) return;
 
     size_t h = hash_fn(entry);
@@ -328,6 +343,7 @@ void _hmap_del(void* data, size_t capacity, size_t* length, const void* entry,
         if(hdr->state == HMAP_OCCUPIED && hdr->hash == h && eq_fn(e, entry)) {
             hdr->state = HMAP_DELETED;
             (*length)--;
+            (*tombstones)++;
             return;
         }
 

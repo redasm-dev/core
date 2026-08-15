@@ -268,31 +268,34 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
 
 #define hmap_set(self, entry)                                                  \
     _hmap_set((void**)&(self)->data, &(self)->capacity, &(self)->length,       \
-              (entry), sizeof(*(self)->data), (self)->hash, (self)->equal)
+              &(self)->tombstones, (entry), sizeof(*(self)->data),             \
+              (self)->hash, (self)->equal)
 
 #define hmap_del(self, entry)                                                  \
-    _hmap_del((self)->data, (self)->capacity, &(self)->length, (entry),        \
-              sizeof(*(self)->data), (self)->hash, (self)->equal)
+    _hmap_del((self)->data, (self)->capacity, &(self)->length,                 \
+              &(self)->tombstones, (entry), sizeof(*(self)->data),             \
+              (self)->hash, (self)->equal)
 
 #define hmap_reserve(self, n)                                                  \
-    do {                                                                       \
-        if((n) > (self)->capacity)                                             \
-            _hmap_rehash((void**)&(self)->data, &(self)->capacity, (n),        \
-                         (self)->length, sizeof(*(self)->data));               \
-    } while(0)
+    _hmap_rehash((void**)&(self)->data, &(self)->capacity,                     \
+                 &(self)->tombstones, (n), (self)->length,                     \
+                 sizeof(*(self)->data))
 
 #define hmap_dup(dst, src)                                                     \
     do {                                                                       \
         (dst)->length = (src)->length;                                         \
         (dst)->capacity = (src)->capacity;                                     \
+        (dst)->tombstones = (src)->tombstones;                                 \
         (dst)->hash = (src)->hash;                                             \
         (dst)->equal = (src)->equal;                                           \
-        if(((src)->capacity)) {                                                \
+        if((src)->capacity) {                                                  \
             (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));      \
             assert((dst)->data);                                               \
             memcpy((dst)->data, (src)->data,                                   \
                    (src)->capacity * sizeof(*(src)->data));                    \
         }                                                                      \
+        else                                                                   \
+            (dst)->data = NULL;                                                \
     } while(0)
 
 #define hmap_destroy(self)                                                     \
@@ -301,6 +304,7 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
         (self)->data = NULL;                                                   \
         (self)->length = 0;                                                    \
         (self)->capacity = 0;                                                  \
+        (self)->tombstones = 0;                                                \
     } while(0)
 
 #define hmap_clear(self)                                                       \
@@ -308,6 +312,7 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
         if((self)->data)                                                       \
             memset((self)->data, 0, (self)->capacity * sizeof(*(self)->data)); \
         (self)->length = 0;                                                    \
+        (self)->tombstones = 0;                                                \
     } while(0)
 
 #define hmap_length(self) ((self)->length)
@@ -364,11 +369,13 @@ size_t _vect_bsearch(const void* key, const void* data, size_t length,
                      size_t elem_size, VectKeyCompare cb);
 size_t _vect_idx(const void* p, const void* data, size_t length,
                  size_t elem_size);
-void _hmap_rehash(void** data, size_t* capacity, size_t newcapacity,
-                  size_t length, size_t elem_size);
+void _hmap_rehash(void** data, size_t* capacity, size_t* tombstones,
+                  size_t entries, size_t length, size_t elem_size);
 void* _hmap_get(void* data, size_t capacity, const void* entry,
                 size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);
-void _hmap_set(void** data, size_t* capacity, size_t* length, const void* entry,
-               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);
-void _hmap_del(void* data, size_t capacity, size_t* length, const void* entry,
-               size_t elem_size, HMapHash hash_fn, HMapEqual eq_fn);
+void _hmap_set(void** data, size_t* capacity, size_t* length,
+               size_t* tombstones, const void* entry, size_t elem_size,
+               HMapHash hash_fn, HMapEqual eq_fn);
+void _hmap_del(void* data, size_t capacity, size_t* length, size_t* tombstones,
+               const void* entry, size_t elem_size, HMapHash hash_fn,
+               HMapEqual eq_fn);
