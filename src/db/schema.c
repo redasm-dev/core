@@ -1,11 +1,11 @@
 #include "schema.h"
 
 const char DB_SCHEMA[] = " \
+PRAGMA page_size = 8192; \
 PRAGMA synchronous = OFF; \
 PRAGMA journal_mode = MEMORY; \
 PRAGMA cache_size = -65536; \
-PRAGMA page_size = 8192; \
-PRAGMA foreign_keys = OFF; \
+PRAGMA foreign_keys = ON; \
 PRAGMA temp_store = MEMORY; \
 \
 CREATE TABLE IF NOT EXISTS Segments ( \
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS TypeDefs( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS TypeParams ( \
-    owner      TEXT NOT NULL, \
+    owner      TEXT NOT NULL REFERENCES TypeDefs(name), \
     type       TEXT NOT NULL, \
     name       TEXT NOT NULL, \
     count      INTEGER NOT NULL, \
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS TypeParams ( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS TypeEnum ( \
-    owner TEXT NOT NULL, \
+    owner TEXT NOT NULL REFERENCES TypeDefs(name), \
     name  TEXT NOT NULL, \
     value INTEGER NOT NULL, \
     PRIMARY KEY(owner, name) \
@@ -100,4 +100,6 @@ CREATE TABLE IF NOT EXISTS Problems ( \
     address      INTEGER NOT NULL, \
     message      TEXT NOT NULL \
 ); \
+CREATE INDEX IF NOT EXISTS Names_NameIdx ON Names(name); \
+CREATE INDEX IF NOT EXISTS XRefs_ToIdx ON XRefs(to_address, from_address, type); \
 ";
