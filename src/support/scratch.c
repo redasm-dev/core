@@ -86,6 +86,18 @@ void rd_scratch_puts_n(RDScratchBuffer* self, const char* s, usize n) {
     if(s) str_append_n(&self->impl, s, n);
 }
 
+void rd_scratch_putchar(RDScratchBuffer* self, char c) {
+    str_push(&self->impl, c);
+}
+
+const char* rd_scratch_first(const RDScratchBuffer* self) {
+    return vect_is_empty(&self->impl) ? NULL : vect_first(&self->impl);
+}
+
+const char* rd_scratch_last(const RDScratchBuffer* self) {
+    return vect_is_empty(&self->impl) ? NULL : vect_last(&self->impl);
+}
+
 const char* rd_scratch_data(const RDScratchBuffer* self) {
     return self->impl.data ? self->impl.data : "";
 }
