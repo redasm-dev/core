@@ -77,7 +77,5 @@ int rd_i_renderer_get_max_column(const RDRenderer* self);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);
-
-// vvv NEW vvv
 RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
                                 usize idx, usize sub_line, usize indent);

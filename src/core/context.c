@@ -465,13 +465,13 @@ bool rd_get_address(RDContext* self, const char* name, RDAddress* address) {
     return true;
 }
 
-const char* rd_get_comment(RDContext* self, RDAddress address) {
+const char* rd_get_comment_inline(RDContext* self, RDAddress address) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return NULL;
 
     if(rd_i_flagsbuffer_has_comment(seg->flags,
                                     rd_i_address2index(seg, address)))
-        return rd_i_db_get_comment(self, address);
+        return rd_i_db_get_comment(self, address, RD_COMMENT_INLINE, 0);
 
     return NULL;
 }
@@ -590,7 +590,8 @@ bool rd_set_noreturn(RDContext* self, RDAddress address) {
     return rd_i_flagsbuffer_set_noret(seg->flags, idx);
 }
 
-bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
+bool rd_set_comment_inline(RDContext* self, RDAddress address,
+                           const char* cmt) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
@@ -603,18 +604,70 @@ bool rd_set_comment(RDContext* self, RDAddress address, const char* cmt) {
     }
 
     if((!cmt || !(*cmt)) && rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
-        rd_i_flagsbuffer_clear_comment(seg->flags, idx);
-        rd_i_db_del_comment(self, address);
+        rd_i_db_del_comment(self, address, RD_COMMENT_INLINE);
+
+        if(!rd_i_db_has_any_comment(self, address))
+            rd_i_flagsbuffer_clear_comment(seg->flags, idx);
         return true;
     }
 
     if(cmt && *cmt) {
         rd_i_flagsbuffer_set_comment(seg->flags, idx);
-        rd_i_db_set_comment(self, address, cmt);
+        rd_i_db_add_comment(self, address, cmt, RD_COMMENT_INLINE);
         return true;
     }
 
     return false;
+}
+
+bool rd_add_comment_before(RDContext* self, RDAddress address,
+                           const char* cmt) {
+    return rd_i_add_comment(self, address, cmt, RD_COMMENT_BEFORE);
+}
+
+bool rd_add_comment_after(RDContext* self, RDAddress address, const char* cmt) {
+    return rd_i_add_comment(self, address, cmt, RD_COMMENT_AFTER);
+}
+
+bool rd_del_comment_before(RDContext* self, RDAddress address) {
+    return rd_i_del_comment(self, address, RD_COMMENT_BEFORE);
+}
+
+bool rd_del_comment_after(RDContext* self, RDAddress address) {
+    return rd_i_del_comment(self, address, RD_COMMENT_AFTER);
+}
+
+bool rd_i_add_comment(RDContext* self, RDAddress address, const char* cmt,
+                      RDCommentPlacement p) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
+        rd_i_add_problem(self, address, address,
+                         "cannot set comment on tail byte");
+        return false;
+    }
+
+    rd_i_flagsbuffer_set_comment(seg->flags, idx);
+    rd_i_db_add_comment(self, address, cmt ? cmt : "", p);
+    return true;
+}
+
+bool rd_i_del_comment(RDContext* self, RDAddress address,
+                      RDCommentPlacement p) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+    rd_i_db_del_comment(self, address, p);
+
+    // only clear the shared flag if NOTHING remains at ANY placement
+    if(!rd_i_db_has_any_comment(self, address))
+        rd_i_flagsbuffer_clear_comment(seg->flags, idx);
+
+    return true;
 }
 
 bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c) {

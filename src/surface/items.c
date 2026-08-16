@@ -213,10 +213,10 @@ static void _rd_render_refs(RDRenderer* r, RDAddress address) {
     }
 }
 
-static void _rd_render_comment(RDRenderer* r, RDAddress address) {
+static void _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
-    const char* cmt = rd_get_comment(r->context, address);
+    const char* cmt = rd_get_comment_inline(r->context, address);
     if(!cmt) return;
 
     vect_clear(&r->comment_buf);
@@ -248,13 +248,34 @@ static void _rd_render_comment(RDRenderer* r, RDAddress address) {
 
 static void _rd_render_comment_item(RDRenderer* r, const RDSegmentFull* seg,
                                     usize idx, usize sub_line,
-                                    const char* comment) {
+                                    const char* comment, usize indent) {
     if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
-    rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
-    rd_renderer_text(r, "<", RD_THEME_MUTED, RD_THEME_BACKGROUND);
+    rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
+    rd_renderer_text(r, "; ", RD_THEME_MUTED, RD_THEME_BACKGROUND);
     rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, ">", RD_THEME_MUTED, RD_THEME_BACKGROUND);
+}
+
+static bool _rd_render_comment_line(RDRenderer* r, const RDSegmentFull* seg,
+                                    usize idx, usize sub_line, usize local_line,
+                                    RDCommentPlacement p, usize* out_n) {
+    if(out_n) *out_n = 0;
+
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return false;
+    if(!rd_i_flagsbuffer_has_comment(seg->flags, idx)) return false;
+
+    RDAddress address = seg->base.start_address + idx;
+    usize n = rd_i_db_get_comment_count(r->context, address, p);
+    if(out_n) *out_n = n;
+
+    if(local_line < n) {
+        const char* text =
+            rd_i_db_get_comment(r->context, address, p, local_line);
+        _rd_render_comment_item(r, seg, idx, sub_line, text, 0);
+        return true;
+    }
+
+    return false;
 }
 
 static void _rd_render_label_item(RDRenderer* r, const RDSegmentFull* seg,
@@ -348,7 +369,7 @@ static void _rd_render_instruction_item(RDRenderer* r, const RDSegmentFull* seg,
     }
 
     _rd_render_refs(r, address);
-    _rd_render_comment(r, address);
+    _rd_render_comment_inline(r, address);
 }
 
 static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
@@ -357,8 +378,8 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
     // indentation is a schema property (depth), not a row ordinal: the
     // same field indents identically whether reached from its root's
     // address or its own (first.x under the root, first.y at its own
-    // head - both depth 1, both at the same column). The banner sits
-    // one level above depth 0
+    // head: both depth 1, both at the same column).
+    // The banner sits one level above depth 0
     usize indent = is_banner ? 8 : 8 + ((res->depth + 1) * 2);
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
@@ -444,19 +465,42 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         _rd_render_value(r, address, &t, true);
     }
 
-    _rd_render_comment(r, address);
+    _rd_render_comment_inline(r, address);
 }
 
 static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
                                                   const RDSegmentFull* seg,
                                                   usize idx, usize sub_line) {
-    usize slot = 0, curridx = idx;
+    usize curridx = idx;
 
-    if(rd_i_flagsbuffer_has_info(seg->flags, idx)) {
+    // walk forward once to get the chunk's real width, needed by
+    // every row at this idx, not just the hex-dump one
+    while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
+        if(!rd_flagsbuffer_has_unknown(seg->flags, curridx)) break;
+        if(curridx != idx && rd_i_is_hexchunk_head(seg, curridx)) break;
+        curridx++;
+    }
+
+    usize before, item_len = curridx - idx;
+
+    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
+                               RD_COMMENT_BEFORE, &before)) {
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = item_len,
+        };
+    }
+
+    usize slot = before;
+
+    if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
+       rd_flagsbuffer_has_name(seg->flags, idx)) {
         if(sub_line == slot) {
             _rd_render_label_item(r, seg, idx, sub_line);
-            return (RDRenderItemResult){.status = RD_ROW_OK};
+            return (RDRenderItemResult){.status = RD_ROW_OK,
+                                        .length = item_len};
         }
+
         slot++;
     }
 
@@ -467,44 +511,45 @@ static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
         if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
 
         // hex part
-        while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
-            if(!rd_flagsbuffer_has_unknown(seg->flags, curridx)) break;
-            if(curridx != idx && rd_i_is_hexchunk_head(seg, curridx)) break;
-
+        for(usize i = 0; i < item_len; i++) {
             u8 v;
-            if(rd_flagsbuffer_get_value(seg->flags, curridx, &v))
+            if(rd_flagsbuffer_get_value(seg->flags, idx + i, &v))
                 rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
             else
                 rd_renderer_muted(r, "??");
-
             rd_renderer_ws(r, 1);
-            curridx++;
         }
 
-        usize n = curridx - idx;
-        if(lead + n < RD_SURFACE_HEX_LINE)
-            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - lead - n) * 3);
+        if(lead + item_len < RD_SURFACE_HEX_LINE)
+            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - lead - item_len) * 3);
 
         curridx = idx;
 
         if(lead) rd_renderer_ws(r, lead); // ascii column: 1 char per byte
 
         // ascii part
-        for(usize i = 0; i < n; i++, curridx++) {
+        for(usize i = 0; i < item_len; i++) {
             char ptr[2] = {0};
-            if(rd_flagsbuffer_get_value(seg->flags, curridx, (u8*)&ptr))
+            if(rd_flagsbuffer_get_value(seg->flags, idx + i, (u8*)&ptr))
                 rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
             else
                 rd_renderer_muted(r, "?");
         }
 
-        if(lead + n < RD_SURFACE_HEX_LINE)
-            rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - n);
+        if(lead + item_len < RD_SURFACE_HEX_LINE)
+            rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - item_len);
 
         return (RDRenderItemResult){
             .status = RD_ROW_OK,
-            .length = curridx - idx,
+            .length = item_len,
         };
+    }
+
+    slot++;
+
+    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line - slot,
+                               RD_COMMENT_AFTER, NULL)) {
+        return (RDRenderItemResult){.status = RD_ROW_OK, .length = item_len};
     }
 
     return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
@@ -515,45 +560,82 @@ static RDRenderItemResult _rd_render_item_data(RDRenderer* r,
                                                usize idx, usize sub_line) {
     RDDataHead head;
     rd_i_data_head_get(r->context, seg, idx, &head);
+    usize whole_len = rd_type_size(&head.root, r->context);
 
-    RDResolveResult res = {0};
-    bool is_head = head.has_banner && sub_line == 0;
-    bool ok;
+    usize before;
+    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
+                               RD_COMMENT_BEFORE, &before))
+        return (RDRenderItemResult){.status = RD_ROW_OK, .length = whole_len};
 
-    if(is_head) {
-        res.field = (RDParam){.type = head.root, .name = NULL};
-        ok = true;
+    usize inner_last = rd_i_row_data_last_sub_line(r->context, seg, idx);
+
+    if(sub_line <= before + inner_last) {
+        RDResolveResult res = {0};
+        bool is_head = head.has_banner && sub_line == before;
+        bool ok;
+
+        if(is_head) {
+            res.field = (RDParam){.type = head.root, .name = NULL};
+            ok = true;
+        }
+        else if(head.has_banner && !rd_i_type_has_more(&head.root)) {
+            ok = false; // solid root: the banner was the whole rendering
+        }
+        else {
+            usize link =
+                head.has_banner ? (sub_line - before - 1) : (sub_line - before);
+            ok = rd_i_data_chain_row(r->context, &head, link, &res);
+        }
+
+        if(!ok) return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+
+        // string-like types (aka char[n], char16[n] ...) are not expanded
+        // but rendered as a single line + terminator
+        if(!is_head && sub_line > before && rd_type_is_string(&head.root))
+            return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+
+        _rd_render_data_row(r, seg, idx, sub_line, is_head, &res);
+
+        // the deepest chain entity is the narrowest:
+        // on EXHAUSTED the fill loop advances by the LAST OK row's length,
+        // which is exactly the step from this head to the next one
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = rd_type_size(&res.field.type, r->context),
+        };
     }
-    else if(head.has_banner && !rd_i_type_has_more(&head.root)) {
-        ok = false; // solid root: the banner was the whole rendering
+
+    // after-range: re-resolve the LAST real row, ordinary known-valid call,
+    // to get its correct length for the after-comment's .length
+    usize last_link = head.has_banner ? (inner_last - 1) : inner_last;
+    RDResolveResult last_res;
+    rd_i_data_chain_row(r->context, &head, last_link, &last_res);
+    usize after_len = rd_type_size(&last_res.field.type, r->context);
+
+    if(_rd_render_comment_line(r, seg, idx, sub_line,
+                               sub_line - (before + inner_last + 1),
+                               RD_COMMENT_AFTER, NULL)) {
+        return (RDRenderItemResult){.status = RD_ROW_OK, .length = after_len};
     }
-    else {
-        usize link = head.has_banner ? sub_line - 1 : sub_line;
-        ok = rd_i_data_chain_row(r->context, &head, link, &res);
-    }
 
-    if(!ok) return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
-
-    // string-like types (aka char[n], char16[n] ...) are not expanded
-    // but rendered as a single line + terminator
-    if(!is_head && sub_line > 0 && rd_type_is_string(&head.root))
-        return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
-
-    _rd_render_data_row(r, seg, idx, sub_line, is_head, &res);
-
-    // the deepest chain entity is the narrowest:
-    // on EXHAUSTED the fill loop advances by the LAST OK row's length, which is
-    // exactly the step from this head to the next one
-    return (RDRenderItemResult){
-        .status = RD_ROW_OK,
-        .length = rd_type_size(&res.field.type, r->context),
-    };
+    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
 }
 
 static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
                                                const RDSegmentFull* seg,
                                                usize idx, usize sub_line) {
-    usize slot = 0;
+    usize item_len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+    usize before;
+
+    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
+                               RD_COMMENT_BEFORE, &before)) {
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = item_len,
+        };
+    }
+
+    usize slot = before;
 
     if(rd_flagsbuffer_has_func(seg->flags, idx)) {
         if(sub_line == slot) {
@@ -561,7 +643,7 @@ static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
 
             return (RDRenderItemResult){
                 .status = RD_ROW_OK,
-                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+                .length = item_len,
             };
         }
         slot++;
@@ -571,7 +653,7 @@ static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
             _rd_render_label_item(r, seg, idx, sub_line);
             return (RDRenderItemResult){
                 .status = RD_ROW_OK,
-                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+                .length = item_len,
             };
         }
         slot++;
@@ -582,7 +664,7 @@ static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
 
         return (RDRenderItemResult){
             .status = RD_ROW_OK,
-            .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+            .length = item_len,
         };
     }
 
@@ -590,14 +672,24 @@ static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
 
     if(rd_flagsbuffer_has_noret(seg->flags, idx)) {
         if(sub_line == slot) {
-            _rd_render_comment_item(r, seg, idx, sub_line, "does not return");
+            _rd_render_comment_item(r, seg, idx, sub_line, "does not return",
+                                    8);
 
             return (RDRenderItemResult){
                 .status = RD_ROW_OK,
-                .length = rd_i_flagsbuffer_get_range_length(seg->flags, idx),
+                .length = item_len,
             };
         }
+
         slot++;
+    }
+
+    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line - slot,
+                               RD_COMMENT_AFTER, NULL)) {
+        return (RDRenderItemResult){
+            .status = RD_ROW_OK,
+            .length = item_len,
+        };
     }
 
     return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
@@ -714,8 +806,15 @@ RDRenderItemResult rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg,
                                         usize idx) {
     usize sub_line = 0;
 
+    if(!rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS) &&
+       rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
+        RDAddress address = seg->base.start_address + idx;
+        sub_line =
+            rd_i_db_get_comment_count(r->context, address, RD_COMMENT_BEFORE);
+    }
+
     if(rd_flagsbuffer_has_code(seg->flags, idx))
-        sub_line = rd_i_row_code_instr_sub_line(seg, idx);
+        sub_line += rd_i_row_code_instr_sub_line(seg, idx);
 
     return rd_i_render_item(r, seg, idx, sub_line);
 }

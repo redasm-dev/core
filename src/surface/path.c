@@ -36,14 +36,22 @@ static bool _rd_surfacepath_exists(const RDSurfacePath* self, int fromrow,
 static bool _rd_row_is_instruction(RDContext* ctx, const RDRow* row,
                                    const RDSegmentFull** out_seg,
                                    usize* out_idx) {
-    if(row->sub_line == RD_SUB_LINE_NONE) return false; // segment banner
+    if(row->sub_line == RD_SUB_LINE_NONE) return false;
 
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, row->address);
     if(!rd_flagsbuffer_has_code(seg->flags, idx)) return false;
-    if(row->sub_line != rd_i_row_code_instr_sub_line(seg, idx)) return false;
+
+    usize before = 0;
+    if(rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
+        before =
+            rd_i_db_get_comment_count(ctx, row->address, RD_COMMENT_BEFORE);
+    }
+
+    if(row->sub_line != before + rd_i_row_code_instr_sub_line(seg, idx))
+        return false;
 
     if(out_seg) *out_seg = seg;
     if(out_idx) *out_idx = idx;
@@ -80,23 +88,20 @@ static int _rd_surfacepath_calculate_row(const RDRowVect* rows, RDContext* ctx,
 }
 
 static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
-                                   const RDRowVect* rows, int fromrow,
-                                   int torow) {
-    if(fromrow == torow || _rd_surfacepath_exists(self, fromrow, torow)) return;
+                                   int from_row, int to_row,
+                                   RDAddress from_address) {
+    if(from_row == to_row || _rd_surfacepath_exists(self, from_row, to_row))
+        return;
 
     bool is_dst_cond = false;
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, from_address);
 
-    if(fromrow >= 0 && (usize)fromrow < vect_length(rows)) {
-        const RDRow* src = vect_at(rows, (usize)fromrow);
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, src->address);
-
-        if(seg) {
-            usize idx = rd_i_address2index(seg, src->address);
-            is_dst_cond = rd_flagsbuffer_has_cond(seg->flags, idx);
-        }
+    if(seg) {
+        usize idx = rd_i_address2index(seg, from_address);
+        is_dst_cond = rd_flagsbuffer_has_cond(seg->flags, idx);
     }
 
-    bool is_loop = fromrow > torow;
+    bool is_loop = from_row > to_row;
     RDThemeKind style;
 
     if(is_loop)
@@ -105,8 +110,8 @@ static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
         style = is_dst_cond ? RD_THEME_JUMP_COND : RD_THEME_JUMP;
 
     vect_push(&self->path, ((RDSurfacePathItem){
-                               .from_row = fromrow,
-                               .to_row = torow,
+                               .from_row = from_row,
+                               .to_row = to_row,
                                .is_loop = is_loop,
                                .style = style,
                            }));
@@ -144,7 +149,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
                 int fromrow =
                     _rd_surfacepath_calculate_row(rows, ctx, r->address);
-                _rd_surfacepath_insert(self, ctx, rows, fromrow, (int)i);
+                _rd_surfacepath_insert(self, ctx, fromrow, (int)i, r->address);
             }
         }
 
@@ -165,7 +170,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
                 int torow =
                     _rd_surfacepath_calculate_row(rows, ctx, r->address);
-                _rd_surfacepath_insert(self, ctx, rows, (int)i, torow);
+                _rd_surfacepath_insert(self, ctx, (int)i, torow, row->address);
             }
         }
     }

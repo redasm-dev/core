@@ -58,6 +58,8 @@ void rd_i_rowvect_push(RDRowVect* self, usize sub_line, RDAddress address);
 void rd_i_row_reserve(RDRow* self, int n);
 void rd_i_row_push(RDRow* self, u32 ch, RDThemeKind fg, RDThemeKind bg);
 usize rd_i_row_code_instr_sub_line(const RDSegmentFull* seg, usize idx);
+usize rd_i_row_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
+                                  usize idx);
 
 static inline RDCell* rd_i_row_cell_at(RDRow* self, int idx) {
     return vect_at(&self->cells, idx);

@@ -21,8 +21,11 @@ CREATE TABLE IF NOT EXISTS InputMappings ( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS Comments ( \
-    address INTEGER PRIMARY KEY, \
-    comment TEXT NOT NULL \
+    address   INTEGER NOT NULL, \
+    placement INTEGER NOT NULL, \
+    line      INTEGER NOT NULL, \
+    comment   TEXT NOT NULL, \
+    PRIMARY KEY(address, placement, line) \
 ); \
 \
 CREATE TABLE IF NOT EXISTS XRefs ( \

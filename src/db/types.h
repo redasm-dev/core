@@ -5,6 +5,12 @@
 #include <redasm/registers.h>
 #include <redasm/types/type.h>
 
+typedef enum {
+    RD_COMMENT_INLINE = 0,
+    RD_COMMENT_BEFORE,
+    RD_COMMENT_AFTER,
+} RDCommentPlacement;
+
 typedef struct RDAddressVect {
     RDAddress* data;
     usize length;

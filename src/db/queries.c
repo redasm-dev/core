@@ -893,14 +893,17 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
     return v;
 }
 
-const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address) {
+const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address,
+                                       RDCommentPlacement p, usize line) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_COMMENT, "\
         SELECT comment \
         FROM Comments \
-        WHERE address = :address \
+        WHERE address = :address AND placement = :placement AND line = :line \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    _rd_db_bind_param_int(ctx, stmt, ":placement", (sqlite3_int64)p);
+    _rd_db_bind_param_int(ctx, stmt, ":line", (sqlite3_int64)line);
 
     if(_rd_db_step(ctx, stmt) == SQLITE_ROW)
         return (const char*)sqlite3_column_text(stmt, 0);
@@ -908,28 +911,64 @@ const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address) {
     return NULL;
 }
 
-void _rd_i_db_query_set_comment(RDContext* ctx, RDAddress address,
-                                const char* cmt) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_COMMENT, "\
-        INSERT INTO Comments \
-            VALUES (:address, :comment) \
-        ON CONFLICT DO  \
-            UPDATE SET comment = EXCLUDED.comment \
+void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address,
+                                const char* cmt, RDCommentPlacement p) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_COMMENT, "\
+        INSERT INTO Comments (address, placement, line, comment) \
+        SELECT :address, :placement, COALESCE(MAX(line), -1) + 1, :comment \
+        FROM Comments \
+        WHERE address = :address AND placement = :placement \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    _rd_db_bind_param_int(ctx, stmt, ":placement", (sqlite3_int64)p);
     _rd_db_bind_param_str(ctx, stmt, ":comment", cmt);
     _rd_db_step(ctx, stmt);
 }
 
-void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address) {
+void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address,
+                                RDCommentPlacement p) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_COMMENT, "\
-        DELETE FROM Comments \
-        WHERE address = :address \
+       DELETE FROM Comments \
+        WHERE address = :address AND placement = :placement \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    _rd_db_bind_param_int(ctx, stmt, ":placement", (sqlite3_int64)p);
     _rd_db_step(ctx, stmt);
+}
+
+usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
+                                       RDCommentPlacement p) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_COMMENT_COUNT, "\
+        SELECT COUNT(*) \
+        FROM Comments \
+        WHERE address = :address AND placement = :placement \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+    _rd_db_bind_param_int(ctx, stmt, ":placement", (sqlite_int64)p);
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW)
+        return (usize)sqlite3_column_int64(stmt, 0);
+
+    return 0;
+}
+
+bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_HAS_ANY_COMMENT, "\
+        SELECT EXISTS( \
+            SELECT 1 FROM Comments WHERE address = :address \
+        ) \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address", (sqlite3_int64)address);
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW)
+        return sqlite3_column_int(stmt, 0) != 0;
+
+    return false;
 }
 
 void _rd_i_db_query_set_function(RDContext* ctx, const RDFunction* f) {

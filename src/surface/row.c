@@ -5,6 +5,21 @@
 #include "surface/items.h"
 #include <inttypes.h>
 
+static usize _rd_row_code_last_sub_line(const RDSegmentFull* seg, usize idx) {
+    usize last = rd_i_row_code_instr_sub_line(seg, idx);
+    if(rd_flagsbuffer_has_noret(seg->flags, idx)) last++;
+    return last;
+}
+
+// mirror of _rd_render_item_unknown's slot layout, keep in lockstep
+static usize _rd_row_unknown_last_sub_line(const RDSegmentFull* seg,
+                                           usize idx) {
+    return (rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
+            rd_flagsbuffer_has_name(seg->flags, idx))
+               ? 1
+               : 0;
+}
+
 /*
  * The CODE slot layout, single source of truth
  * mirror of _rd_render_item_code, keep in lockstep.
@@ -20,12 +35,6 @@ usize rd_i_row_code_instr_sub_line(const RDSegmentFull* seg, usize idx) {
                : 0;
 }
 
-static usize _rd_code_last_sub_line(const RDSegmentFull* seg, usize idx) {
-    usize last = rd_i_row_code_instr_sub_line(seg, idx);
-    if(rd_flagsbuffer_has_noret(seg->flags, idx)) last++;
-    return last;
-}
-
 /*
  * The last row ordinal at a DATA head, counted by the SAME function the
  * forward dispatch uses to render them (rd_i_data_chain_row): the last
@@ -35,8 +44,8 @@ static usize _rd_code_last_sub_line(const RDSegmentFull* seg, usize idx) {
  * through an outer member at a nonzero offset is row 0 at its own head, yet
  * sits at depth >= 1).
  */
-static usize _rd_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
-                                    usize idx) {
+usize rd_i_row_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
+                                  usize idx) {
     RDDataHead head;
     rd_i_data_head_get(ctx, seg, idx, &head);
 
@@ -54,12 +63,6 @@ static usize _rd_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
         last++;
 
     return last;
-}
-
-// mirror of _rd_render_item_unknown's slot layout, keep in lockstep
-static usize _rd_unknown_last_sub_line(const RDSegmentFull* seg, usize idx) {
-    // rows: [optional label], hex line: the hex line is always last
-    return rd_i_flagsbuffer_has_info(seg->flags, idx) ? 1 : 0;
 }
 
 void rd_i_rowvect_destroy(RDRowVect* self) {
@@ -137,14 +140,23 @@ bool rd_i_row_step_back(RDContext* ctx, const RDSegmentFull** seg,
                  "item spans segment boundary");
     }
 
+    usize before = 0, after = 0;
+    if(rd_i_flagsbuffer_has_comment((*seg)->flags, *idx)) {
+        RDAddress addr = (*seg)->base.start_address + *idx;
+        before = rd_i_db_get_comment_count(ctx, addr, RD_COMMENT_BEFORE);
+        after = rd_i_db_get_comment_count(ctx, addr, RD_COMMENT_AFTER);
+    }
+
+    // clang-format off
     if(rd_flagsbuffer_has_code((*seg)->flags, *idx))
-        *sub_line = _rd_code_last_sub_line(*seg, *idx);
+        *sub_line = before + _rd_row_code_last_sub_line(*seg, *idx) + after;
     else if(rd_flagsbuffer_has_unknown((*seg)->flags, *idx))
-        *sub_line = _rd_unknown_last_sub_line(*seg, *idx);
+        *sub_line = before + _rd_row_unknown_last_sub_line(*seg, *idx) + after;
     else if(rd_flagsbuffer_has_data((*seg)->flags, *idx))
-        *sub_line = _rd_data_last_sub_line(ctx, *seg, *idx);
+        *sub_line = before + rd_i_row_data_last_sub_line(ctx, *seg, *idx) + after;
     else
         unreachable();
+    // clang-format on
 
     return true;
 }

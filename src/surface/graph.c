@@ -79,6 +79,11 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
             rd_i_render_item(self->renderer, seg, idx, sub_line);
 
         if(r.status == RD_ROW_OK) {
+            panic_if(r.length == 0,
+                     "rd_i_render_item returned OK with zero length @ "
+                     "%s+%zx sub_line=%zu",
+                     seg->base.name, idx, sub_line);
+
             last_len = r.length;
             sub_line++;
         }

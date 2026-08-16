@@ -419,16 +419,28 @@ RDTypeVect* rd_i_db_get_all_types(RDContext* ctx, RDAddressVect* av,
     return _rd_i_db_query_get_all_types(ctx, av, v);
 }
 
-const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address) {
-    return _rd_i_db_query_get_comment(ctx, address);
+const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address,
+                                RDCommentPlacement p, usize line) {
+    return _rd_i_db_query_get_comment(ctx, address, p, line);
 }
 
-void rd_i_db_set_comment(RDContext* ctx, RDAddress address, const char* cmt) {
-    _rd_i_db_query_set_comment(ctx, address, cmt);
+void rd_i_db_add_comment(RDContext* ctx, RDAddress address, const char* cmt,
+                         RDCommentPlacement p) {
+    _rd_i_db_query_add_comment(ctx, address, cmt, p);
 }
 
-void rd_i_db_del_comment(RDContext* ctx, RDAddress address) {
-    _rd_i_db_query_del_comment(ctx, address);
+void rd_i_db_del_comment(RDContext* ctx, RDAddress address,
+                         RDCommentPlacement p) {
+    _rd_i_db_query_del_comment(ctx, address, p);
+}
+
+usize rd_i_db_get_comment_count(RDContext* ctx, RDAddress address,
+                                RDCommentPlacement p) {
+    return _rd_i_db_query_get_comment_count(ctx, address, p);
+}
+
+bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address) {
+    return _rd_i_db_query_has_any_comment(ctx, address);
 }
 
 void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p) {

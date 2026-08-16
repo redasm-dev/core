@@ -27,9 +27,11 @@ enum {
     RD_QUERY_HAS_XREFS_FROM,
     RD_QUERY_HAS_XREFS_TO,
 
-    RD_QUERY_SET_COMMENT,
+    RD_QUERY_ADD_COMMENT,
     RD_QUERY_GET_COMMENT,
     RD_QUERY_DEL_COMMENT,
+    RD_QUERY_GET_COMMENT_COUNT,
+    RD_QUERY_HAS_ANY_COMMENT,
 
     RD_QUERY_SET_TYPE_DEF,
     RD_QUERY_SET_TYPE_DEF_PARAMS,
@@ -141,10 +143,15 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
                                                 RDTypeDefVect* v);
 
-const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address);
-void _rd_i_db_query_set_comment(RDContext* ctx, RDAddress address,
-                                const char* cmt);
-void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address);
+const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address,
+                                       RDCommentPlacement p, usize line);
+void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address,
+                                const char* cmt, RDCommentPlacement p);
+void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address,
+                                RDCommentPlacement p);
+usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
+                                       RDCommentPlacement p);
+bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address);
 
 void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p);
 

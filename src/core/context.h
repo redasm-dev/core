@@ -144,6 +144,10 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
                      RDConfidence c);
 void rd_i_clear_n(RDContext* self, RDAddress address, usize n);
 
+bool rd_i_add_comment(RDContext* self, RDAddress address, const char* cmt,
+                      RDCommentPlacement p);
+bool rd_i_del_comment(RDContext* self, RDAddress address, RDCommentPlacement p);
+
 const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
                                       RDXRefType type);
 const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr,

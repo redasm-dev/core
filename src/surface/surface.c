@@ -1,6 +1,7 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "surface/items.h"
 #include "surface/path.h"
 #include "surface/renderer.h"
@@ -80,6 +81,11 @@ static bool _rd_surface_render(RDSurface* self, usize seg_idx, usize idx,
                 rd_i_render_item(self->renderer, seg, idx, sub_line);
 
             if(r.status == RD_ROW_OK) {
+                panic_if(r.length == 0,
+                         "rd_i_render_item returned OK with zero length @ "
+                         "%s+%zx sub_line=%zu",
+                         seg->base.name, idx, sub_line);
+
                 // stamp the row's byte width for rd_surface_get_byte_span.
                 // Some renderers return OK without emitting a row under
                 // RD_RF_* flags, hence the count check
