@@ -252,6 +252,8 @@ static void _rd_render_comment_item(RDRenderer* r, const RDSegmentFull* seg,
     if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
 
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
+    if(!comment || !(*comment)) return; // it's just an empty line
+
     rd_renderer_text(r, "; ", RD_THEME_MUTED, RD_THEME_BACKGROUND);
     rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
