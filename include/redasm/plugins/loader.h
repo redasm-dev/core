@@ -20,6 +20,7 @@ typedef enum {
 
 typedef struct RDLoaderPlugin {
     RD_PLUGIN_HEADER;
+    usize instance_size;
 
     RDLoader* (*create)(const struct RDLoaderPlugin*);
     void (*destroy)(RDLoader*);

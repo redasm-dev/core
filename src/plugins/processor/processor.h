@@ -10,6 +10,9 @@ typedef struct RDInstructionVect {
     RDInstruction real_instr;
 } RDInstructionVect;
 
+RDProcessor* rd_i_processor_create(const RDProcessorPlugin* plugin);
+void rd_i_processor_destroy(const RDProcessorPlugin* plugin, RDProcessor* p);
+
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
                                    int idx, RDProcessor* p);
 void rd_i_processor_render_instruction(RDRenderer* r,

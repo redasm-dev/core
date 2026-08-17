@@ -10,6 +10,25 @@ static bool _rd_part_loaders(const RDTestResult** tr) {
     return !((*tr)->loaderplugin->flags & RD_PF_LAST);
 }
 
+RDLoader* rd_i_loader_create(const RDLoaderPlugin* plugin) {
+    if(!plugin) return NULL;
+
+    if(plugin->create) return plugin->create(plugin);
+    if(plugin->instance_size) return rd_alloc0(1, plugin->instance_size);
+    return NULL;
+}
+
+void rd_i_loader_destroy(const RDLoaderPlugin* plugin, RDLoader* ldr) {
+    if(!plugin) return;
+
+    if(plugin->destroy) {
+        plugin->destroy(ldr);
+        return;
+    }
+
+    if(!plugin->create && plugin->instance_size) rd_free(ldr);
+}
+
 RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
     if(!inputbuf) return (RDTestResultSlice){0};
 
@@ -50,16 +69,14 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
 
 RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
                          const char* filepath) {
-    RDParseResult pr = {
-        .loader = plugin->create ? plugin->create(plugin) : NULL,
-    };
-
     RDLoaderRequest req = {
         .filepath = filepath,
         .input = rd_i_reader_create((RDBuffer*)inputbuf),
         .name = rd_i_get_file_name(filepath),
         .ext = rd_i_get_file_ext(filepath),
     };
+
+    RDParseResult pr = {.loader = rd_i_loader_create(plugin)};
 
     if(plugin->parse(pr.loader, &req)) {
         if(plugin->get_processor) {
@@ -72,8 +89,8 @@ RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
 
         assert(pr.processorplugin);
     }
-    else if(plugin->destroy)
-        plugin->destroy(pr.loader);
+    else
+        rd_i_loader_destroy(plugin, pr.loader);
 
     rd_i_reader_destroy(req.input);
     return pr;
@@ -109,6 +126,12 @@ bool rd_register_loader(const RDLoaderPlugin* l) {
     if(!l->load) {
         RD_LOG_FAIL("loader '%s' requires a load function", l->id);
         return false;
+    }
+
+    if(l->create && l->instance_size) {
+        RD_LOG_WARN(
+            "loader '%s': 'instance_size' is ignored because 'create' is set",
+            l->id);
     }
 
     if(rd_loader_find(l->id)) {

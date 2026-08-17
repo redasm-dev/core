@@ -6,6 +6,25 @@
 #include <redasm/support/logging.h>
 #include <stddef.h>
 
+RDProcessor* rd_i_processor_create(const RDProcessorPlugin* plugin) {
+    if(!plugin) return NULL;
+
+    if(plugin->create) return plugin->create(plugin);
+    if(plugin->instance_size) return rd_alloc0(1, plugin->instance_size);
+    return NULL;
+}
+
+void rd_i_processor_destroy(const RDProcessorPlugin* plugin, RDProcessor* p) {
+    if(!plugin) return;
+
+    if(plugin->destroy) {
+        plugin->destroy(p);
+        return;
+    }
+
+    if(!plugin->create && plugin->instance_size) rd_free(p);
+}
+
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
                                    int idx, RDProcessor* p) {
     RD_UNUSED(p);
@@ -139,6 +158,12 @@ bool rd_register_processor(const RDProcessorPlugin* p) {
     if(!p->ptr_size) {
         RD_LOG_FAIL("invalid pointer-size for processor '%s'", p->id);
         return false;
+    }
+
+    if(p->create && p->instance_size) {
+        RD_LOG_WARN("processor '%s': 'instance_size' is ignored because "
+                    "'create' is set",
+                    p->id);
     }
 
     if(rd_processor_find(p->id)) {

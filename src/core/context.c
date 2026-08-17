@@ -153,14 +153,11 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
     return self;
 }
 
-void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* pplugin) {
+void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* plugin) {
     panic_if(self->processorplugin, "processor already set");
 
-    self->processorplugin = pplugin;
-
-    if(self->processorplugin->create)
-        self->processor = self->processorplugin->create(self->processorplugin);
-
+    self->processorplugin = plugin;
+    self->processor = rd_i_processor_create(plugin);
     rd_i_register_builtins(self);
 }
 
@@ -769,9 +766,7 @@ void rd_destroy(RDContext* self) {
     vect_each(def, &self->typedefs) rd_typedef_destroy(*def);
     vect_destroy(&self->typedefs);
 
-    if(self->processorplugin && self->processorplugin->destroy)
-        self->processorplugin->destroy(self->processor);
-
+    rd_i_processor_destroy(self->processorplugin, self->processor);
     rd_i_reader_destroy(self->input_reader);
     rd_i_reader_destroy(self->reader);
     rd_i_buffer_destroy((RDBuffer*)self->input);

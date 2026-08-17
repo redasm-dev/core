@@ -53,7 +53,7 @@ RDTestResult* rd_i_testresult_create(const RDLoaderPlugin* loaderplugin,
 void rd_i_testresult_destroy(RDTestResult* self) {
     if(!self) return;
 
-    if(self->loaderplugin->destroy) self->loaderplugin->destroy(self->loader);
+    rd_i_loader_destroy(self->loaderplugin, self->loader);
     rd_free(self->loader_name);
     rd_free(self->filepath);
     rd_free(self);

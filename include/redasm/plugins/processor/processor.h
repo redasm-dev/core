@@ -23,6 +23,7 @@ typedef struct RDProcessorPlugin {
     const char* operand_sep;
     unsigned int code_ptr_size;
     unsigned int ptr_size;
+    usize instance_size;
 
     RDProcessor* (*create)(const struct RDProcessorPlugin*);
     void (*destroy)(RDProcessor*);
