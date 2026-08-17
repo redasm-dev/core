@@ -230,7 +230,10 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
     rd_foreach_operand(i, op, instr) {
         str_append(d, rd_i_format(&buf, "  [%d].kind: ", i));
 
-        if(op->kind == RD_OP_CNST) {
+        if(op->kind == RD_OP_STUB) {
+            str_append(d, "OP_STUB\n");
+        }
+        else if(op->kind == RD_OP_CNST) {
             str_append(d, "OP_CNST\n");
             str_append(d, rd_i_format(&buf, "  [%d].cnst: %x\n", i, op->cnst));
         }

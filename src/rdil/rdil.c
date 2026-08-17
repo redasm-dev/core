@@ -136,6 +136,9 @@ static RDILValue _rd_il_eval_op(RDIL* self, const RDInstruction* il,
             return (RDILValue){.value = val, .known = true};
         }
 
+        case RD_OP_STUB: // known operand: unhandled by the plugin
+            return (RDILValue){0};
+
         default: unreachable(); break;
     }
 
@@ -473,6 +476,7 @@ static bool _rd_il_invalid_operand(const RDInstruction* instr,
 
     switch(op->kind) {
         case RD_OP_NULL: op_kind = "NULL"; break;
+        case RD_OP_STUB: op_kind = "STUB"; break;
         case RD_OP_CNST: op_kind = "CNST"; break;
         case RD_OP_REG: op_kind = "REG"; break;
         case RD_OP_IMM: op_kind = "IMM"; break;

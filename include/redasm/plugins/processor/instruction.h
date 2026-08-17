@@ -10,6 +10,7 @@
 
 typedef enum {
     RD_OP_NULL = 0,
+    RD_OP_STUB, // highlight unhandled operands (for plugin developers)
     RD_OP_CNST,
     RD_OP_REG,
     RD_OP_IMM,

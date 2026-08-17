@@ -33,6 +33,11 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
     const unsigned int ADDR_W = plugin->ptr_size * 2;
 
     switch(op->kind) {
+        case RD_OP_STUB:
+            rd_renderer_text(r, "???", RD_THEME_BACKGROUND,
+                             RD_THEME_FOREGROUND);
+            break;
+
         case RD_OP_CNST:
             rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_NOADDR);
             break;
