@@ -208,7 +208,8 @@ const char* rd_integral_from_size(unsigned int size) {
         default: break;
     }
 
-    panic("integral type not found for size: %u", size);
+    RD_LOG_FAIL("integral type not found for size: %u", size);
+    return NULL;
 }
 
 const RDTypeDef* rd_integral_typedef_from_size(unsigned int size,
