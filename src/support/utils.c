@@ -159,7 +159,7 @@ const char* rd_i_strip_prefix(const char* s) {
         res = s + sizeof("sub_") - 1;
 
     if(res) {
-        if(*(res + 1) != 0) return res;
+        if(*res) return res;
         return s;
     }
 
