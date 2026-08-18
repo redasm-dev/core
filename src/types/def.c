@@ -268,6 +268,8 @@ bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
 }
 
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name) {
+    if(!name) return NULL;
+
     RDTypeDef** it;
     vect_each(it, &ctx->typedefs) {
         if(!strcmp((*it)->name, name)) return *it;
