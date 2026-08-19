@@ -64,7 +64,7 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
     // 'endidx' is calculated manually because
     // it can trigger rd_i_address2index assertion if is EXACTLY at end
     usize idx = rd_i_address2index(seg, start);
-    usize endidx = seg->base.start_address + end;
+    usize endidx = end - seg->base.start_address;
     usize len = rd_flagsbuffer_get_length(seg->flags);
     if(endidx > len) endidx = len; // chunks never cross segments
 
@@ -118,8 +118,9 @@ void rd_surfacegraph_render(RDSurfaceGraph* self) {
     rd_i_functionchunk_sort(&chunks);
 
     RDFunctionChunk** chunk;
-    vect_each(chunk, &chunks)
+    vect_each(chunk, &chunks) {
         _rd_surfacegraph_render_range(self, (*chunk)->start, (*chunk)->end);
+    }
 
     vect_destroy(&chunks);
     _rd_surfacegraph_render_finalize(self);
