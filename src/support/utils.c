@@ -32,7 +32,7 @@ static const char* _rd_get_temp_path(void) {
     DWORD len = GetTempPath(MAX_PATH, tmp);
     if(len == 0 || len > MAX_PATH) return NULL;
     return tmp;
-#elif defined(__unix__) || defined(__APPLE__)
+#elif defined(__unix__) || defined(__APPLE__) || defined(__HAIKU__)
     const char* const CANDIDATES[] = {
         getenv("TMPDIR"), getenv("TEMP"), getenv("TMP"), P_tmpdir, "/tmp",
     };
