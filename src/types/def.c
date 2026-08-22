@@ -410,7 +410,7 @@ bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef,
     return false;
 }
 
-void rd_i_register_builtins(RDContext* ctx) {
+void rd_i_typedef_register_builtins(RDContext* ctx) {
     rd_typedef_register(&t_prim_bool, ctx);
     rd_typedef_register(&t_prim_u8, ctx);
     rd_typedef_register(&t_prim_u16, ctx);

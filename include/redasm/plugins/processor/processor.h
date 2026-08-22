@@ -46,6 +46,7 @@ typedef struct RDProcessorPlugin {
 
     RDProcessor* (*create)(const struct RDProcessorPlugin*);
     void (*destroy)(RDProcessor*);
+    void (*setup)(RDContext*, RDProcessor*);
 
     void (*decode)(RDContext*, RDInstruction*, RDProcessor*);
     bool (*encode)(RDContext*, RDAddress, const char*, RDScratchBuffer*, RDProcessor*);

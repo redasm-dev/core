@@ -60,7 +60,7 @@ typedef struct RDTypeDefVect {
     usize capacity;
 } RDTypeDefVect;
 
-void rd_i_register_builtins(RDContext* ctx);
+void rd_i_typedef_register_builtins(RDContext* ctx);
 void rd_i_typedef_measure(const RDContext* ctx, RDTypeDef* tdef);
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 

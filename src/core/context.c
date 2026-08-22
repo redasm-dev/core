@@ -158,7 +158,11 @@ void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* plugin) {
 
     self->processorplugin = plugin;
     self->processor = rd_i_processor_create(plugin);
-    rd_i_register_builtins(self);
+
+    rd_i_typedef_register_builtins(self);
+
+    if(self->processorplugin->setup)
+        self->processorplugin->setup(self, self->processor);
 }
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
