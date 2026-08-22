@@ -4,13 +4,12 @@
 #include <redasm/config.h>
 
 #define RD_REGMASK_FULL UINT64_MAX
-#define RD_REGID_UNKNOWN UINT32_MAX
+#define RD_REGID_INVALID UINT32_MAX
 
 typedef u32 RDReg;
 typedef u64 RDRegValue;
 
 typedef struct RDRegMask {
-    RDReg reg;
     RDRegValue mask;
     u8 shift;
 } RDRegMask;

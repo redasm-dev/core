@@ -3,6 +3,11 @@
 #include "support/containers.h"
 #include "support/hash.h"
 
+static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
+    RDQueryReg q = {.kind = RD_QUERY_REG_BY_ID, .id = id};
+    return rd_query_reg(ctx, &q) ? q.name : NULL;
+}
+
 static size_t _rd_register_hash(const void* e) {
     const RDRegister* r = (const RDRegister*)e;
     return rd_i_murmur3(r->name, (u32)strlen(r->name));
@@ -15,19 +20,6 @@ static bool _rd_register_equal(const void* a, const void* b) {
     return !strcmp(ra->name, rb->name);
 }
 
-static bool _rd_reg_getmask(RDContext* ctx, const char* regname, RDRegMask* m) {
-    if(ctx->processorplugin->get_reg_mask) {
-        if(!ctx->processorplugin->get_reg_name) return false;
-
-        if(!ctx->processorplugin->get_reg_mask(regname, m, ctx->processor))
-            return false;
-
-        return rd_get_reg_name(ctx, m->reg);
-    }
-
-    return false;
-}
-
 void rd_i_registermap_init(RDRegisterHMap* self) {
     *self = (RDRegisterHMap){
         .hash = _rd_register_hash,
@@ -35,85 +27,109 @@ void rd_i_registermap_init(RDRegisterHMap* self) {
     };
 }
 
-bool rd_set_regval(RDContext* ctx, const char* regname, u64 value) {
+bool rd_i_reg_resolve_name(RDContext* ctx, const char* regname,
+                           RDRegResolved* out) {
     if(!regname) return false;
 
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
-    if(!regname) return false;
-
-    RDRegister r = {
-        .name = rd_i_strpool_intern(&ctx->strings, regname),
+    RDQueryReg q = {
+        .kind = RD_QUERY_REG_BY_NAME,
+        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_CANONICAL,
+        .name = regname,
     };
 
-    // merge if bit field
-    if(m.mask != RD_REGMASK_FULL) {
-        RDRegValue base = 0;
+    if(!rd_query_reg(ctx, &q)) return false;
 
-        const RDRegister* curr = hmap_get(&ctx->engine.current.registers, &r);
-        if(curr) base = curr->value;
+    out->mask = q.mask;
+    out->name = rd_i_strpool_intern(&ctx->strings, q.canonical_name);
+    return true;
+}
 
-        value = (base & ~m.mask) | ((value << m.shift) & m.mask);
+bool rd_i_reg_resolve_id(RDContext* ctx, RDReg id, RDRegResolved* out) {
+    if(id == RD_REGID_INVALID) return false;
 
-        if(curr && curr->value == value)
-            return false; // same value, don't update
+    RDQueryReg q = {
+        .kind = RD_QUERY_REG_BY_ID,
+        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_CANONICAL,
+        .id = id,
+    };
+
+    if(!rd_query_reg(ctx, &q)) return false;
+
+    out->mask = q.mask;
+    out->name = rd_i_strpool_intern(&ctx->strings, q.canonical_name);
+    return true;
+}
+
+bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
+                     RDRegValue value) {
+    RDRegister r = {.name = res->name};
+    const RDRegister* curr = hmap_get(map, &r);
+
+    if(res->mask.mask != RD_REGMASK_FULL) { // merge partial write
+        RDRegValue base = curr ? curr->value : 0;
+        value = (base & ~res->mask.mask) |
+                ((value << res->mask.shift) & res->mask.mask);
     }
 
+    // Applies to full-width writes too.
+    if(curr && curr->value == value) return false;
+
     r.value = value;
-    hmap_set(&ctx->engine.current.registers, &r);
+    hmap_set(map, &r);
     return true;
+}
+
+bool rd_i_regmap_get(const RDRegisterHMap* map, const RDRegResolved* res,
+                     RDRegValue* value) {
+    RDRegister key = {.name = res->name};
+
+    const RDRegister* r = hmap_get(map, &key);
+    if(!r) return false;
+
+    if(value) *value = (r->value & res->mask.mask) >> res->mask.shift;
+    return true;
+}
+
+bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res) {
+    RDRegister key = {.name = res->name};
+    hmap_del(map, &key);
+    return true;
+}
+
+bool rd_set_regval(RDContext* ctx, const char* regname, u64 value) {
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(ctx, regname, &res) &&
+           rd_i_regmap_set(&ctx->engine.current.registers, &res, value);
 }
 
 bool rd_get_regval(RDContext* ctx, const char* regname, RDRegValue* value) {
-    if(!regname) return false;
-
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
-
-    if(!regname) return false;
-
-    RDRegister key = {
-        .name = rd_i_strpool_intern(&ctx->strings, regname),
-    };
-
-    const RDRegister* r = hmap_get(&ctx->engine.current.registers, &key);
-    if(!r) return false;
-
-    if(value) *value = (r->value & m.mask) >> m.shift;
-    return true;
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(ctx, regname, &res) &&
+           rd_i_regmap_get(&ctx->engine.current.registers, &res, value);
 }
 
 bool rd_del_regval(RDContext* ctx, const char* regname) {
-    if(!regname) return false;
-
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(_rd_reg_getmask(ctx, regname, &m)) regname = rd_get_reg_name(ctx, m.reg);
-
-    if(!regname) return false;
-
-    RDRegister key = {
-        .name = rd_i_strpool_intern(&ctx->strings, regname),
-    };
-
-    hmap_del(&ctx->engine.current.registers, &key);
-    return true;
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(ctx, regname, &res) &&
+           rd_i_regmap_del(&ctx->engine.current.registers, &res);
 }
 
 bool rd_set_regval_id(RDContext* ctx, RDReg id, RDRegValue value) {
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_set_regval(ctx, regname, value);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(ctx, id, &res) &&
+           rd_i_regmap_set(&ctx->engine.current.registers, &res, value);
 }
 
 bool rd_get_regval_id(RDContext* ctx, RDReg id, RDRegValue* value) {
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_get_regval(ctx, regname, value);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(ctx, id, &res) &&
+           rd_i_regmap_get(&ctx->engine.current.registers, &res, value);
 }
 
 bool rd_del_regval_id(RDContext* ctx, RDReg id) {
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_del_regval(ctx, regname);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(ctx, id, &res) &&
+           rd_i_regmap_del(&ctx->engine.current.registers, &res);
 }
 
 bool rd_auto_sregval(RDContext* ctx, RDAddress address, const char* regname,
@@ -156,40 +172,40 @@ bool rd_get_sregval(RDContext* ctx, RDAddress address, const char* regname,
 
 bool rd_auto_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                         RDRegValue value) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_auto_sregval(ctx, address, regname, value);
 }
 
 bool rd_library_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                            RDRegValue value) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_library_sregval(ctx, address, regname, value);
 }
 
 bool rd_user_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                         RDRegValue value) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_user_sregval(ctx, address, regname, value);
 }
 
 bool rd_del_auto_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_del_auto_sregval(ctx, address, regname);
 }
 
 bool rd_del_library_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_del_library_sregval(ctx, address, regname);
 }
 
 bool rd_del_user_sregval_id(RDContext* ctx, RDAddress address, RDReg id) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_del_user_sregval(ctx, address, regname);
 }
 
 bool rd_get_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                        RDRegValue* value) {
-    const char* regname = rd_get_reg_name(ctx, id);
+    const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_get_sregval(ctx, address, regname, value);
 }
 

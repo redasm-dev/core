@@ -3,6 +3,7 @@
 #include "core/state.h"
 #include "plugins/common.h"
 #include "surface/renderer.h"
+#include <inttypes.h>
 #include <redasm/support/logging.h>
 #include <stddef.h>
 
@@ -62,7 +63,7 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
             rd_renderer_norm(r, "[");
             rd_renderer_reg(r, op->displ.base);
 
-            if(op->displ.index != RD_REGID_UNKNOWN) {
+            if(op->displ.index != RD_REGID_INVALID) {
                 rd_renderer_norm(r, "+");
                 rd_renderer_reg(r, op->displ.index);
 
@@ -127,13 +128,6 @@ void rd_i_processor_render_instruction(RDRenderer* r,
     data->operand.index = -1;
 }
 
-const char* rd_get_reg_name(const RDContext* ctx, RDReg r) {
-    if(ctx->processorplugin->get_reg_name)
-        return ctx->processorplugin->get_reg_name(r, ctx->processor);
-
-    return NULL;
-}
-
 unsigned int rd_get_ptr_size(const RDContext* ctx) {
     assert(ctx->processorplugin);
     return ctx->processorplugin->ptr_size;
@@ -144,6 +138,28 @@ unsigned int rd_get_code_ptr_size(const RDContext* ctx) {
     return ctx->processorplugin->code_ptr_size
                ? ctx->processorplugin->code_ptr_size
                : ctx->processorplugin->ptr_size;
+}
+
+bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
+    assert(ctx->processorplugin);
+    if(!q || !ctx->processorplugin->query_reg) return false;
+
+    // initialize mask
+    q->mask = (RDRegMask){.mask = RD_REGMASK_FULL, .shift = 0};
+
+    if(!ctx->processorplugin->query_reg(q, ctx->processor)) return false;
+
+    if(!q->name) {
+        RD_LOG_WARN("register name is NULL for id %" PRIx32, q->id);
+        return false;
+    }
+
+    if((q->want & RD_QUERY_REG_WANT_CANONICAL) && !q->canonical_name) {
+        RD_LOG_WARN("canonical register name for '%s' is NULL", q->name);
+        return false;
+    }
+
+    return true;
 }
 
 bool rd_register_processor(const RDProcessorPlugin* p) {

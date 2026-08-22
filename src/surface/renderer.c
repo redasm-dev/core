@@ -433,12 +433,10 @@ void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
 }
 
 void rd_renderer_reg(RDRenderer* self, RDReg reg) {
-    const RDProcessorPlugin* p = self->context->processorplugin;
     const char* regname = NULL;
 
-    if(p->get_reg_name)
-        regname = p->get_reg_name(reg, self->context->processor);
-
+    RDQueryReg q = {.kind = RD_QUERY_REG_BY_ID, .id = reg};
+    if(rd_query_reg(self->context, &q)) regname = q.name;
     if(!regname) regname = rd_i_to_dec(reg);
 
     rd_renderer_text(self, regname, RD_THEME_REG, RD_THEME_BACKGROUND);

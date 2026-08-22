@@ -117,7 +117,7 @@ static RDILValue _rd_il_eval_op(RDIL* self, const RDInstruction* il,
 
             u64 addr = base_val;
 
-            if(op->displ.index != RD_REGID_UNKNOWN) {
+            if(op->displ.index != RD_REGID_INVALID) {
                 RDRegValue index_val = 0;
                 known &= rd_il_get_regval_id(self, op->displ.index, &index_val);
                 addr += index_val * (op->displ.scale ? op->displ.scale : 1);
@@ -383,89 +383,39 @@ bool rd_il_get_target(const RDIL* self, RDAddress* target) {
 
 bool rd_il_get_regval(const RDIL* self, const char* regname,
                       RDRegValue* value) {
-    if(!regname) return false;
-
-    RDContext* ctx = self->context;
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(ctx->processorplugin->get_reg_mask)
-        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
-
-    const char* canonical = regname;
-    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = rd_get_reg_name(ctx, m.reg);
-
-    RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
-    const RDRegister* r = hmap_get(&self->registers, &key);
-    if(!r) return false;
-
-    if(value) *value = (r->value & m.mask) >> m.shift;
-    return true;
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(self->context, regname, &res) &&
+           rd_i_regmap_get(&self->registers, &res, value);
 }
 
 bool rd_il_set_regval(RDIL* self, const char* regname, RDRegValue value) {
-    if(!regname) return false;
-
-    RDContext* ctx = self->context;
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(ctx->processorplugin->get_reg_mask)
-        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
-
-    const char* canonical = regname;
-    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = rd_get_reg_name(ctx, m.reg);
-
-    // merge if bit field
-    if(m.mask != RD_REGMASK_FULL) {
-        RDRegValue base = 0;
-        rd_il_get_regval(self, canonical, &base);
-        value = (base & ~m.mask) | ((value << m.shift) & m.mask);
-    }
-
-    RDRegister r = {
-        .name = rd_i_strpool_intern(&ctx->strings, canonical),
-        .value = value,
-    };
-
-    hmap_set(&self->registers, &r);
-    return true;
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(self->context, regname, &res) &&
+           rd_i_regmap_set(&self->registers, &res, value);
 }
 
 bool rd_il_del_regval(RDIL* self, const char* regname) {
-    if(!regname) return false;
-
-    RDContext* ctx = self->context;
-    RDRegMask m = {.mask = RD_REGMASK_FULL, .shift = 0};
-
-    if(ctx->processorplugin->get_reg_mask)
-        ctx->processorplugin->get_reg_mask(regname, &m, ctx->processor);
-
-    const char* canonical = regname;
-    if(m.mask != RD_REGMASK_FULL && ctx->processorplugin->get_reg_name)
-        canonical = rd_get_reg_name(ctx, m.reg);
-
-    RDRegister key = {.name = rd_i_strpool_intern(&ctx->strings, canonical)};
-    hmap_del(&self->registers, &key);
-    return true;
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(self->context, regname, &res) &&
+           rd_i_regmap_del(&self->registers, &res);
 }
 
 bool rd_il_get_regval_id(const RDIL* self, RDReg id, RDRegValue* value) {
-    RDContext* ctx = self->context;
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_il_get_regval(self, regname, value);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(self->context, id, &res) &&
+           rd_i_regmap_get(&self->registers, &res, value);
 }
 
 bool rd_il_set_regval_id(RDIL* self, RDReg id, RDRegValue value) {
-    RDContext* ctx = self->context;
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_il_set_regval(self, regname, value);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(self->context, id, &res) &&
+           rd_i_regmap_set(&self->registers, &res, value);
 }
 
 bool rd_il_del_regval_id(RDIL* self, RDReg id) {
-    RDContext* ctx = self->context;
-    const char* regname = rd_get_reg_name(ctx, id);
-    return regname && rd_il_del_regval(self, regname);
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(self->context, id, &res) &&
+           rd_i_regmap_del(&self->registers, &res);
 }
 
 static bool _rd_il_invalid_operand(const RDInstruction* instr,

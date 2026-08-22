@@ -16,6 +16,25 @@ typedef enum {
     RD_PF_BE = (1 << 0),
 } RDProcessorFlags;
 
+typedef enum {
+    RD_QUERY_REG_BY_ID = 0,
+    RD_QUERY_REG_BY_NAME,
+} RDQueryRegKind;
+
+typedef enum {
+    RD_QUERY_REG_WANT_MASK = 1 << 0,
+    RD_QUERY_REG_WANT_CANONICAL = 1 << 1,
+} RDQueryRegWant;
+
+typedef struct RDQueryReg {
+    RDQueryRegKind kind;
+    RDQueryRegWant want;
+    RDReg id;
+    const char* name;
+    const char* canonical_name;
+    RDRegMask mask;
+} RDQueryReg;
+
 // clang-format off
 typedef struct RDProcessorPlugin {
     RD_PLUGIN_HEADER;
@@ -34,9 +53,7 @@ typedef struct RDProcessorPlugin {
     void (*lift)(RDContext*, RDInstructionVect*, const RDInstruction*, RDProcessor*);
 
     const char* (*get_mnemonic)(const RDInstruction*, RDProcessor*);
-
-    const char* (*get_reg_name)(RDReg, RDProcessor*);
-    bool (*get_reg_mask)(const char* name, RDRegMask*, RDProcessor*);
+    bool (*query_reg)(RDQueryReg*, RDProcessor*);
 
     void (*render_segment)(RDRenderer*, const RDSegment*, RDProcessor*);
     void (*render_function)(RDRenderer*, const RDFunction*, RDProcessor*);
@@ -46,6 +63,6 @@ typedef struct RDProcessorPlugin {
 // clang-format on
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
-RD_API const char* rd_get_reg_name(const RDContext* ctx, RDReg r);
+RD_API bool rd_query_reg(const RDContext* ctx, RDQueryReg* q);
 RD_API unsigned int rd_get_ptr_size(const RDContext* ctx);
 RD_API unsigned int rd_get_code_ptr_size(const RDContext* ctx);
