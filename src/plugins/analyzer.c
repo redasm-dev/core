@@ -16,10 +16,10 @@ static int _rd_analyzers_cmp(const void* arg1, const void* arg2) {
 
 static int _rd_analyzeritem_kcmp_pred(const void* key, const void* v) {
     const RDAnalyzerPlugin* plugin = (const RDAnalyzerPlugin*)key;
-    const RDAnalyzerItem* item = (const RDAnalyzerItem*)v;
+    const RDAnalyzerItem** item = (const RDAnalyzerItem**)v;
 
-    if(plugin->order < item->plugin->order) return -1;
-    if(plugin->order > item->plugin->order) return 1;
+    if(plugin->order < (*item)->plugin->order) return -1;
+    if(plugin->order > (*item)->plugin->order) return 1;
     return 0;
 }
 
