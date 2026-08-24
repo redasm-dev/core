@@ -2,19 +2,20 @@
 
 #include <redasm/config.h>
 
-// clang-format off
-#if defined(__HAIKU__)
+#if defined(__linux__) || defined(__HAIKU__)
 #include <endian.h>
 #elif defined(_WIN32)
 // Windows: no include needed, always little-endian
 #elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
 #include <sys/endian.h>
-#elif defined(__linux__) || defined(__APPLE__)
-#include <sys/param.h>
+#elif defined(__APPLE__)
+#include <machine/endian.h>
+#define BYTE_ORDER __DARWIN_BYTE_ORDER
+#define LITTLE_ENDIAN __DARWIN_LITTLE_ENDIAN
+#define BIG_ENDIAN __DARWIN_BIG_ENDIAN
 #else
 #error "byteorder: unsupported platform"
 #endif
-// clang-format on
 
 #if defined(_WIN32) ||                                                         \
     (defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN) ||              \
