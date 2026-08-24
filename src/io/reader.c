@@ -32,7 +32,7 @@ static void _rd_flagsreader_seek(RDReader* self, u64 pos) {
 }
 
 static u64 _rd_flagsreader_get_pos(const RDReader* self) {
-    return rd_i_index2address(self->segment, self->position);
+    return self->segment->base.start_address + self->position;
 }
 
 RDReader* rd_i_reader_create(RDBuffer* buf) {
