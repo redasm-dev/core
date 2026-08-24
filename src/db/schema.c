@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS TypeDefs( \
     name      TEXT UNIQUE NOT NULL, \
     kind      INTEGER NOT NULL, \
     is_noret  INTEGER NOT NULL, \
+    callconv  TEXT, \
     enum_type TEXT \
 ); \
 \

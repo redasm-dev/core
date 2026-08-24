@@ -754,21 +754,30 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
              "builtin type definitions not allowed in DB");
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
-        INSERT INTO TypeDefs (name, kind, is_noret, enum_type) \
-            VALUES (:name, :kind, :is_noret, :enum_type) \
+        INSERT INTO TypeDefs (name, kind, is_noret, callconv, enum_type) \
+            VALUES (:name, :kind, :is_noret, :callconv, :enum_type) \
         ON CONFLICT(name) DO \
             UPDATE SET kind = EXCLUDED.kind, \
                        is_noret = EXCLUDED.is_noret, \
+                       callconv = EXCLUDED.callconv, \
                        enum_type = EXCLUDED.enum_type \
     ");
 
     _rd_db_bind_param_str(ctx, stmt, ":name", tdef->name);
     _rd_db_bind_param_int(ctx, stmt, ":kind", (sqlite3_int64)tdef->kind);
 
-    if(tdef->kind == RD_TKIND_FUNC)
+    if(tdef->kind == RD_TKIND_FUNC) {
+        if(tdef->func_.callconv)
+            _rd_db_bind_param_str(ctx, stmt, ":callconv", tdef->func_.callconv);
+        else
+            _rd_db_bind_param_null(ctx, stmt, ":callconv");
+
         _rd_db_bind_param_int(ctx, stmt, ":is_noret", tdef->func_.is_noret);
-    else
+    }
+    else {
+        _rd_db_bind_param_null(ctx, stmt, ":callconv");
         _rd_db_bind_param_int(ctx, stmt, ":is_noret", 0);
+    }
 
     if(tdef->kind == RD_TKIND_ENUM) {
         _rd_db_bind_param_str(ctx, stmt, ":enum_type",
@@ -824,7 +833,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
                                                 RDTypeDefVect* v) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPE_DEFS, "\
-        SELECT name, kind, is_noret, enum_type \
+        SELECT name, kind, is_noret, callconv, enum_type \
         FROM TypeDefs \
         ORDER BY id \
     ");
@@ -833,7 +842,8 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
         const char* name = (const char*)sqlite3_column_text(stmt, 0);
         RDTypeKind kind = (RDTypeKind)sqlite3_column_int(stmt, 1);
         bool is_noret = (bool)sqlite3_column_int(stmt, 2);
-        const char* enum_type = (const char*)sqlite3_column_text(stmt, 3);
+        const char* callconv = (const char*)sqlite3_column_text(stmt, 3);
+        const char* enum_type = (const char*)sqlite3_column_text(stmt, 4);
 
         sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
         RDTypeDef* tdef = NULL;
@@ -846,6 +856,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
             tdef = rd_typedef_create_enum(name, enum_type, ctx);
         else if(kind == RD_TKIND_FUNC) {
             tdef = rd_typedef_create_func(name, ctx);
+            rd_typedef_set_callconv(tdef, callconv);
             rd_typedef_set_noret(tdef, is_noret);
         }
         else
