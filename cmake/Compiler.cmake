@@ -5,7 +5,9 @@ function(setup_compiler project_name)
             C_STANDARD 17
     )
 
-    set(NOT_MSVC_COMPILE_OPTIONS
+    set(NOT_MSVC_COMPILE_OPTIONS)
+
+    set(NOT_MSVC_COMPILE_OPTIONS_DEBUG
         "-Wall"
         "-Wextra"
         "-Wpedantic"
@@ -23,9 +25,6 @@ function(setup_compiler project_name)
         "-Wno-error=unused-but-set-parameter"
         "-Wno-error=unused-but-set-variable"
         "-Wno-error=unused-const-variable"
-    )
-
-    set(NOT_MSVC_COMPILE_OPTIONS_DEBUG
         "-Werror"
         "-g"
         "-fsanitize=address,undefined"
