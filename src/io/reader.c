@@ -16,7 +16,7 @@ static void _rd_reader_seek(RDReader* self, u64 pos) {
 
 static u64 _rd_reader_get_pos(const RDReader* self) { return self->position; }
 
-static void _rd_flagsreader_seek(RDReader* self, usize pos) {
+static void _rd_flagsreader_seek(RDReader* self, u64 pos) {
     RDFlagsReader* fr = (RDFlagsReader*)self;
     self->segment = rd_i_db_find_segment(fr->context, pos);
 
@@ -88,7 +88,7 @@ void rd_reader_skip(RDReader* self, usize n) {
     rd_reader_seek(self, rd_reader_tell(self) + n);
 }
 
-usize rd_reader_tell(const RDReader* self) { return self->tell(self); }
+u64 rd_reader_tell(const RDReader* self) { return self->tell(self); }
 u64 rd_reader_get_length(const RDReader* self) { return self->buffer->length; }
 bool rd_reader_has_error(const RDReader* self) { return self->error; }
 void rd_reader_clear_error(RDReader* self) { self->error = false; }
