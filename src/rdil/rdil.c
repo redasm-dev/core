@@ -319,7 +319,7 @@ bool rd_il_run(RDIL* self) {
 }
 
 bool rd_il_step(RDIL* self) {
-    if(self->done || !self->function || !self->function->graph) return false;
+    if(self->done || !self->function) return false;
 
     self->target.known = false;
 

@@ -74,6 +74,7 @@ static RDTypeDef* _rd_typedef_create(const char* name, RDTypeKind kind,
     RDTypeDef* self = rd_alloc(sizeof(*self));
 
     *self = (RDTypeDef){
+        .context = ctx,
         .name = rd_i_strpool_intern(&ctx->strings, name),
         .kind = kind,
     };
@@ -259,11 +260,21 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
 
 bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
     if(self->kind != RD_TKIND_FUNC) {
-        RD_LOG_FAIL("cannot noret to '%s'", self->name);
+        RD_LOG_FAIL("cannot apply noret to '%s'", self->name);
         return false;
     }
 
     self->func_.is_noret = b;
+    return true;
+}
+
+bool rd_typedef_set_callconv(RDTypeDef* self, const char* cc) {
+    if(self->kind != RD_TKIND_FUNC) {
+        RD_LOG_FAIL("cannot apply callconv to '%s'", self->name);
+        return false;
+    }
+
+    self->func_.callconv = rd_i_strpool_intern(&self->context->strings, cc);
     return true;
 }
 
@@ -370,6 +381,10 @@ fail:
 const char* rd_typedef_name(const RDTypeDef* self) { return self->name; }
 RDTypeKind rd_typedef_kind(const RDTypeDef* self) { return self->kind; }
 usize rd_typedef_size(const RDTypeDef* self) { return self->size; }
+
+const char* rd_typedef_get_callconv(const RDTypeDef* self) {
+    return self->kind == RD_TKIND_FUNC ? self->func_.callconv : NULL;
+}
 
 bool rd_typedef_is_noret(const RDTypeDef* self) {
     return self->kind == RD_TKIND_FUNC && self->func_.is_noret;

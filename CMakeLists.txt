@@ -16,6 +16,7 @@ setup_compiler(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} 
     PRIVATE
         src/core/autorename.c
+        src/core/callconv.c
         src/core/context.c
         src/core/engine.c
         src/core/function.c

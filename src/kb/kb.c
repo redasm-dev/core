@@ -162,19 +162,31 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
     return rd_kbobject_get_str(obj, "name");
 }
 
-static void _rd_kb_load_dependencies(const RDKBObject* root, RDContext* ctx) {
+// push the current manifest (if any):
+// - NULL 'callconv' is valid and it means "no specified"
+static bool _rd_kb_push_manifest(const RDKBObject* root, RDContext* ctx) {
     const RDKBObject* manifest = rd_kbobject_get_table(root, "manifest");
-    if(!manifest) return;
+    if(manifest && !rd_i_kb_validate_manifest(manifest)) return false;
 
     const RDKBObject* dependencies =
         rd_kbobject_get_array(manifest, "dependencies");
-    if(!dependencies) return;
 
-    const RDKBObject* dep;
-    rd_kbobject_each(dep, dependencies) {
-        const char* dep_path = rd_kbobject_to_str(dep);
-        if(dep_path) rd_kb_load(ctx, dep_path);
+    if(dependencies) {
+        const RDKBObject* dep;
+        rd_kbobject_each(dep, dependencies) {
+            const char* dep_path = rd_kbobject_to_str(dep);
+            if(dep_path) rd_kb_load(ctx, dep_path);
+        }
     }
+
+    vect_push(&ctx->kb->curr_callconv,
+              rd_kbobject_get_str(manifest, "callconv"));
+
+    return true;
+}
+
+static void _rd_kb_pop_manifest(RDContext* ctx) {
+    vect_pop_last(&ctx->kb->curr_callconv);
 }
 
 static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx,
@@ -260,9 +272,15 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
         if(!rd_i_kb_validate_function(f)) continue;
 
         RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
+
         bool is_noret = false;
         rd_kbobject_get_bool(f, "noret", &is_noret);
         rd_typedef_set_noret(tdef, is_noret);
+
+        // try explicit 'callconv' or manifest provided one (if any)
+        const char* callconv = rd_kbobject_get_str(f, "callconv");
+        if(!callconv) callconv = *vect_last(&ctx->kb->curr_callconv);
+        rd_typedef_set_callconv(tdef, callconv);
 
         const RDKBObject* ret = rd_kbobject_get(f, "ret");
         assert(ret);
@@ -419,6 +437,65 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
     return true;
 }
 
+static bool _rd_kb_load_callconvs(const RDKBObject* root, RDContext* ctx) {
+    const RDKBObject* callconv = rd_kbobject_get_table(root, "callconvs");
+    if(!callconv) return false;
+
+    const char* cc_kb_name;
+    const RDKBObject* cc_kb;
+    rd_kbobject_each_pair(cc_kb_name, cc_kb, callconv) {
+        if(!rd_i_kb_validate_callconv(cc_kb)) continue;
+
+        if(rd_i_callconv_find(ctx, cc_kb_name)) {
+            RD_LOG_WARN("calling convention '%s' already registered",
+                        cc_kb_name);
+            continue;
+        }
+
+        RDCallConv* cc = rd_i_callconv_create(cc_kb_name, ctx);
+        const RDKBObject* arg_regs = rd_kbobject_get_array(cc_kb, "arg_regs");
+
+        if(arg_regs) {
+            const RDKBObject* arg_reg;
+            rd_kbobject_each(arg_reg, arg_regs) {
+                const char* regname = rd_kbobject_to_str(arg_reg);
+                RDQueryReg q = {.kind = RD_QUERY_REG_BY_NAME, .name = regname};
+
+                if(!rd_query_reg(ctx, &q)) {
+                    RD_LOG_FAIL("calling convention '%s': unknown register "
+                                "'%s' in 'arg_regs'",
+                                cc_kb_name, regname);
+                    goto discard;
+                }
+
+                vect_push(&cc->arg_regs,
+                          rd_i_strpool_intern(&ctx->strings, regname));
+            }
+        }
+
+        const char* arg_order = rd_kbobject_get_str(cc_kb, "arg_order");
+        cc->arg_order =
+            !strcmp(arg_order, "ltr") ? RD_ARGORDER_LTR : RD_ARGORDER_RTL;
+
+        const char* stack_cleanup = rd_kbobject_get_str(cc_kb, "stack_cleanup");
+        cc->stack_cleanup = !strcmp(stack_cleanup, "caller")
+                                ? RD_STACK_CLEANUP_CALLER
+                                : RD_STACK_CLEANUP_CALLEE;
+
+        i64 shadow_space;
+        if(rd_kbobject_get_int(cc_kb, "shadow_space", &shadow_space))
+            cc->shadow_space = (usize)shadow_space;
+
+        vect_push(&ctx->callconvs, cc);
+        continue;
+
+    discard:
+        rd_i_callconv_destroy(cc);
+    }
+
+    return true;
+}
+
 void rd_i_kb_paths_init(const char** kb_paths) {
     if(!kb_paths) return;
 
@@ -447,6 +524,7 @@ void rd_i_kb_destroy(RDKB* self) {
     }
 
     vect_destroy(&self->ordinal_modules);
+    vect_destroy(&self->curr_callconv);
     vect_destroy(&self->files);
     rd_free(self);
 }
@@ -491,15 +569,19 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
 
     vect_push(&ctx->kb->files, kbfile); // avoid recursion
-    _rd_kb_load_dependencies(kbfile->root, ctx);
-
     RD_LOG_INFO("loading KB '%s'", kb);
-    _rd_kb_load_compound(kbfile->root, ctx, "unions");
-    _rd_kb_load_compound(kbfile->root, ctx, "structs");
-    _rd_kb_load_enums(kbfile->root, ctx);
-    _rd_kb_load_functions(kbfile->root, ctx);
-    _rd_kb_load_symbols(kbfile->root, ctx);
-    _rd_kb_load_ordinals(kbfile->root, ctx);
+
+    if(_rd_kb_push_manifest(kbfile->root, ctx)) {
+        _rd_kb_load_compound(kbfile->root, ctx, "unions");
+        _rd_kb_load_compound(kbfile->root, ctx, "structs");
+        _rd_kb_load_enums(kbfile->root, ctx);
+        _rd_kb_load_callconvs(kbfile->root, ctx);
+        _rd_kb_load_functions(kbfile->root, ctx);
+        _rd_kb_load_symbols(kbfile->root, ctx);
+        _rd_kb_load_ordinals(kbfile->root, ctx);
+
+        _rd_kb_pop_manifest(ctx);
+    }
 
     return kbfile->root;
 }

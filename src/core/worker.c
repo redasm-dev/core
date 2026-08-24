@@ -13,15 +13,19 @@
 static const char* const RD_STEP_NAMES[] = {
     "Init",
     "Reconcile",
-    "Emulate #1", "Analyze #1", 
-    "Merge Data #1",
-    "Emulate #2","Analyze #2", 
-    "Merge Data #2",
+    "Emulate", "Analyze", "Symbols",
     "Finalize", "Done",
 };
 // clang-format on
 
 static_assert(rd_count_of(RD_STEP_NAMES) == RD_WS_COUNT, "step names mismatch");
+
+static void _rd_worker_next_or_emulate(RDContext* ctx) {
+    if(rd_i_engine_has_pending_code(ctx))
+        ctx->engine.step = RD_WS_EMULATE;
+    else
+        ctx->engine.step++;
+}
 
 static int _rd_worker_problem_cmp(const void* a, const void* b) {
     const RDProblem* pa = (const RDProblem*)a;
@@ -90,7 +94,7 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
         usize idx = rd_i_address2index(seg, address);
 
         if(rd_flagsbuffer_has_func(seg->flags, idx)) {
-            RDFunction* f = rd_i_find_function(ctx, address);
+            RDFunction* f = rd_i_get_function(ctx, address);
             if(!f || f->type_def == tdef) continue;
 
             if(f->type_def && !(f->type_def->flags & RD_TFLAGS_BUILTIN))
@@ -235,7 +239,7 @@ static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
         item->n = end_idx - start_idx;
     }
 
-    ctx->engine.step = RD_WS_EMULATE1;
+    ctx->engine.step = RD_WS_EMULATE;
 }
 
 static void _rd_worker_step_emulate(RDContext* ctx, RDWorkerStatus* status) {
@@ -270,30 +274,22 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
 
     rd_reader_seek(ctx->input_reader, 0);
 
-    if(rd_i_engine_has_pending_code(ctx)) {
-        if(ctx->engine.step == RD_WS_ANALYZE1)
-            ctx->engine.step = RD_WS_EMULATE1;
-        else if(ctx->engine.step == RD_WS_ANALYZE2)
-            ctx->engine.step = RD_WS_EMULATE2;
-        else
-            unreachable();
-    }
-    else
-        ctx->engine.step++;
+    _rd_worker_next_or_emulate(ctx);
 }
 
-static void _rd_worker_step_mergedata(RDContext* ctx) {
-    rd_i_find_strings(ctx);
-    ctx->engine.step++;
-}
-
-static void _rd_worker_step_finalize(RDContext* ctx) {
-    _rd_worker_rebuild_functions(ctx);
-    _rd_worker_follow_pointers(ctx);
+static void _rd_worker_step_symbols(RDContext* ctx) {
     _rd_worker_resolve_ordinals(ctx);
     _rd_worker_dedup_names(ctx);
     rd_i_autorename(ctx);
     _rd_worker_apply_function_types(ctx);
+
+    _rd_worker_next_or_emulate(ctx);
+}
+
+static void _rd_worker_step_finalize(RDContext* ctx) {
+    rd_i_find_strings(ctx);
+    _rd_worker_rebuild_functions(ctx);
+    _rd_worker_follow_pointers(ctx);
     _rd_worker_apply_noret(ctx);
     rd_fire_hook(ctx, "redasm.finalized");
     vect_sort(&ctx->problems, _rd_worker_problem_cmp);
@@ -325,16 +321,9 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
         switch(self->engine.step) {
             case RD_WS_INIT: _rd_worker_step_init(self, status); break;
             case RD_WS_RECONCILE: _rd_worker_step_reconcile(self, status); break;
-
-            case RD_WS_EMULATE1:
-            case RD_WS_EMULATE2: _rd_worker_step_emulate(self, status); break;
-
-            case RD_WS_ANALYZE1:
-            case RD_WS_ANALYZE2: _rd_worker_step_analyze(self); break;
-
-            case RD_WS_MERGEDATA1:
-            case RD_WS_MERGEDATA2: _rd_worker_step_mergedata(self); break;
-
+            case RD_WS_EMULATE: _rd_worker_step_emulate(self, status); break;
+            case RD_WS_ANALYZE: _rd_worker_step_analyze(self); break;
+            case RD_WS_SYMBOLS: _rd_worker_step_symbols(self); break;
             case RD_WS_FINALIZE: _rd_worker_step_finalize(self); break;
             default: unreachable();
         }

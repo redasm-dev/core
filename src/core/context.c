@@ -395,6 +395,13 @@ RDFunction* rd_i_find_function(const RDContext* self, RDAddress address) {
     return (RDFunction*)chunk->func;
 }
 
+RDFunction* rd_i_get_function(const RDContext* self, RDAddress address) {
+    usize idx = vect_bsearch(&self->functions.addresses, &address,
+                             rd_i_address_kcmp_pred);
+    if(idx == vect_length(&self->functions.addresses)) return NULL;
+    return *vect_at(&self->functions, idx);
+}
+
 const RDFunction* rd_find_function(const RDContext* self, RDAddress address) {
     return rd_i_find_function(self, address);
 }
@@ -765,6 +772,10 @@ void rd_destroy(RDContext* self) {
     rd_i_engine_destroy(self);
     rd_i_kb_destroy(self->kb);
     rd_i_db_destroy(self->db);
+
+    RDCallConv** cc;
+    vect_each(cc, &self->callconvs) rd_i_callconv_destroy(*cc);
+    vect_destroy(&self->callconvs);
 
     RDTypeDef** def;
     vect_each(def, &self->typedefs) rd_typedef_destroy(*def);

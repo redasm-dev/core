@@ -35,6 +35,12 @@ typedef struct RDKB {
     RDKBFileVect files;
 
     struct {
+        const char** data;
+        usize length;
+        usize capacity;
+    } curr_callconv;
+
+    struct {
         RDKBOrdinalModule* data;
         usize length;
         usize capacity;

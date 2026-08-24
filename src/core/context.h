@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/callconv.h"
 #include "core/engine.h"
 #include "core/segment.h"
 #include "core/symbol.h"
@@ -86,6 +87,7 @@ typedef struct RDContext {
     RDExternalVect externals;
     RDHookItemVect hooks;
 
+    RDCallConvVect callconvs;
     RDTypeDefVect typedefs;
     RDPendingRenameVect pending_renames;
     RDStringTerminatorVect string_terminators;
@@ -158,6 +160,7 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefType type, RDXRefVect* r);
 
 RDFunction* rd_i_find_function(const RDContext* self, RDAddress address);
+RDFunction* rd_i_get_function(const RDContext* self, RDAddress address);
 
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 

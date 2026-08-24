@@ -14,5 +14,10 @@ typedef struct RDTomlSchema {
     };
 } RDTomlSchema;
 
+extern const RDTomlSchema RD_TOMLSCHEMA_ITEM_STRING;
+extern const RDTomlSchema RD_TOMLSCHEMA_ITEM_INT64;
+extern const RDTomlSchema RD_TOMLSCHEMA_ITEM_FP64;
+extern const RDTomlSchema RD_TOMLSCHEMA_ITEM_BOOLEAN;
+
 const char* rd_i_toml_type_str(toml_type_t t);
 bool rd_i_toml_validate_schema(toml_datum_t root, const RDTomlSchema* schema);

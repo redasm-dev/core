@@ -32,6 +32,7 @@ typedef struct RDFunctionType {
     } args;
 
     bool is_noret;
+    const char* callconv;
 } RDFunctionType;
 
 typedef enum {
@@ -42,6 +43,7 @@ typedef enum {
 } RDTypeFlags;
 
 typedef struct RDTypeDef {
+    RDContext* context;
     const char* name;
     usize size;
     RDTypeKind kind;

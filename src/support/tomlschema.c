@@ -4,6 +4,11 @@
 #include <redasm/support/logging.h>
 #include <string.h>
 
+const RDTomlSchema RD_TOMLSCHEMA_ITEM_STRING = {.type = TOML_STRING};
+const RDTomlSchema RD_TOMLSCHEMA_ITEM_INT64 = {.type = TOML_INT64};
+const RDTomlSchema RD_TOMLSCHEMA_ITEM_FP64 = {.type = TOML_FP64};
+const RDTomlSchema RD_TOMLSCHEMA_ITEM_BOOLEAN = {.type = TOML_BOOLEAN};
+
 static bool _rd_toml_expect(const toml_datum_t* d, const RDTomlSchema* s) {
     assert(s->key);
     assert(s->type != TOML_UNKNOWN);

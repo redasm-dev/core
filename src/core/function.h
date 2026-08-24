@@ -9,6 +9,7 @@
 typedef struct RDFunction {
     u32 gen;
 
+    const char* callconv;
     const RDTypeDef* type_def;
     RDContext* context;
     RDAddress address;
