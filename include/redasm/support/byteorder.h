@@ -7,34 +7,26 @@
 #include <endian.h>
 #elif defined(_WIN32)
 // Windows: no include needed, always little-endian
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#include <sys/endian.h>
+#elif defined(__linux__) || defined(__APPLE__)
 #include <sys/param.h>
 #else
 #error "byteorder: unsupported platform"
 #endif
 // clang-format on
 
-#if defined(_WIN32) // Windows is always little-endian
+#if defined(_WIN32) ||                                                         \
+    (defined(__BYTE_ORDER) && __BYTE_ORDER == __LITTLE_ENDIAN) ||              \
+    (defined(_BYTE_ORDER) && _BYTE_ORDER == _LITTLE_ENDIAN) ||                 \
+    (defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN)
 #define RD_IS_LITTLE_ENDIAN 1
 #define RD_IS_BIG_ENDIAN 0
-#elif defined(__HAIKU__)
-#if BYTE_ORDER == BIG_ENDIAN
+#elif (defined(__BYTE_ORDER) && __BYTE_ORDER == __BIG_ENDIAN) ||               \
+    (defined(_BYTE_ORDER) && _BYTE_ORDER == _BIG_ENDIAN) ||                    \
+    (defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN)
 #define RD_IS_LITTLE_ENDIAN 0
 #define RD_IS_BIG_ENDIAN 1
-#else
-#define RD_IS_LITTLE_ENDIAN 1
-#define RD_IS_BIG_ENDIAN 0
-#endif
-#elif defined(__BYTE_ORDER)
-#if defined(__BIG_ENDIAN) && (__BYTE_ORDER == __BIG_ENDIAN)
-#define RD_IS_LITTLE_ENDIAN 0
-#define RD_IS_BIG_ENDIAN 1
-#elif defined(__LITTLE_ENDIAN) && (__BYTE_ORDER == __LITTLE_ENDIAN)
-#define RD_IS_LITTLE_ENDIAN 1
-#define RD_IS_BIG_ENDIAN 0
-#else
-#error "byteorder: unsupported endianness"
-#endif
 #else
 #error "byteorder: cannot detect byte order"
 #endif
