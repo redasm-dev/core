@@ -16,6 +16,8 @@ typedef struct RDILInstructionSlice {
 
 // clang-format off
 RD_API RDILInstructionSlice rd_lift(RDContext* ctx, RDAddress address);
+RD_API RDILInstructionSlice rd_lift_prev(RDContext* ctx, RDAddress address);
+RD_API RDILInstructionSlice rd_lift_instruction(RDContext* ctx, const RDInstruction* instr);
 RD_API RDInstruction* rd_il_push_instr(RDInstructionVect* self, RDILStatement s);
 RD_API bool rd_il_instr_match(const RDContext* ctx, const RDILInstructionSlice* il,
                               const RDInstruction* shapes, usize count);

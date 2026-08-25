@@ -20,5 +20,12 @@ typedef struct RDIL {
     bool done;
 } RDIL;
 
-const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
-                                    RDInstructionVect* il);
+const RDInstructionVect*
+rd_i_il_lift_instruction(RDContext* ctx, const RDInstruction* real_instr,
+                         RDInstructionVect* il);
+
+const RDInstructionVect* rd_i_il_lift_prev(RDContext* ctx, RDAddress address,
+                                           RDInstructionVect* il);
+
+const RDInstructionVect* rd_i_il_lift(RDContext* ctx, RDAddress address,
+                                      RDInstructionVect* il);

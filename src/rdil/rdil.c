@@ -324,7 +324,12 @@ bool rd_il_step(RDIL* self) {
     self->target.known = false;
 
     const RDInstructionVect* v =
-        rd_il_lift(self->context, self->current_address, &self->lifted);
+        rd_i_il_lift(self->context, self->current_address, &self->lifted);
+
+    if(!v) { // decoding failed
+        self->done = true;
+        return false;
+    }
 
     RDAddress next_address = self->current_address + v->real_instr.length;
 
@@ -550,23 +555,77 @@ static bool _rd_il_validate(RDAddress address, const RDInstructionVect* v) {
     return true;
 }
 
-const RDInstructionVect* rd_il_lift(RDContext* ctx, RDAddress address,
-                                    RDInstructionVect* v) {
-    vect_clear(v);
+const RDInstructionVect*
+rd_i_il_lift_instruction(RDContext* ctx, const RDInstruction* real_instr,
+                         RDInstructionVect* il) {
+    vect_clear(il);
+
+    if(ctx->processorplugin->lift)
+        ctx->processorplugin->lift(ctx, il, real_instr, ctx->processor);
+
+    if(!_rd_il_validate(real_instr->address, il)) vect_clear(il);
+    if(vect_is_empty(il)) rd_il_push_instr(il, RD_IL_UNKNOWN);
+
+    return il;
+}
+
+const RDInstructionVect* rd_i_il_lift_prev(RDContext* ctx, RDAddress address,
+                                           RDInstructionVect* il) {
+    vect_clear(il);
 
     if(ctx->processorplugin->lift) {
-        if(rd_decode(ctx, address, &v->real_instr))
-            ctx->processorplugin->lift(ctx, v, &v->real_instr, ctx->processor);
+        if(!rd_decode_prev(ctx, address, &il->real_instr)) return NULL;
+        ctx->processorplugin->lift(ctx, il, &il->real_instr, ctx->processor);
     }
 
-    if(!_rd_il_validate(address, v)) vect_clear(v);
-    if(vect_is_empty(v)) rd_il_push_instr(v, RD_IL_UNKNOWN);
+    if(!_rd_il_validate(address, il)) vect_clear(il);
+    if(vect_is_empty(il)) rd_il_push_instr(il, RD_IL_UNKNOWN);
 
-    return v;
+    return il;
+}
+
+const RDInstructionVect* rd_i_il_lift(RDContext* ctx, RDAddress address,
+                                      RDInstructionVect* il) {
+    vect_clear(il);
+
+    if(ctx->processorplugin->lift) {
+        if(!rd_decode(ctx, address, &il->real_instr)) return NULL;
+        ctx->processorplugin->lift(ctx, il, &il->real_instr, ctx->processor);
+    }
+
+    if(!_rd_il_validate(address, il)) vect_clear(il);
+    if(vect_is_empty(il)) rd_il_push_instr(il, RD_IL_UNKNOWN);
+
+    return il;
+}
+
+RDILInstructionSlice rd_lift_prev(RDContext* ctx, RDAddress address) {
+    const RDInstructionVect* il =
+        rd_i_il_lift_prev(ctx, address, &ctx->lift_buf);
+    if(!il) return (RDILInstructionSlice){0};
+
+    return (RDILInstructionSlice){
+        .data = il->data,
+        .length = il->length,
+        .instruction_length = il->real_instr.length,
+    };
+}
+
+RDILInstructionSlice rd_lift_instruction(RDContext* ctx,
+                                         const RDInstruction* instr) {
+    const RDInstructionVect* il =
+        rd_i_il_lift_instruction(ctx, instr, &ctx->lift_buf);
+
+    return (RDILInstructionSlice){
+        .data = il->data,
+        .length = il->length,
+        .instruction_length = il->real_instr.length,
+    };
 }
 
 RDILInstructionSlice rd_lift(RDContext* ctx, RDAddress address) {
-    const RDInstructionVect* il = rd_il_lift(ctx, address, &ctx->lift_buf);
+    const RDInstructionVect* il = rd_i_il_lift(ctx, address, &ctx->lift_buf);
+    if(!il) return (RDILInstructionSlice){0};
 
     return (RDILInstructionSlice){
         .data = il->data,

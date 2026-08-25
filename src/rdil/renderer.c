@@ -33,7 +33,7 @@ static RDThemeKind _rd_il_stmt_color(RDILStatement stmt) {
 }
 
 void rd_i_il_render(RDRenderer* r, const RDInstructionVect* v) {
-    if(vect_is_empty(v)) {
+    if(!v || vect_is_empty(v)) {
         rd_renderer_muted(r, "unknown");
         return;
     }

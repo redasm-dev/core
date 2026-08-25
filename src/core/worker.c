@@ -1,4 +1,5 @@
 #include "worker.h"
+#include "core/argdiscover.h"
 #include "core/autorename.h"
 #include "core/context.h"
 #include "core/engine.h"
@@ -282,6 +283,7 @@ static void _rd_worker_step_symbols(RDContext* ctx) {
     _rd_worker_dedup_names(ctx);
     rd_i_autorename(ctx);
     _rd_worker_apply_function_types(ctx);
+    rd_i_discover_args(ctx);
 
     _rd_worker_next_or_emulate(ctx);
 }

@@ -304,7 +304,7 @@ void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
 
 void rd_i_renderer_rdil(RDRenderer* self, RDAddress address) {
     const RDInstructionVect* v =
-        rd_il_lift(self->context, address, &self->instr_buf);
+        rd_i_il_lift(self->context, address, &self->instr_buf);
 
     rd_i_il_render(self, v);
 }
