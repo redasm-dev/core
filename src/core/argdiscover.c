@@ -4,6 +4,22 @@
 #include "support/containers.h"
 #include <inttypes.h>
 
+typedef struct RDArgTarget {
+    RDAddress address;
+    const RDTypeDef* tdef;
+} RDArgTarget;
+
+typedef struct RDArgTargetVect {
+    RDArgTarget* data;
+    usize length;
+    usize capacity;
+} RDArgTargetVect;
+
+static bool _rd_discover_is_usable_proto(const RDTypeDef* tdef) {
+    return tdef && (tdef->kind == RD_TKIND_FUNC) &&
+           tdef->func_.args.has_value && tdef->func_.callconv;
+}
+
 static bool _rd_discover_arg_is_address(const RDOperand* op, RDAddress* out) {
     switch(op->kind) {
         case RD_OP_ADDR: *out = op->addr; return true;
@@ -69,11 +85,10 @@ static bool _rd_discover_get_call_arg(RDContext* ctx, RDAddress call_address,
     return false;
 }
 
-static void _rd_discover_call_args(RDContext* ctx, const RDFunction* f,
+static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
                                    RDAddress call_address,
                                    RDInstructionVect* il_vect,
                                    RDCharVect* fmt_buf) {
-    const RDTypeDef* tdef = f->type_def;
     const RDCallConv* cc = rd_i_callconv_find(ctx, tdef->func_.callconv);
     if(!cc) return; // names a convention this processor never registered
 
@@ -103,37 +118,65 @@ static void _rd_discover_call_args(RDContext* ctx, const RDFunction* f,
     }
 }
 
+static void _rd_discover_collect_targets(RDContext* ctx,
+                                         RDArgTargetVect* targets) {
+    // (1) thunks: prototype attached to a function by autorename
+    RDFunction** fit;
+    vect_each(fit, &ctx->functions) {
+        const RDFunction* f = *fit;
+        if(!_rd_discover_is_usable_proto(f->type_def)) continue;
+
+        vect_push(targets, ((RDArgTarget){
+                               .address = f->address,
+                               .tdef = f->type_def,
+                           }));
+    }
+
+    // (2) direct indirect: prototype attached to nothing, resolve the
+    //     named address instead
+    RDTypeDef** tit;
+    vect_each(tit, &ctx->typedefs) {
+        const RDTypeDef* tdef = *tit;
+        if(!_rd_discover_is_usable_proto(tdef)) continue;
+
+        RDAddress address;
+        if(!rd_get_address(ctx, tdef->name, &address)) continue;
+
+        // (1) already covers this:
+        //     a function at this exact address already carries the prototype.
+        const RDFunction* f = rd_i_get_function(ctx, address);
+        if(f && f->type_def == tdef) continue;
+
+        vect_push(targets, ((RDArgTarget){
+                               .address = address,
+                               .tdef = tdef,
+                           }));
+    }
+}
+
 void rd_i_discover_args(RDContext* ctx) {
     RDCharVect fmt_buf = {0};
     RDXRefVect xrefs = {0};
     RDInstructionVect il = {0};
+    RDArgTargetVect targets = {0};
 
-    RDFunction** it;
-    vect_each(it, &ctx->functions) {
-        const RDFunction* f = *it;
+    _rd_discover_collect_targets(ctx, &targets);
 
-        // A prototype with real arguments AND a declared convention.
-        // args.has_value alone isn't enough: `callconv` is an optional KB
-        // key, and without one there's no way to know where an argument
-        // lives.
-        // The builtin `function` placeholder falls out here too.
-        // It never sets args.has_value.
-
-        if(!f->type_def) continue;
-        assert(f->type_def->kind == RD_TKIND_FUNC);
-
-        if(!f->type_def->func_.args.has_value || !f->type_def->func_.callconv)
-            continue;
-
-        rd_i_get_xrefs_to_ex(ctx, f->address, RD_XR_NONE, &xrefs);
+    const RDArgTarget* t;
+    vect_each(t, &targets) {
+        rd_i_get_xrefs_to_ex(ctx, t->address, RD_XR_NONE, &xrefs);
 
         const RDXRef* r;
         vect_each(r, &xrefs) {
-            if(r->type != RD_CR_CALL) continue;
-            _rd_discover_call_args(ctx, f, r->address, &il, &fmt_buf);
+            RDInstruction instr;
+            if(!rd_decode(ctx, r->address, &instr)) continue;
+            if(!rd_instr_is_call(&instr)) continue;
+
+            _rd_discover_call_args(ctx, t->tdef, r->address, &il, &fmt_buf);
         }
     }
 
+    vect_destroy(&targets);
     vect_destroy(&il);
     vect_destroy(&xrefs);
     vect_destroy(&fmt_buf);
