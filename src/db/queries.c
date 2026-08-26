@@ -131,6 +131,24 @@ static sqlite3_stmt* _rd_db_prepare_get_type_enum_params(RDContext* ctx,
     return stmt;
 }
 
+static sqlite3_stmt* _rd_db_prepare_set_callconv_reg_query(RDContext* ctx,
+                                                           const char* owner,
+                                                           const char* reg,
+                                                           usize reg_idx) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_CALLCONV_REG, "\
+        INSERT INTO CallConvRegs \
+            VALUES (:owner, :reg, :reg_idx) \
+        ON CONFLICT DO \
+            UPDATE SET reg = EXCLUDED.reg, \
+                       reg_idx = EXCLUDED.reg_idx \
+    ");
+
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    _rd_db_bind_param_str(ctx, stmt, ":reg", reg);
+    _rd_db_bind_param_int(ctx, stmt, ":reg_idx", (sqlite3_int64)reg_idx);
+    return stmt;
+}
+
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_SEGMENT, "\
         INSERT INTO Segments \
@@ -144,6 +162,20 @@ void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s) {
                           (sqlite3_int64)s->base.end_address);
     _rd_db_bind_param_int(ctx, stmt, ":perm", s->base.perm);
     _rd_db_step(ctx, stmt);
+}
+
+static sqlite3_stmt* _rd_db_prepare_get_all_callconv_regs(RDContext* ctx,
+                                                          const char* owner) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_CALLCONV_REGS, "\
+        SELECT reg \
+        FROM CallConvRegs \
+        WHERE owner = :owner \
+        ORDER BY reg_idx \
+    ");
+
+    _rd_db_bind_param_str(ctx, stmt, ":owner", owner);
+    return stmt;
 }
 
 RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
@@ -1183,4 +1215,65 @@ RDConfidence _rd_i_db_query_get_undefine_confidence(RDContext* ctx,
     }
 
     return RD_CONFIDENCE_AUTO;
+}
+
+void _rd_i_db_query_set_callconv(RDContext* ctx, const RDCallConv* cc) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_CALLCONV, "\
+        INSERT INTO CallConvs (name, arg_order, shadow_space, stack_cleanup) \
+            VALUES (:name, :arg_order, :shadow_space, :stack_cleanup) \
+        ON CONFLICT(name) DO \
+            UPDATE SET arg_order = EXCLUDED.arg_order, \
+                       shadow_space = EXCLUDED.shadow_space, \
+                       stack_cleanup = EXCLUDED.stack_cleanup \
+    ");
+
+    _rd_db_bind_param_str(ctx, stmt, ":name", cc->name);
+    _rd_db_bind_param_int(ctx, stmt, ":arg_order",
+                          (sqlite3_int64)cc->arg_order);
+    _rd_db_bind_param_int(ctx, stmt, ":shadow_space",
+                          (sqlite3_int64)cc->shadow_space);
+    _rd_db_bind_param_int(ctx, stmt, ":stack_cleanup",
+                          (sqlite3_int64)cc->stack_cleanup);
+    _rd_db_step(ctx, stmt);
+
+    const char** reg;
+    usize i = 0;
+    vect_each(reg, &cc->arg_regs) {
+        stmt = _rd_db_prepare_set_callconv_reg_query(ctx, cc->name, *reg, i++);
+        _rd_db_step(ctx, stmt);
+    }
+}
+
+RDCallConvVect* _rd_i_db_query_get_all_callconvs(RDContext* ctx,
+                                                 RDCallConvVect* v) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_CALLCONVS, "\
+        SELECT name, arg_order, shadow_space, stack_cleanup \
+        FROM CallConvs \
+    ");
+
+    while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
+        const char* name = (const char*)sqlite3_column_text(stmt, 0);
+        RDArgOrder arg_order = (RDArgOrder)sqlite3_column_int(stmt, 1);
+        usize shadow_space = (usize)sqlite3_column_int64(stmt, 2);
+        RDStackCleanup stack_cleanup =
+            (RDStackCleanup)sqlite3_column_int(stmt, 3);
+
+        RDCallConv* cc = rd_i_callconv_create(name, ctx);
+        cc->arg_order = arg_order;
+        cc->shadow_space = shadow_space;
+        cc->stack_cleanup = stack_cleanup;
+
+        sqlite3_stmt* stmt_reg =
+            _rd_db_prepare_get_all_callconv_regs(ctx, name);
+
+        while(_rd_db_step(ctx, stmt_reg) == SQLITE_ROW) {
+            const char* reg = (const char*)sqlite3_column_text(stmt_reg, 0);
+            vect_push(&cc->arg_regs, rd_i_strpool_intern(&ctx->strings, reg));
+        }
+
+        vect_push(v, cc);
+    }
+
+    return v;
 }

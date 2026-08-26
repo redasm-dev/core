@@ -75,15 +75,31 @@ CREATE TABLE IF NOT EXISTS Names ( \
     name       TEXT NOT NULL, \
     confidence INTEGER NOT NULL \
 ); \
+\
 CREATE TABLE IF NOT EXISTS Externals ( \
     address INTEGER PRIMARY KEY, \
     ordinal INTEGER, \
     module  TEXT, \
     kind    INTEGER NOT NULL \
 ); \
+\
 CREATE TABLE IF NOT EXISTS Functions ( \
     address   INTEGER PRIMARY KEY, \
     type_name TEXT \
+); \
+\
+CREATE TABLE IF NOT EXISTS CallConvs ( \
+    name          TEXT PRIMARY KEY, \
+    arg_order     INTEGER NOT NULL, \
+    shadow_space  INTEGER NOT NULL, \
+    stack_cleanup INTEGER NOT NULL \
+); \
+\
+CREATE TABLE IF NOT EXISTS CallConvRegs ( \
+    owner   TEXT NOT NULL REFERENCES CallConvs(name), \
+    reg     TEXT NOT NULL, \
+    reg_idx INTEGER NOT NULL, \
+    PRIMARY KEY(owner, reg_idx) \
 ); \
 \
 CREATE TABLE IF NOT EXISTS SegmentRegisters ( \
@@ -93,6 +109,7 @@ CREATE TABLE IF NOT EXISTS SegmentRegisters ( \
     confidence INTEGER NOT NULL, \
     PRIMARY KEY(address, reg) \
 ); \
+\
 CREATE TABLE IF NOT EXISTS OperandOverrides ( \
     address  INTEGER NOT NULL, \
     idx      INTEGER NOT NULL, \
@@ -104,6 +121,7 @@ CREATE TABLE IF NOT EXISTS Problems ( \
     address      INTEGER NOT NULL, \
     message      TEXT NOT NULL \
 ); \
+\
 CREATE INDEX IF NOT EXISTS Names_NameIdx ON Names(name); \
 CREATE INDEX IF NOT EXISTS XRefs_ToIdx ON XRefs(to_address, from_address, type); \
 ";

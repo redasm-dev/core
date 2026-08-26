@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/callconv.h"
 #include "core/function.h"
 #include "core/segment.h"
 #include "db/types.h"
@@ -49,6 +50,11 @@ enum {
 
     RD_QUERY_SET_FUNCTION,
     RD_QUERY_LOAD_ALL_FUNCTIONS,
+
+    RD_QUERY_SET_CALLCONV,
+    RD_QUERY_GET_ALL_CALLCONVS,
+    RD_QUERY_SET_CALLCONV_REG,
+    RD_QUERY_GET_ALL_CALLCONV_REGS,
 
     RD_QUERY_ADD_SEGMENT,
     RD_QUERY_GET_ALL_SEGMENTS,
@@ -138,6 +144,10 @@ bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
 
 void _rd_i_db_query_set_function(RDContext* ctx, const RDFunction* f);
 void _rd_i_db_query_load_all_functions(RDContext* ctx);
+
+void _rd_i_db_query_set_callconv(RDContext* ctx, const RDCallConv* cc);
+RDCallConvVect* _rd_i_db_query_get_all_callconvs(RDContext* ctx,
+                                                 RDCallConvVect* v);
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,

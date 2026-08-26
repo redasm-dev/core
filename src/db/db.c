@@ -111,9 +111,14 @@ void rd_i_db_save(RDContext* ctx) {
     rd_i_db_begin(ctx);
 
     // clang-format off
+    sqlite3_exec(ctx->db->handle, "DELETE FROM CallConvs", NULL, NULL, NULL);
+    sqlite3_exec(ctx->db->handle, "DELETE FROM CallConvRegs", NULL, NULL, NULL);
     sqlite3_exec(ctx->db->handle, "DELETE FROM Functions", NULL, NULL, NULL);
     sqlite3_exec(ctx->db->handle, "DELETE FROM SegmentRegisters", NULL, NULL, NULL);
     // clang-format on
+
+    RDCallConv** cc;
+    vect_each(cc, &ctx->callconvs) _rd_i_db_query_set_callconv(ctx, *cc);
 
     RDFunction** f;
     vect_each(f, &ctx->functions) _rd_i_db_query_set_function(ctx, *f);
@@ -128,6 +133,7 @@ void rd_i_db_save(RDContext* ctx) {
 }
 
 void rd_i_db_load(RDContext* ctx) {
+    _rd_i_db_query_get_all_callconvs(ctx, &ctx->callconvs);
     _rd_i_db_query_get_all_type_defs(ctx, &ctx->typedefs);
 
     // restore NORET status in KB
