@@ -870,7 +870,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
             const char* p_name = (const char*)sqlite3_column_text(stmt_param, 1);
             usize p_count = (usize)sqlite3_column_int64(stmt_param, 2);
             RDTypeModifier p_mod = (RDTypeModifier)sqlite3_column_int64(stmt_param, 3);
-            usize p_midx = (usize)sqlite3_column_int64(stmt_param, 3);
+            usize p_midx = (usize)sqlite3_column_int64(stmt_param, 4);
             // clang-format on
 
             if(rd_i_typedef_is_compound(tdef)) {
