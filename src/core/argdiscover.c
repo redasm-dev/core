@@ -7,6 +7,7 @@
 typedef struct RDArgTarget {
     RDAddress address;
     const RDTypeDef* tdef;
+    const RDCallConv* cc;
 } RDArgTarget;
 
 typedef struct RDArgTargetVect {
@@ -15,9 +16,16 @@ typedef struct RDArgTargetVect {
     usize capacity;
 } RDArgTargetVect;
 
-static bool _rd_discover_is_usable_proto(const RDTypeDef* tdef) {
-    return tdef && (tdef->kind == RD_TKIND_FUNC) &&
-           tdef->func_.args.has_value && tdef->func_.callconv;
+static bool _rd_discover_resolve_proto(const RDContext* ctx,
+                                       const RDTypeDef* tdef,
+                                       const RDCallConv** cc) {
+    if(tdef && (tdef->kind == RD_TKIND_FUNC) && tdef->func_.args.has_value &&
+       !vect_is_empty(&tdef->func_.args.value)) {
+        *cc = rd_i_callconv_find(ctx, tdef->func_.callconv);
+        return *cc != NULL;
+    }
+
+    return false;
 }
 
 static bool _rd_discover_arg_is_address(const RDOperand* op, RDAddress* out) {
@@ -86,12 +94,9 @@ static bool _rd_discover_get_call_arg(RDContext* ctx, RDAddress call_address,
 }
 
 static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
-                                   RDAddress call_address,
+                                   RDAddress call_address, const RDCallConv* cc,
                                    RDInstructionVect* il_vect,
                                    RDCharVect* fmt_buf) {
-    const RDCallConv* cc = rd_i_callconv_find(ctx, tdef->func_.callconv);
-    if(!cc) return; // names a convention this processor never registered
-
     usize n_args = vect_length(&tdef->func_.args.value);
 
     for(usize i = 0; i < n_args; i++) {
@@ -110,8 +115,8 @@ static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
         // The argument has to point at something executable. A literal
         // sitting in a function-typed slot but landing in data is a null
         // handle or a sentinel, not a callback.
-        const RDSegment* seg = rd_find_segment(ctx, fn);
-        if(!seg || !(seg->perm & RD_SP_X)) continue;
+        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, fn);
+        if(!seg || !(seg->base.perm & RD_SP_X)) continue;
 
         rd_set_function(ctx, fn);
         rd_auto_name(ctx, fn, rd_i_format(fmt_buf, "%s_%" PRIx64, p->name, fn));
@@ -124,11 +129,13 @@ static void _rd_discover_collect_targets(RDContext* ctx,
     RDFunction** fit;
     vect_each(fit, &ctx->functions) {
         const RDFunction* f = *fit;
-        if(!_rd_discover_is_usable_proto(f->type_def)) continue;
+        const RDCallConv* cc = NULL;
+        if(!_rd_discover_resolve_proto(ctx, f->type_def, &cc)) continue;
 
         vect_push(targets, ((RDArgTarget){
                                .address = f->address,
                                .tdef = f->type_def,
+                               .cc = cc,
                            }));
     }
 
@@ -137,7 +144,8 @@ static void _rd_discover_collect_targets(RDContext* ctx,
     RDTypeDef** tit;
     vect_each(tit, &ctx->typedefs) {
         const RDTypeDef* tdef = *tit;
-        if(!_rd_discover_is_usable_proto(tdef)) continue;
+        const RDCallConv* cc = NULL;
+        if(!_rd_discover_resolve_proto(ctx, tdef, &cc)) continue;
 
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
@@ -150,6 +158,7 @@ static void _rd_discover_collect_targets(RDContext* ctx,
         vect_push(targets, ((RDArgTarget){
                                .address = address,
                                .tdef = tdef,
+                               .cc = cc,
                            }));
     }
 }
@@ -172,7 +181,8 @@ void rd_i_discover_args(RDContext* ctx) {
             if(!rd_decode(ctx, r->address, &instr)) continue;
             if(!rd_instr_is_call(&instr)) continue;
 
-            _rd_discover_call_args(ctx, t->tdef, r->address, &il, &fmt_buf);
+            _rd_discover_call_args(ctx, t->tdef, r->address, t->cc, &il,
+                                   &fmt_buf);
         }
     }
 
