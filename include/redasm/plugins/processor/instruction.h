@@ -198,23 +198,11 @@ static inline bool rd_instr_is_delay_slot(const RDInstruction* self) {
 }
 
 static inline bool rd_instr_is_jump(const RDInstruction* self) {
-    switch(self->flow) {
-        case RD_IF_JUMP:
-        case RD_IF_JUMP_COND: return true;
-        default: break;
-    }
-
-    return false;
+    return self->flow == RD_IF_JUMP || self->flow == RD_IF_JUMP_COND;
 }
 
 static inline bool rd_instr_is_call(const RDInstruction* self) {
-    switch(self->flow) {
-        case RD_IF_CALL:
-        case RD_IF_CALL_COND: return true;
-        default: break;
-    }
-
-    return false;
+    return self->flow == RD_IF_CALL || self->flow == RD_IF_CALL_COND;
 }
 
 static inline bool rd_instr_is_branch(const RDInstruction* self) {
@@ -230,13 +218,7 @@ static inline bool rd_instr_is_transparent(const RDInstruction* self) {
 }
 
 static inline bool rd_instr_is_cond(const RDInstruction* self) {
-    switch(self->flow) {
-        case RD_IF_JUMP_COND:
-        case RD_IF_CALL_COND: return true;
-        default: break;
-    }
-
-    return false;
+    return self->flow == RD_IF_JUMP_COND || self->flow == RD_IF_CALL_COND;
 }
 
 #define _rd_foreach_op_arg(x) x
