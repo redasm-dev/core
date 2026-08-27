@@ -1,14 +1,6 @@
 #include <redasm/version.h>
 #include <stdio.h>
 
-#if !defined(RD_VERSION)
-#define RD_VERSION "unknown"
-#endif
-
-#if !defined(RD_BUILD_VERSION)
-#define RD_BUILD_VERSION "unknown"
-#endif
-
 RDVersion rd_version(void) {
     RDVersion v = {0};
     bool ok = rd_version_parse(RD_VERSION, &v);
@@ -22,10 +14,10 @@ const char* rd_version_build(void) { return RD_BUILD_VERSION; }
 bool rd_version_parse(const char* s, RDVersion* v) {
     if(!s || !v) return false;
 
-    int major, minor, rev;
+    int major, minor, patch;
     int consumed = 0;
 
-    if(sscanf(s, "%d.%d.%d%n", &major, &minor, &rev, &consumed) != 3) {
+    if(sscanf(s, "%d.%d.%d%n", &major, &minor, &patch, &consumed) != 3) {
         return -1;
     }
 
@@ -38,6 +30,6 @@ bool rd_version_parse(const char* s, RDVersion* v) {
 
     v->major = major;
     v->minor = minor;
-    v->rev = rev;
+    v->patch = patch;
     return true;
 }

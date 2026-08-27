@@ -1,13 +1,12 @@
 #pragma once
 
 #include <redasm/config.h>
-
-#define RD_API_LEVEL 1
+#include <redasm/level.h>
 
 typedef struct RDVersion {
     int major;
     int minor;
-    int rev;
+    int patch;
     const char* suffix;
 } RDVersion;
 

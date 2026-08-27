@@ -38,14 +38,22 @@ if(NOT REDASM_VERSION_SUFFIX STREQUAL "")
 endif()
 
 if(REDASM_GIT_VERSION STREQUAL "")
-    set(REDASM_BUILD "${REDASM_VERSION} (${REDASM_BUILD_TIMESTAMP})")
+    set(REDASM_BUILD_VERSION "${REDASM_VERSION}-${REDASM_BUILD_TIMESTAMP}")
 else()
-    set(REDASM_BUILD "${REDASM_VERSION} (${REDASM_BUILD_TIMESTAMP}.${REDASM_GIT_VERSION})")
+    set(REDASM_BUILD_VERSION "${REDASM_VERSION}-${REDASM_BUILD_TIMESTAMP}.${REDASM_GIT_VERSION}")
 endif()
 
-function(redasm_setup_version target)
-    target_compile_definitions(${target} PRIVATE
-        RD_VERSION="${REDASM_VERSION}"
-        RD_BUILD_VERSION="${REDASM_BUILD}"
+math(EXPR REDASM_API_LEVEL "${REDASM_VERSION_MINOR} + 1")
+
+function(redasm_generate_version)
+    configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/redasm/level.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/level.h
+        @ONLY
+    )
+
+    install(
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/level.h 
+        DESTINATION include/redasm
     )
 endfunction()

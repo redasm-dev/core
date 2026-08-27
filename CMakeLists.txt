@@ -85,6 +85,7 @@ target_sources(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:include>
 
     PRIVATE
@@ -99,7 +100,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 include(cmake/Version.cmake)
-redasm_setup_version(redasm)
+redasm_generate_version()
 
 install(
     TARGETS ${PROJECT_NAME}
@@ -112,6 +113,8 @@ install(
 install(
     DIRECTORY include/redasm
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN "*.h.in" EXCLUDE
 )
 
 include(CMakePackageConfigHelpers)
