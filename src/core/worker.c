@@ -83,7 +83,8 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
     vect_each(it, &ctx->typedefs) {
         const RDTypeDef* tdef = *it;
 
-        if(tdef->kind != RD_TKIND_FUNC || tdef->flags & RD_TFLAGS_BUILTIN)
+        if(tdef->kind != RD_TKIND_FUNC || (tdef->flags & RD_TFLAGS_BUILTIN) ||
+           (tdef->flags & RD_TFLAGS_PROTOTYPE))
             continue;
 
         RDAddress address;
