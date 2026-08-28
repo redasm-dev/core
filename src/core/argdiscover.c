@@ -19,13 +19,14 @@ typedef struct RDArgTargetVect {
 static bool _rd_discover_resolve_proto(const RDContext* ctx,
                                        const RDTypeDef* tdef,
                                        const RDCallConv** cc) {
-    if(tdef && (tdef->kind == RD_TKIND_FUNC) && tdef->func_.args.has_value &&
-       !vect_is_empty(&tdef->func_.args.value)) {
-        *cc = rd_i_callconv_find(ctx, tdef->func_.callconv);
-        return *cc != NULL;
-    }
+    if(!tdef || (tdef->kind != RD_TKIND_FUNC) || rd_typedef_is_proto(tdef))
+        return false;
 
-    return false;
+    if(!tdef->func_.args.has_value || vect_is_empty(&tdef->func_.args.value))
+        return false;
+
+    *cc = rd_i_callconv_find(ctx, tdef->func_.callconv);
+    return *cc != NULL;
 }
 
 static bool _rd_discover_arg_is_address(const RDOperand* op, RDAddress* out) {
