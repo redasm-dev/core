@@ -189,18 +189,21 @@ static void _rd_kb_pop_manifest(RDContext* ctx) {
     vect_pop_last(&ctx->kb->curr_callconv);
 }
 
-static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx,
-                                 const char* kind) {
-    const RDKBObject* types = rd_kbobject_get_table(root, kind);
-    if(!types) return false;
-
+static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
+                                  RDTypeKind kind) {
     const char* name;
     const RDKBObject* def;
     rd_kbobject_each_pair(name, def, types) {
         if(!rd_i_kb_validate_compound(def)) continue;
 
-        RDTypeDef* tdef = rd_typedef_create_struct(name, ctx);
-        assert(tdef);
+        RDTypeDef* tdef = NULL;
+
+        if(kind == RD_TKIND_STRUCT)
+            tdef = rd_typedef_create_struct(name, ctx);
+        else if(kind == RD_TKIND_UNION)
+            tdef = rd_typedef_create_union(name, ctx);
+        else
+            unreachable();
 
         const RDKBObject* members = rd_kbobject_get_array(def, "members");
         assert(members);
@@ -212,7 +215,7 @@ static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx,
 
             if(!param_name) {
                 rd_typedef_destroy(tdef);
-                return false;
+                return;
             }
 
             rd_typedef_add_member(tdef, t.def->name, param_name, t.count, t.mod,
@@ -221,14 +224,17 @@ static bool _rd_kb_load_compound(const RDKBObject* root, RDContext* ctx,
 
         rd_typedef_register(tdef, ctx);
     }
-
-    return true;
 }
 
-static bool _rd_kb_load_enums(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* enums = rd_kbobject_get_table(root, "enums");
-    if(!enums) return false;
+static void _rd_kb_load_structs(const RDKBObject* types, RDContext* ctx) {
+    _rd_kb_load_compounds(types, ctx, RD_TKIND_STRUCT);
+}
 
+static void _rd_kb_load_unions(const RDKBObject* types, RDContext* ctx) {
+    _rd_kb_load_compounds(types, ctx, RD_TKIND_UNION);
+}
+
+static void _rd_kb_load_enums(const RDKBObject* enums, RDContext* ctx) {
     const char* name;
     const RDKBObject* e;
     rd_kbobject_each_pair(name, e, enums) {
@@ -250,7 +256,7 @@ static bool _rd_kb_load_enums(const RDKBObject* root, RDContext* ctx) {
 
             if(!m_name || !value_ok) {
                 rd_typedef_destroy(tdef);
-                return false;
+                return;
             }
 
             rd_typedef_add_enumval(tdef, m_name, m_value, ctx);
@@ -258,20 +264,17 @@ static bool _rd_kb_load_enums(const RDKBObject* root, RDContext* ctx) {
 
         rd_typedef_register(tdef, ctx);
     }
-
-    return true;
 }
 
-static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* functions = rd_kbobject_get_table(root, "functions");
-    if(!functions) return false;
-
+static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
+                              RDTypeFlags flags) {
     const char* name;
     const RDKBObject* f;
     rd_kbobject_each_pair(name, f, functions) {
         if(!rd_i_kb_validate_function(f)) continue;
 
         RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
+        rd_typedef_set_proto(tdef, flags & RD_TFLAGS_PROTOTYPE);
 
         bool is_noret = false;
         rd_kbobject_get_bool(f, "noret", &is_noret);
@@ -306,7 +309,7 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
 
             if(!arg_name) {
                 rd_typedef_destroy(tdef);
-                return false;
+                return;
             }
 
             rd_typedef_add_arg(tdef, t.def->name, arg_name, t.count, t.mod,
@@ -315,14 +318,18 @@ static bool _rd_kb_load_functions(const RDKBObject* root, RDContext* ctx) {
 
         rd_typedef_register(tdef, ctx);
     }
-
-    return true;
 }
 
-static bool _rd_kb_load_symbols(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* symbols = rd_kbobject_get_table(root, "symbols");
-    if(!symbols) return false;
+static void _rd_kb_load_functions(const RDKBObject* functions, RDContext* ctx) {
+    _rd_kb_load_funcs(functions, ctx, RD_TFLAGS_NONE);
+}
 
+static void _rd_kb_load_prototypes(const RDKBObject* functions,
+                                   RDContext* ctx) {
+    _rd_kb_load_funcs(functions, ctx, RD_TFLAGS_PROTOTYPE);
+}
+
+static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
     const char* name;
     const RDKBObject* sym;
     rd_kbobject_each_pair(name, sym, symbols) {
@@ -379,14 +386,9 @@ static bool _rd_kb_load_symbols(const RDKBObject* root, RDContext* ctx) {
                             has_count ? (usize)type_count : 0, mod);
         }
     }
-
-    return true;
 }
 
-static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* ordinals = rd_kbobject_get_table(root, "ordinals");
-    if(!ordinals) return false;
-
+static void _rd_kb_load_ordinals(const RDKBObject* ordinals, RDContext* ctx) {
     const char* modname;
     const RDKBObject* ord_list;
     rd_kbobject_each_pair(modname, ord_list, ordinals) {
@@ -433,17 +435,12 @@ static bool _rd_kb_load_ordinals(const RDKBObject* root, RDContext* ctx) {
                      });
         }
     }
-
-    return true;
 }
 
-static bool _rd_kb_load_callconvs(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* callconv = rd_kbobject_get_table(root, "callconvs");
-    if(!callconv) return false;
-
+static void _rd_kb_load_callconvs(const RDKBObject* callconvs, RDContext* ctx) {
     const char* cc_kb_name;
     const RDKBObject* cc_kb;
-    rd_kbobject_each_pair(cc_kb_name, cc_kb, callconv) {
+    rd_kbobject_each_pair(cc_kb_name, cc_kb, callconvs) {
         if(!rd_i_kb_validate_callconv(cc_kb)) continue;
 
         if(rd_i_callconv_find(ctx, cc_kb_name)) {
@@ -492,9 +489,24 @@ static bool _rd_kb_load_callconvs(const RDKBObject* root, RDContext* ctx) {
     discard:
         rd_i_callconv_destroy(cc);
     }
-
-    return true;
 }
+
+typedef struct RDKBCategory {
+    const char* name;
+    void (*load)(const RDKBObject*, RDContext*);
+} RDKBCategory;
+
+static const RDKBCategory KB_CATEGORIES[] = {
+    {"unions", _rd_kb_load_unions},
+    {"structs", _rd_kb_load_structs},
+    {"enums", _rd_kb_load_enums},
+    {"callconvs", _rd_kb_load_callconvs},
+    {"prototypes", _rd_kb_load_prototypes},
+    {"functions", _rd_kb_load_functions},
+    {"symbols", _rd_kb_load_symbols},
+    {"ordinals", _rd_kb_load_ordinals},
+    {NULL, NULL},
+};
 
 void rd_i_kb_paths_init(const char** kb_paths) {
     if(!kb_paths) return;
@@ -572,13 +584,20 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     RD_LOG_INFO("loading KB '%s'", kb);
 
     if(_rd_kb_push_manifest(kbfile->root, ctx)) {
-        _rd_kb_load_compound(kbfile->root, ctx, "unions");
-        _rd_kb_load_compound(kbfile->root, ctx, "structs");
-        _rd_kb_load_enums(kbfile->root, ctx);
-        _rd_kb_load_callconvs(kbfile->root, ctx);
-        _rd_kb_load_functions(kbfile->root, ctx);
-        _rd_kb_load_symbols(kbfile->root, ctx);
-        _rd_kb_load_ordinals(kbfile->root, ctx);
+        const char* cat;
+        const RDKBObject* table;
+        rd_kbobject_each_pair(cat, table, kbfile->root) {
+            const RDKBCategory* c = KB_CATEGORIES;
+
+            while(c->name) {
+                if(!strcmp(c->name, cat)) {
+                    c->load(table, ctx);
+                    break;
+                }
+
+                c++;
+            }
+        }
 
         _rd_kb_pop_manifest(ctx);
     }

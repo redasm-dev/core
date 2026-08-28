@@ -268,6 +268,20 @@ bool rd_typedef_set_noret(RDTypeDef* self, bool b) {
     return true;
 }
 
+bool rd_typedef_set_proto(RDTypeDef* self, bool b) {
+    if(self->kind != RD_TKIND_FUNC) {
+        RD_LOG_FAIL("cannot apply prototype to '%s'", self->name);
+        return false;
+    }
+
+    if(b)
+        self->flags |= RD_TFLAGS_PROTOTYPE;
+    else
+        self->flags &= ~(RDTypeFlags)RD_TFLAGS_PROTOTYPE;
+
+    return true;
+}
+
 bool rd_typedef_set_callconv(RDTypeDef* self, const char* cc) {
     if(self->kind != RD_TKIND_FUNC) {
         RD_LOG_FAIL("cannot apply callconv to '%s'", self->name);
@@ -388,6 +402,10 @@ const char* rd_typedef_get_callconv(const RDTypeDef* self) {
 
 bool rd_typedef_is_noret(const RDTypeDef* self) {
     return self->kind == RD_TKIND_FUNC && self->func_.is_noret;
+}
+
+bool rd_typedef_is_proto(const RDTypeDef* self) {
+    return self->kind == RD_TKIND_FUNC && self->flags & RD_TFLAGS_PROTOTYPE;
 }
 
 bool rd_typedef_is_builtin(const RDTypeDef* self) {

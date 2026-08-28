@@ -17,6 +17,7 @@ RD_API RDTypeKind rd_typedef_kind(const RDTypeDef* self);
 RD_API usize rd_typedef_size(const RDTypeDef* self);
 RD_API const char* rd_typedef_get_callconv(const RDTypeDef* self);
 RD_API bool rd_typedef_is_noret(const RDTypeDef* self);
+RD_API bool rd_typedef_is_proto(const RDTypeDef* self);
 RD_API bool rd_typedef_is_builtin(const RDTypeDef* self);
 RD_API void rd_typedef_destroy(RDTypeDef* self);
 RD_API bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef, usize offset, const RDParam** m);
@@ -25,6 +26,7 @@ RD_API bool rd_typedef_add_enumval(RDTypeDef* self, const char* name, i64 value,
 RD_API bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name, usize n, RDTypeModifier mod, RDContext* ctx);
 RD_API bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n, RDTypeModifier mod, RDContext* ctx);
 RD_API bool rd_typedef_set_noret(RDTypeDef* self, bool b);
+RD_API bool rd_typedef_set_proto(RDTypeDef* self, bool b);
 RD_API bool rd_typedef_set_callconv(RDTypeDef* self, const char* cc);
 RD_API bool rd_typedef_register(RDTypeDef* self, RDContext* ctx);
 // clang-format on
