@@ -16,9 +16,9 @@ typedef struct RDArgTargetVect {
     usize capacity;
 } RDArgTargetVect;
 
-static bool _rd_discover_resolve_proto(const RDContext* ctx,
-                                       const RDTypeDef* tdef,
-                                       const RDCallConv** cc) {
+static bool _rd_discover_is_call_target(const RDContext* ctx,
+                                        const RDTypeDef* tdef,
+                                        const RDCallConv** cc) {
     if(!tdef || (tdef->kind != RD_TKIND_FUNC) || rd_typedef_is_proto(tdef))
         return false;
 
@@ -119,19 +119,26 @@ static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, fn);
         if(!seg || !(seg->base.perm & RD_SP_X)) continue;
 
-        rd_set_function(ctx, fn);
+        rd_set_typed_function(ctx, fn, p->type.def->name);
         rd_auto_name(ctx, fn, rd_i_format(fmt_buf, "%s_%" PRIx64, p->name, fn));
     }
 }
 
 static void _rd_discover_collect_targets(RDContext* ctx,
                                          RDArgTargetVect* targets) {
+    const RDTypeDef* builtin = rd_i_typedef_find(ctx, "function");
+
     // (1) thunks: prototype attached to a function by autorename
     RDFunction** fit;
     vect_each(fit, &ctx->functions) {
         const RDFunction* f = *fit;
         const RDCallConv* cc = NULL;
-        if(!_rd_discover_resolve_proto(ctx, f->type_def, &cc)) continue;
+
+        // The builtin placeholder: "it's a function, signature unknown".
+        // Not redundant with the args check below: that one rejects it only
+        // because the builtin happens to have no args, which is incidental.
+        if(f->type_def == builtin) continue;
+        if(!_rd_discover_is_call_target(ctx, f->type_def, &cc)) continue;
 
         vect_push(targets, ((RDArgTarget){
                                .address = f->address,
@@ -146,7 +153,7 @@ static void _rd_discover_collect_targets(RDContext* ctx,
     vect_each(tit, &ctx->typedefs) {
         const RDTypeDef* tdef = *tit;
         const RDCallConv* cc = NULL;
-        if(!_rd_discover_resolve_proto(ctx, tdef, &cc)) continue;
+        if(!_rd_discover_is_call_target(ctx, tdef, &cc)) continue;
 
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
