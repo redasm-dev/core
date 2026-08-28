@@ -19,7 +19,8 @@ typedef struct RDArgTargetVect {
 static bool _rd_discover_is_call_target(const RDContext* ctx,
                                         const RDTypeDef* tdef,
                                         const RDCallConv** cc) {
-    if(!tdef || (tdef->kind != RD_TKIND_FUNC) || rd_typedef_is_proto(tdef))
+    if(!tdef || (tdef->kind != RD_TKIND_FUNC) || rd_typedef_is_proto(tdef) ||
+       rd_typedef_is_builtin(tdef))
         return false;
 
     if(!tdef->func_.args.has_value || vect_is_empty(&tdef->func_.args.value))
@@ -126,18 +127,11 @@ static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
 
 static void _rd_discover_collect_targets(RDContext* ctx,
                                          RDArgTargetVect* targets) {
-    const RDTypeDef* builtin = rd_i_typedef_find(ctx, "function");
-
     // (1) thunks: prototype attached to a function by autorename
     RDFunction** fit;
     vect_each(fit, &ctx->functions) {
         const RDFunction* f = *fit;
         const RDCallConv* cc = NULL;
-
-        // The builtin placeholder: "it's a function, signature unknown".
-        // Not redundant with the args check below: that one rejects it only
-        // because the builtin happens to have no args, which is incidental.
-        if(f->type_def == builtin) continue;
         if(!_rd_discover_is_call_target(ctx, f->type_def, &cc)) continue;
 
         vect_push(targets, ((RDArgTarget){
