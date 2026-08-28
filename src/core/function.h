@@ -34,8 +34,9 @@ typedef struct RDFunctionVect {
 } RDFunctionVect;
 
 void rd_i_function_declare_if(RDContext* ctx, const RDSegmentFull* seg,
-                              usize idx);
-RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address);
+                              usize idx, const char* type);
+RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address,
+                                  const char* type);
 void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
                              usize idx);
 

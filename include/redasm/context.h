@@ -170,6 +170,7 @@ RD_API bool rd_add_comment_after(RDContext* self, RDAddress address, const char*
 RD_API bool rd_del_comment_before(RDContext* self, RDAddress address);
 RD_API bool rd_del_comment_after(RDContext* self, RDAddress address);
 RD_API bool rd_set_function(RDContext* self, RDAddress address);
+RD_API bool rd_set_typed_function(RDContext* self, RDAddress address, const char* type);
 RD_API bool rd_placeholder_name(RDContext* self, RDAddress address, const char* name);
 RD_API bool rd_auto_name(RDContext* self, RDAddress address, const char* name);
 RD_API bool rd_library_name(RDContext* self, RDAddress address, const char* name);

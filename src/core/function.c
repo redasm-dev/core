@@ -86,15 +86,28 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
     return n;
 }
 
-static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address) {
+static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address,
+                                       const char* type) {
     RDFunction* self = rd_alloc(sizeof(*self));
 
-    *self = (RDFunction){
-        .context = ctx,
-        .address = address,
-        .type_def = rd_i_typedef_find(ctx, "function"),
-    };
+    const RDTypeDef* tdef = NULL;
 
+    if(type) {
+        tdef = rd_i_typedef_find(ctx, type);
+
+        if(!tdef) {
+            RD_LOG_WARN(
+                "function type '%s' not found, defaulting to 'function'", type);
+        }
+        else if(tdef->kind != RD_TKIND_FUNC) {
+            RD_LOG_WARN("type '%s' is not a function", type);
+            tdef = NULL;
+        }
+    }
+
+    if(!tdef) tdef = rd_i_typedef_find(ctx, "function");
+
+    *self = (RDFunction){.context = ctx, .address = address, .type_def = tdef};
     assert(self->type_def);
     assert(self->type_def->kind == RD_TKIND_FUNC);
 
@@ -277,15 +290,16 @@ void rd_i_functionchunk_destroy(RDFunctionChunkVect* self) {
 }
 
 void rd_i_function_declare_if(RDContext* ctx, const RDSegmentFull* seg,
-                              usize idx) {
+                              usize idx, const char* type) {
     if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
-    rd_i_function_declare(ctx, seg->base.start_address + idx);
+    rd_i_function_declare(ctx, seg->base.start_address + idx, type);
 }
 
-RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address) {
-    RDFunction* self = _rd_function_create(ctx, address);
+RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address,
+                                  const char* type) {
+    RDFunction* self = _rd_function_create(ctx, address, type);
     self->gen = ++ctx->func_gen;
 
     usize func_idx =

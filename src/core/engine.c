@@ -204,12 +204,14 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
     return false;
 }
 
-bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address) {
+bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
+                              const char* type) {
     if(_rd_engine_accept_address(ctx, address, &ctx->engine.qcall)) {
         RDEngineItem item = {
             .kind = RD_EI_CALL,
             .address = address,
             .from = ctx->engine.current.address,
+            .func_type = rd_i_strpool_intern(&ctx->strings, type),
         };
 
         hmap_dup(&item.registers, &ctx->engine.current.registers);
@@ -225,7 +227,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address) {
 
     if((seg->base.perm & RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
-        rd_i_function_declare_if(ctx, seg, dstidx);
+        rd_i_function_declare_if(ctx, seg, dstidx, type);
     }
 
     if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
@@ -283,7 +285,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
         if(!q && !queue_is_empty(&ctx->engine.qcall)) q = &ctx->engine.qcall;
         if(!q && !queue_is_empty(&ctx->engine.qjump)) q = &ctx->engine.qjump;
-        if(!q) return 0;
+        if(!q) goto done;
 
         hmap_destroy(&ctx->engine.current.registers);
         queue_pop(q, &ctx->engine.current);
@@ -313,7 +315,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     // or a duplicate mark) there is nothing left to do
     if(_rd_engine_is_dirty_kind(ctx->engine.current.kind) &&
        !rd_flagsbuffer_has_unknown(ctx->engine.segment->flags, idx))
-        return 0;
+        goto done;
 
     if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx)) {
         const char* queue_kind =
@@ -387,8 +389,10 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
         if(ctx->engine.current.kind == RD_EI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
-        else if(ctx->engine.current.kind == RD_EI_CALL)
-            rd_i_function_declare_if(ctx, ctx->engine.segment, idx);
+        else if(ctx->engine.current.kind == RD_EI_CALL) {
+            rd_i_function_declare_if(ctx, ctx->engine.segment, idx,
+                                     ctx->engine.current.func_type);
+        }
         else if(ctx->engine.current.kind == RD_EI_JUMP)
             rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
     }

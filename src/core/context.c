@@ -720,6 +720,11 @@ void rd_i_clear_n(RDContext* self, RDAddress address, usize n) {
 }
 
 bool rd_set_function(RDContext* self, RDAddress address) {
+    return rd_set_typed_function(self, address, NULL);
+}
+
+bool rd_set_typed_function(RDContext* self, RDAddress address,
+                           const char* type) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
@@ -738,7 +743,7 @@ bool rd_set_function(RDContext* self, RDAddress address) {
     if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
     if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
 
-    return rd_i_engine_enqueue_call(self, address);
+    return rd_i_engine_enqueue_call(self, address, type);
 }
 
 void rd_destroy(RDContext* self) {
@@ -1283,7 +1288,7 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 
             if(!isreftotail) {
                 rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
-                rd_i_engine_enqueue_call(self, toaddr);
+                rd_i_engine_enqueue_call(self, toaddr, NULL);
             }
 
             break;
