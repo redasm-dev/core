@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS TypeDefs( \
     id        INTEGER PRIMARY KEY AUTOINCREMENT, \
     name      TEXT UNIQUE NOT NULL, \
     kind      INTEGER NOT NULL, \
+    flags     INTEGER NOT NULL, \
     is_noret  INTEGER NOT NULL, \
     callconv  TEXT, \
     enum_type TEXT \

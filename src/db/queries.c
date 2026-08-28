@@ -786,10 +786,11 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
              "builtin type definitions not allowed in DB");
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_SET_TYPE_DEF, "\
-        INSERT INTO TypeDefs (name, kind, is_noret, callconv, enum_type) \
-            VALUES (:name, :kind, :is_noret, :callconv, :enum_type) \
+        INSERT INTO TypeDefs (name, kind, flags, is_noret, callconv, enum_type) \
+            VALUES (:name, :kind, :flags, :is_noret, :callconv, :enum_type) \
         ON CONFLICT(name) DO \
             UPDATE SET kind = EXCLUDED.kind, \
+                       flags = EXCLUDED.flags, \
                        is_noret = EXCLUDED.is_noret, \
                        callconv = EXCLUDED.callconv, \
                        enum_type = EXCLUDED.enum_type \
@@ -797,6 +798,7 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
 
     _rd_db_bind_param_str(ctx, stmt, ":name", tdef->name);
     _rd_db_bind_param_int(ctx, stmt, ":kind", (sqlite3_int64)tdef->kind);
+    _rd_db_bind_param_int(ctx, stmt, ":flags", (sqlite3_int64)tdef->flags);
 
     if(tdef->kind == RD_TKIND_FUNC) {
         if(tdef->func_.callconv)
@@ -865,7 +867,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
                                                 RDTypeDefVect* v) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_TYPE_DEFS, "\
-        SELECT name, kind, is_noret, callconv, enum_type \
+        SELECT name, kind, flags, is_noret, callconv, enum_type \
         FROM TypeDefs \
         ORDER BY id \
     ");
@@ -873,9 +875,10 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         const char* name = (const char*)sqlite3_column_text(stmt, 0);
         RDTypeKind kind = (RDTypeKind)sqlite3_column_int(stmt, 1);
-        bool is_noret = (bool)sqlite3_column_int(stmt, 2);
-        const char* callconv = (const char*)sqlite3_column_text(stmt, 3);
-        const char* enum_type = (const char*)sqlite3_column_text(stmt, 4);
+        RDTypeFlags flags = (RDTypeFlags)sqlite3_column_int(stmt, 2);
+        bool is_noret = (bool)sqlite3_column_int(stmt, 3);
+        const char* callconv = (const char*)sqlite3_column_text(stmt, 4);
+        const char* enum_type = (const char*)sqlite3_column_text(stmt, 5);
 
         sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
         RDTypeDef* tdef = NULL;
@@ -895,6 +898,7 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
             unreachable();
 
         assert(tdef);
+        tdef->flags = flags; // attach flags directly
 
         while(_rd_db_step(ctx, stmt_param) == SQLITE_ROW) {
             // clang-format off
@@ -1045,16 +1049,7 @@ void _rd_i_db_query_load_all_functions(RDContext* ctx) {
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
         RDAddress address = (RDAddress)sqlite3_column_int64(stmt, 0);
         const char* type_name = (const char*)sqlite3_column_text(stmt, 1);
-        RDFunction* f = rd_i_function_declare(ctx, address);
-
-        if(type_name) {
-            const RDTypeDef* tdef = rd_i_typedef_find(ctx, type_name);
-            panic_if(!tdef, "function typedef '%s' not found", type_name);
-            panic_if(tdef->kind != RD_TKIND_FUNC,
-                     "typedef '%s' is not a function", type_name);
-            rd_i_function_set_type_def(f, tdef);
-        }
-
+        RDFunction* f = rd_i_function_declare(ctx, address, type_name);
         rd_i_function_rebuild(f);
     }
 }
