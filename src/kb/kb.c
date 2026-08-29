@@ -96,25 +96,13 @@ static RDKBOrdinalModule* _rd_kb_check_ordinal_module(RDContext* ctx,
     return vect_at(&ctx->kb->ordinal_modules, idx);
 }
 
-static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
-                                    const RDContext* ctx, bool is_ret) {
+static bool _rd_kb_get_type(const RDKBObject* obj, RDType* t,
+                            const RDContext* ctx) {
     *t = (RDType){.mod = RD_TYPE_NONE};
 
     i64 count = 0;
     const char* tname = rd_kbobject_get_str(obj, "type");
     assert(tname);
-
-    if(!strcmp(tname, "void")) {
-        if(!is_ret) {
-            RD_LOG_FAIL("void type unallowed");
-            return NULL;
-        }
-
-        rd_type_init_void(t);
-
-        // return type is nameless, prefer empty string instead of NULL
-        return "";
-    }
 
     bool is_type_cptr = !strcmp(tname, "cptr");
     bool is_type_ptr = !strcmp(tname, "ptr");
@@ -156,10 +144,10 @@ static const char* _rd_kb_get_param(const RDKBObject* obj, RDType* t,
 
     if(!t->def) {
         RD_LOG_FAIL("cannot find type '%s'", tname);
-        return NULL;
+        return false;
     }
 
-    return rd_kbobject_get_str(obj, "name");
+    return true;
 }
 
 // push the current manifest (if any):
@@ -216,15 +204,22 @@ static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
         const RDKBObject* m;
         rd_kbobject_each(m, members) {
             RDType t;
-            const char* param_name = _rd_kb_get_param(m, &t, ctx, false);
+            if(!_rd_kb_get_type(m, &t, ctx)) {
+                rd_typedef_destroy(tdef);
+                return;
+            }
 
+            const char* param_name = rd_kbobject_get_str(m, "name");
             if(!param_name) {
                 rd_typedef_destroy(tdef);
                 return;
             }
 
-            rd_typedef_add_member(tdef, t.def->name, param_name, t.count, t.mod,
-                                  ctx);
+            if(!rd_typedef_add_member(tdef, t.def->name, param_name, t.count,
+                                      t.mod, ctx)) {
+                rd_typedef_destroy(tdef);
+                return;
+            }
         }
 
         rd_typedef_register(tdef, ctx);
@@ -264,7 +259,10 @@ static void _rd_kb_load_enums(const RDKBObject* enums, RDContext* ctx) {
                 return;
             }
 
-            rd_typedef_add_enumval(tdef, m_name, m_value, ctx);
+            if(!rd_typedef_add_enumval(tdef, m_name, m_value, ctx)) {
+                rd_typedef_destroy(tdef);
+                return;
+            }
         }
 
         rd_typedef_register(tdef, ctx);
@@ -294,7 +292,10 @@ static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
         assert(ret);
 
         RDType ret_type;
-        _rd_kb_get_param(ret, &ret_type, ctx, true);
+        if(!_rd_kb_get_type(ret, &ret_type, ctx)) {
+            rd_typedef_destroy(tdef);
+            return;
+        }
 
         if(rd_type_is_void(&ret_type)) {
             rd_typedef_set_ret(tdef, NULL, 0, RD_TYPE_NONE, ctx);
@@ -310,15 +311,22 @@ static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
         const RDKBObject* a;
         rd_kbobject_each(a, args) {
             RDType t;
-            const char* arg_name = _rd_kb_get_param(a, &t, ctx, false);
+            if(!_rd_kb_get_type(a, &t, ctx)) {
+                rd_typedef_destroy(tdef);
+                return;
+            }
 
+            const char* arg_name = rd_kbobject_get_str(a, "name");
             if(!arg_name) {
                 rd_typedef_destroy(tdef);
                 return;
             }
 
-            rd_typedef_add_arg(tdef, t.def->name, arg_name, t.count, t.mod,
-                               ctx);
+            if(!rd_typedef_add_arg(tdef, t.def->name, arg_name, t.count, t.mod,
+                                   ctx)) {
+                rd_typedef_destroy(tdef);
+                return;
+            }
         }
 
         rd_typedef_register(tdef, ctx);
