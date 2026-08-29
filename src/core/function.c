@@ -89,7 +89,6 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
 static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address,
                                        const char* type) {
     RDFunction* self = rd_alloc(sizeof(*self));
-
     const RDTypeDef* tdef = NULL;
 
     if(type) {

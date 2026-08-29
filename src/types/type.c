@@ -191,13 +191,29 @@ bool rd_type_init(RDType* self, const char* name, usize n, RDTypeModifier mod,
         return false;
     }
 
+    // 'void' alone has no size, so an array of it is meaningless.
+    // 'void*' does, an array of pointers is fine.
+    if(tdef == rd_i_typedef_get_void() && n > 0 && mod == RD_TYPE_NONE) {
+        RD_LOG_FAIL("'void' cannot have a count");
+        return false;
+    }
+
     self->def = tdef;
     self->count = n;
     self->mod = mod;
     return true;
 }
 
-void rd_type_init_void(RDType* self) { *self = (RDType){0}; }
+void rd_type_init_void(RDType* self) {
+    *self = (RDType){
+        .def = rd_i_typedef_get_void(),
+    };
+}
+
+bool rd_type_is_void(const RDType* t) {
+    return t && t->def == rd_i_typedef_get_void() && t->mod == RD_TYPE_NONE &&
+           t->count == 0;
+}
 
 const char* rd_integral_from_size(unsigned int size) {
     switch(size) {
@@ -218,8 +234,6 @@ const RDTypeDef* rd_integral_typedef_from_size(unsigned int size,
 }
 
 const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
-    if(rd_type_is_void(t)) return "void";
-
     assert(t->def);
 
     str_clear(buf);

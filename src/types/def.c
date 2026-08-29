@@ -15,6 +15,7 @@
     }
 
 // clang-format off
+static RDTypeDef t_prim_void = RD_PRIMITIVE("void", 0, RD_TFLAGS_VOID);
 static RDTypeDef t_prim_bool = RD_PRIMITIVE("bool", sizeof(bool), RD_TFLAGS_NONE);
 static RDTypeDef t_prim_u8 = RD_PRIMITIVE("u8", sizeof(u8), RD_TFLAGS_NONE);
 static RDTypeDef t_prim_u16 = RD_PRIMITIVE("u16", sizeof(u16), RD_TFLAGS_NONE);
@@ -46,7 +47,7 @@ static bool _rd_typedef_enum_in_range(const RDTypeDef* tdef, i64 val) {
 
         case 8: return is_signed || val >= 0; // i64 can't hold full u64 range
 
-        default: break;
+        default: panic("invalid enum base-type size '%zu'", tdef->size); break;
     }
 
     return false;
@@ -143,6 +144,11 @@ RDTypeDef* rd_typedef_create_enum(const char* name, const char* type,
         return NULL;
     }
 
+    if(tdef->flags & RD_TFLAGS_VOID) {
+        RD_LOG_FAIL("enum base-type cannot be 'void'");
+        return NULL;
+    }
+
     RDTypeDef* self = _rd_typedef_create(name, RD_TKIND_ENUM, ctx);
     self->enum_.base_type = tdef;
     return self;
@@ -197,6 +203,12 @@ bool rd_typedef_add_member(RDTypeDef* self, const char* type, const char* name,
 
     RDParam m = {0};
     if(!rd_type_init(&m.type, type, n, mod, ctx)) return false;
+
+    if(rd_type_is_void(&m.type)) {
+        RD_LOG_FAIL("type '%s': field '%s' cannot be void", self->name, name);
+        return false;
+    }
+
     m.name = rd_i_strpool_intern(&ctx->strings, name);
     vect_push(&self->compound_, m);
     return true;
@@ -225,8 +237,19 @@ bool rd_typedef_add_arg(RDTypeDef* self, const char* type, const char* name,
         return false;
     }
 
+    if(!name) {
+        RD_LOG_FAIL("argument name is NULL for '%s' function", self->name);
+        return false;
+    }
+
     RDType t;
     if(!rd_type_init(&t, type, n, mod, ctx)) return false;
+
+    if(rd_type_is_void(&t)) {
+        RD_LOG_FAIL("function '%s': argument '%s' cannot be void", self->name,
+                    name);
+        return false;
+    }
 
     self->func_.args.has_value = true;
 
@@ -379,7 +402,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                     _rd_typedef_kind_str(self->kind), self->name);
     }
 
-    if(!self->size) {
+    if(!self->size && !(self->flags & RD_TFLAGS_VOID)) {
         RD_LOG_FAIL("type '%s' has unresolved size", self->name);
         goto fail;
     }
@@ -395,6 +418,7 @@ fail:
 const char* rd_typedef_name(const RDTypeDef* self) { return self->name; }
 RDTypeKind rd_typedef_kind(const RDTypeDef* self) { return self->kind; }
 usize rd_typedef_size(const RDTypeDef* self) { return self->size; }
+const RDTypeDef* rd_i_typedef_get_void(void) { return &t_prim_void; }
 
 const char* rd_typedef_get_callconv(const RDTypeDef* self) {
     return self->kind == RD_TKIND_FUNC ? self->func_.callconv : NULL;
@@ -444,6 +468,7 @@ bool rd_typedef_resolve_offset(RDContext* ctx, const RDTypeDef* tdef,
 }
 
 void rd_i_typedef_register_builtins(RDContext* ctx) {
+    rd_typedef_register(&t_prim_void, ctx);
     rd_typedef_register(&t_prim_bool, ctx);
     rd_typedef_register(&t_prim_u8, ctx);
     rd_typedef_register(&t_prim_u16, ctx);
@@ -456,12 +481,12 @@ void rd_i_typedef_register_builtins(RDContext* ctx) {
     rd_typedef_register(&t_prim_char, ctx);
     rd_typedef_register(&t_prim_char16, ctx);
 
-    RDTypeDef* tdef_usize = _rd_typedef_create("usize", RD_TKIND_PRIM, ctx);
+    RDTypeDef* tdef_usize = _rd_typedef_create("uptr", RD_TKIND_PRIM, ctx);
     tdef_usize->flags = RD_TFLAGS_BUILTIN;
     tdef_usize->size = rd_get_ptr_size(ctx);
     rd_typedef_register(tdef_usize, ctx);
 
-    RDTypeDef* tdef_isize = _rd_typedef_create("isize", RD_TKIND_PRIM, ctx);
+    RDTypeDef* tdef_isize = _rd_typedef_create("iptr", RD_TKIND_PRIM, ctx);
     tdef_isize->flags = RD_TFLAGS_BUILTIN | RD_TFLAGS_SIGNED;
     tdef_isize->size = rd_get_ptr_size(ctx);
     rd_typedef_register(tdef_isize, ctx);

@@ -39,8 +39,9 @@ typedef enum {
     RD_TFLAGS_NONE = 0,
     RD_TFLAGS_BUILTIN = 1 << 0,
     RD_TFLAGS_STATIC = 1 << 1,
-    RD_TFLAGS_SIGNED = 1 << 2,    // RD_TKIND_PRIM only
-    RD_TFLAGS_PROTOTYPE = 1 << 3, // RD_TKIND_FUNC only
+    RD_TFLAGS_VOID = 1 << 2,      // RD_TKIND_PRIM only
+    RD_TFLAGS_SIGNED = 1 << 3,    // RD_TKIND_PRIM only
+    RD_TFLAGS_PROTOTYPE = 1 << 4, // RD_TKIND_FUNC only
 } RDTypeFlags;
 
 typedef struct RDTypeDef {
@@ -65,6 +66,7 @@ typedef struct RDTypeDefVect {
 
 void rd_i_typedef_register_builtins(RDContext* ctx);
 void rd_i_typedef_measure(const RDContext* ctx, RDTypeDef* tdef);
+const RDTypeDef* rd_i_typedef_get_void(void);
 RDTypeDef* rd_i_typedef_find(const RDContext* ctx, const char* name);
 
 static inline bool rd_i_typedef_is_compound(const RDTypeDef* self) {
