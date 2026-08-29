@@ -168,6 +168,14 @@ static bool _rd_kb_push_manifest(const RDKBObject* root, RDContext* ctx) {
     const RDKBObject* manifest = rd_kbobject_get_table(root, "manifest");
     if(manifest && !rd_i_kb_validate_manifest(manifest)) return false;
 
+    // Resolve and push first: dependencies are includes and inherit this.
+    const char* callconv = rd_kbobject_get_str(manifest, "callconv");
+
+    if(!callconv && !vect_is_empty(&ctx->kb->curr_callconv))
+        callconv = *vect_last(&ctx->kb->curr_callconv);
+
+    vect_push(&ctx->kb->curr_callconv, callconv);
+
     const RDKBObject* dependencies =
         rd_kbobject_get_array(manifest, "dependencies");
 
@@ -178,9 +186,6 @@ static bool _rd_kb_push_manifest(const RDKBObject* root, RDContext* ctx) {
             if(dep_path) rd_kb_load(ctx, dep_path);
         }
     }
-
-    vect_push(&ctx->kb->curr_callconv,
-              rd_kbobject_get_str(manifest, "callconv"));
 
     return true;
 }
