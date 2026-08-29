@@ -20,7 +20,7 @@ void rd_i_callconv_destroy(RDCallConv* self) {
 }
 
 const RDCallConv* rd_i_callconv_find(const RDContext* ctx, const char* name) {
-    if(!name) return NULL;
+    if(!name || !*name) return NULL;
 
     RDCallConv** cc;
     vect_each(cc, &ctx->callconvs) {
