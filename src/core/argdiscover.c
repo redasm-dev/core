@@ -121,7 +121,7 @@ static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
         if(!seg || !(seg->base.perm & RD_SP_X)) continue;
 
         rd_set_typed_function(ctx, fn, p->type.def->name);
-        rd_auto_name(ctx, fn, rd_i_format(fmt_buf, "%s_%" PRIx64, p->name, fn));
+        rd_auto_name(ctx, fn, rd_i_format(fmt_buf, "%s_%" PRIX64, p->name, fn));
     }
 }
 
