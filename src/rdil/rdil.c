@@ -10,6 +10,11 @@ typedef struct RDILValue {
     bool known;
 } RDILValue;
 
+static inline bool _rd_il_is_storable(RDOperandKind k) {
+    return k == RD_OP_REG || k == RD_OP_SYM || k == RD_OP_MEM ||
+           k == RD_OP_DISPL;
+}
+
 static bool _rd_il_eval_cond(const RDInstruction* il, const RDILValue* lhs,
                              const RDILValue* rhs) {
     assert(lhs->known && rhs->known);
@@ -475,7 +480,7 @@ static bool _rd_il_validate(RDAddress address, const RDInstructionVect* v) {
             case RD_IL_MOV: {
                 RDOperandKind k = instr->operands[0].kind;
 
-                if(k != RD_OP_REG && k != RD_OP_MEM && k != RD_OP_SYM)
+                if(!_rd_il_is_storable(k))
                     return _rd_il_invalid_operand(instr, address, i, 0);
 
                 if(instr->operands[1].kind == RD_OP_NULL)
