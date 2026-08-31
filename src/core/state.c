@@ -5,6 +5,7 @@
 #include "plugins/loader.h"
 #include "plugins/module.h"
 #include "support/containers.h"
+#include <inttypes.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader.h>
@@ -204,7 +205,7 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
     if(!instr) return d->data;
 
     RDCharVect buf = {0};
-    str_append(d, rd_i_format(&buf, "Address: %x\n", instr->address));
+    str_append(d, rd_i_format(&buf, "Address: %" PRIX64 "\n", instr->address));
     str_append(d, rd_i_format(&buf, "Id: %x\n", instr->id));
     str_append(d, "Flow: ");
 
@@ -235,23 +236,28 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
         }
         else if(op->kind == RD_OP_CNST) {
             str_append(d, "OP_CNST\n");
-            str_append(d, rd_i_format(&buf, "  [%d].cnst: %x\n", i, op->cnst));
+            str_append(d, rd_i_format(&buf, "  [%d].cnst: %" PRIX64 "\n", i,
+                                      op->cnst));
         }
         else if(op->kind == RD_OP_REG) {
             str_append(d, "OP_REG\n");
-            str_append(d, rd_i_format(&buf, "  [%d].reg: %x\n", i, op->reg));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].reg: %" PRIX32 "\n", i, op->reg));
         }
         else if(op->kind == RD_OP_IMM) {
             str_append(d, "OP_IMM\n");
-            str_append(d, rd_i_format(&buf, "  [%d].imm: %x\n", i, op->imm));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].imm: %" PRIX64 "\n", i, op->imm));
         }
         else if(op->kind == RD_OP_ADDR) {
             str_append(d, "OP_ADDR\n");
-            str_append(d, rd_i_format(&buf, "  [%d].addr: %x\n", i, op->addr));
+            str_append(d, rd_i_format(&buf, "  [%d].addr: %" PRIX64 "\n", i,
+                                      op->addr));
         }
         else if(op->kind == RD_OP_MEM) {
             str_append(d, "OP_MEM\n");
-            str_append(d, rd_i_format(&buf, "  [%d].mem: %x\n", i, op->mem));
+            str_append(
+                d, rd_i_format(&buf, "  [%d].mem: %" PRIX64 "\n", i, op->mem));
         }
         else if(op->kind == RD_OP_DISPL) {
             str_append(d, "OP_DISPL\n");
@@ -259,7 +265,7 @@ const char* rd_dump_instruction(const RDInstruction* instr) {
                 d, rd_i_format(&buf, "  [%d].base: %x\n", i, op->displ.base));
             str_append(
                 d, rd_i_format(&buf, "  [%d].index: %x\n", i, op->displ.index));
-            str_append(d, rd_i_format(&buf, "  [%d].displ: %x\n", i,
+            str_append(d, rd_i_format(&buf, "  [%d].displ: %" PRIX64 "\n", i,
                                       op->displ.offset));
             str_append(
                 d, rd_i_format(&buf, "  [%d].scale: %x\n", i, op->displ.scale));

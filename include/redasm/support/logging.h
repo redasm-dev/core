@@ -14,9 +14,11 @@ typedef void (*RDLogCallback)(RDLogLevel level, const char* tag,
                               const char* msg, void* userdata);
 
 RD_API void rd_set_log_callback(RDLogCallback cb, void* userdata);
-RD_API void rd_log(RDLogLevel level, const char* tag, const char* fmt, ...);
+
+RD_API void rd_log(RDLogLevel level, const char* tag,
+                   RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(3, 4);
 RD_API void rd_log_to(RDScratchBuffer* buf, RDLogLevel level, const char* tag,
-                      const char* fmt, ...);
+                      RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(4, 5);
 
 #if defined(NDEBUG)
 #define RD_LOG_DEBUG(fmt, ...)

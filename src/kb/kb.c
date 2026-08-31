@@ -7,6 +7,7 @@
 #include "support/error.h"
 #include "support/tomlschema.h"
 #include <errno.h>
+#include <inttypes.h>
 #include <redasm/allocator.h>
 #include <redasm/support/logging.h>
 
@@ -360,10 +361,10 @@ static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
         const char* external = rd_kbobject_get_str(sym, "external");
 
         if(has_func && type) {
-            RD_LOG_FAIL(
-                "symbol '%s' @ %llx: 'function' and 'type' are mutually "
-                "exclusive, skipping entry",
-                name, address);
+            RD_LOG_FAIL("symbol '%s' @ %" PRIX64
+                        ": 'function' and 'type' are mutually "
+                        "exclusive, skipping entry",
+                        name, address);
             continue;
         }
 

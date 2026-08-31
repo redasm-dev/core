@@ -61,8 +61,11 @@ const char* rd_i_escape_char(char c, bool isstr);
 const char* rd_i_escape_char16(u16 c, bool isstr);
 int rd_i_utf8_decode(const char* s, u32* cp);
 const char* rd_i_to_base(i64 v, const RDBaseParams* p);
+
+// clang-format off
 char* rd_i_vformat(RDCharVect* buf, const char* fmt, va_list args);
-char* rd_i_format(RDCharVect* buf, const char* fmt, ...);
+char* rd_i_format(RDCharVect* buf, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(2, 3);
+// clang-format on
 
 static inline const char* rd_i_to_dec(i64 v) {
     return rd_i_to_base(v, &(RDBaseParams){

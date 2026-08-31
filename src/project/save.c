@@ -29,7 +29,7 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
         if(i) str_push(v, ',');
 
         const u8* t = vect_at(&ctx->string_terminators, i);
-        str_append(v, rd_i_format(&buf, "%" PRIu8, t));
+        str_append(v, rd_i_format(&buf, "%" PRIu8, *t));
     }
 
     str_append(v, "]\n");

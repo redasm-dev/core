@@ -23,7 +23,7 @@ bool rd_i_validate_plugin_with_name(u32 level, const char* id, const char* name,
     if(!rd_i_validate_plugin(level, id, kind)) return false;
 
     if(!name || !(*name)) {
-        RD_LOG_FAIL("invalid name for plugin '%s'");
+        RD_LOG_FAIL("invalid name for plugin '%s'", id);
         return false;
     }
 

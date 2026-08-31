@@ -24,6 +24,19 @@
 #endif
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define RD_PRINTF_CHECK(fmt_idx, args_idx)                                     \
+    __attribute__((format(printf, fmt_idx, args_idx)))
+#define RD_MSVC_CHECK
+#elif defined(_MSC_VER)
+#define RD_PRINTF_CHECK(fmt_idx, args_idx)
+#include <sal.h>
+#define RD_MSVC_CHECK _Printf_format_string_
+#else
+#define RD_PRINTF_CHECK(fmt_idx, args_idx)
+#define RD_MSVC_CHECK
+#endif
+
 // NOLINTBEGIN
 typedef uint8_t u8;
 typedef uint16_t u16;

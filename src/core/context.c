@@ -347,8 +347,8 @@ bool rd_map_segment(RDContext* self, const char* name, RDAddress addr,
     if(!s) return false;
 
     if(rd_i_db_add_segment(self, s)) {
-        RD_LOG_INFO("mapping segment '%s' (Address: [%X, %X))", name, addr,
-                    endaddr);
+        RD_LOG_INFO("mapping segment '%s' (%" PRIX64 " - %" PRIX64 ")", name,
+                    addr, endaddr);
     }
     else
         rd_i_segment_destroy(s);
@@ -369,9 +369,11 @@ bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr,
         .end_address = endaddr,
     };
 
-    if(rd_i_db_add_mapping(self, m))
-        RD_LOG_INFO("mapping input at offset %X (Address: [%X, %X))", off, addr,
-                    endaddr);
+    if(rd_i_db_add_mapping(self, m)) {
+        RD_LOG_INFO("mapping input @ offset %" PRIX64 " (%" PRIX64 " - %" PRIX64
+                    ")",
+                    off, addr, endaddr);
+    }
 
     return true;
 }
@@ -1376,7 +1378,7 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     else {
         const RDLoaderPlugin* ldr = self->loaderplugin;
         assert(ldr && "invalid loader plugin");
-        name = rd_i_format(&self->name_buf, "%s_entry_point_%llx", ldr->id,
+        name = rd_i_format(&self->name_buf, "%s_entry_point_%" PRIX64, ldr->id,
                            address);
         assert(name && "invalid entry point name");
         rd_placeholder_name(self, address, name);

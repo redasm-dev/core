@@ -2,6 +2,7 @@
 #include "core/context.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include <inttypes.h>
 #include <redasm/support/logging.h>
 #include <stdint.h>
 #include <string.h>
@@ -342,9 +343,9 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
         RDEnumCase* c1;
         vect_each(c1, &self->enum_) {
             if(!_rd_typedef_enum_in_range(self->enum_.base_type, c1->value)) {
-                RD_LOG_FAIL(
-                    "value '%lld' out of range for type '%s' in enum '%s'",
-                    c1->value, self->enum_.base_type, self->name);
+                RD_LOG_FAIL("value '%" PRIX64
+                            "' out of range for type '%s' in enum '%s'",
+                            c1->value, self->enum_.base_type->name, self->name);
                 goto fail;
             }
 
@@ -352,7 +353,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             vect_each(c2, &self->enum_) {
                 if(c1 != c2 && !strcmp(c1->name, c2->name)) {
                     RD_LOG_FAIL("duplicate case '%s' in enum '%s'", c1->name,
-                                self->enum_.base_type);
+                                self->enum_.base_type->name);
                     goto fail;
                 }
             }
@@ -364,14 +365,14 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                 RDParam* arg1 = vect_at(&self->func_.args.value, i);
 
                 if(!arg1->name) {
-                    RD_LOG_FAIL("function '%s': argument %d has no name",
+                    RD_LOG_FAIL("function '%s': argument %zu has no name",
                                 self->name, i + 1);
                     goto fail;
                 }
 
                 if(rd_type_is_void(&arg1->type)) {
                     RD_LOG_FAIL(
-                        "function '%s': argument %d '%s' cannot be void",
+                        "function '%s': argument %zu '%s' cannot be void",
                         self->name, i + 1, arg1->name);
                     goto fail;
                 }
@@ -381,7 +382,7 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
                     RDParam* arg2 = vect_at(&self->func_.args.value, j);
 
                     if(!strcmp(arg1->name, arg2->name)) {
-                        RD_LOG_FAIL("function '%s': argument %d has duplicate "
+                        RD_LOG_FAIL("function '%s': argument %zu has duplicate "
                                     "name '%s'",
                                     self->name, i + 1, arg1->name);
                         goto fail;
