@@ -1,0 +1,19 @@
+#pragma once
+
+#include <redasm/config.h>
+
+// clang-format off
+#define RD_VERSION_MAJOR @REDASM_VERSION_MAJOR@
+#define RD_VERSION_MINOR @REDASM_VERSION_MINOR@
+#define RD_VERSION_PATCH @REDASM_VERSION_PATCH@
+
+// PATCH is ABI-stable by convention, MAJOR/MINOR bumps are not.
+// Packing MAJOR into the high bits keeps levels monotonic and collision-free
+// across major-version boundaries (MINOR resets to 0 on a major bump).
+#define RD_API_VERSION          ((RD_VERSION_MAJOR << 16) | (RD_VERSION_MINOR + 1))
+#define RD_API_VERSION_MAJOR(v) ((u32)(v) >> 16)
+#define RD_API_VERSION_MINOR(v) (((u32)(v) & 0xFFFFu) - 1)
+
+#define RD_VERSION       "@REDASM_VERSION@"
+#define RD_BUILD_VERSION "@REDASM_BUILD_VERSION@"
+// clang-format on

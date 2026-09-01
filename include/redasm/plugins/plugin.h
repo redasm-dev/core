@@ -3,7 +3,6 @@
 #include <redasm/config.h>
 
 #define RD_PLUGIN_HEADER                                                       \
-    u32 level;                                                                 \
     u32 flags;                                                                 \
     void* userdata;                                                            \
     const char* id
@@ -29,8 +28,24 @@ typedef struct RDPluginSlice {
     usize length;
 } RDPluginSlice;
 
+typedef void (*RDModuleLoad)(void);
+typedef void (*RDModuleUnload)(void);
+
+// ABI CONTRACT:
+// - 'api_version' MUST be the first field.
+// - module loader reads it alone as a bare u32 before trusting anything else
+//   about this struct's layout.
+// - never reorder or insert a field before it even in a future major version,
+//   the position is permanent.
+typedef struct RDModuleDescriptor {
+    u32 api_version;
+    RDModuleLoad load;
+    RDModuleUnload unload; // optional, may be NULL
+} RDModuleDescriptor;
+
 typedef struct RDModule {
     const char* path;
+    u32 api_version;
 } RDModule;
 
 typedef struct RDModuleSlice {
@@ -48,6 +63,15 @@ RD_API const RDProcessorPlugin* rd_processor_find(const char* id);
 RD_API const RDAnalyzerPlugin* rd_analyzer_find(const char* id);
 RD_API const RDCommandPlugin* rd_command_find(const char* id);
 
-// Plugin entry points
-RD_API void rd_plugin_create(void);
-RD_API void rd_plugin_destroy(void);
+// Module entry point.
+// Gives static analysis a visible external reference so 'rd_module' isn't
+// flagged as a candidate for internal linkage.
+// The actual definition lives in each plugin's own .c file via
+// RD_MODULE_EXPORT.
+#define RD_MODULE_EXPORT const RDModuleDescriptor rd_module
+
+#ifdef __cplusplus
+RD_API RD_MODULE_EXPORT;
+#else
+RD_API extern RD_MODULE_EXPORT;
+#endif

@@ -6,30 +6,21 @@
 #include <redasm/support/utils.h>
 #include <string.h>
 
-#define RD_MODULE_VERSION_NONE "unknown"
+#define RD_MODULE_SYMBOL "rd_module"
 
-#define RD_PLUGIN_CREATE "rd_plugin_create"
-#define RD_PLUGIN_DESTROY "rd_plugin_destroy"
-
+static const void* _rd_module_sym(const RDModuleFull* self, const char* name) {
 #if defined(_WIN32)
-typedef FARPROC RDModuleProc;
+    // GetProcAddress always returns FARPROC even for data symbols on Windows.
+    // Reinterpret through the same-sized bit pattern rather than assume
+    // implicit convertibility.
+    FARPROC proc = GetProcAddress(self->handle, name);
+    static_assert(sizeof(proc) == sizeof(void*), "pointer size mismatch");
+    const void* out;
+    memcpy(&out, &proc, sizeof(proc));
+    return out;
 #else
-typedef void* RDModuleProc;
+    return dlsym(self->handle, name); // POSIX guarantees data-pointer-safe
 #endif
-
-static void _rd_module_sym(const RDModuleFull* self, const char* name,
-                           void* sym) {
-#if defined(_WIN32)
-    RDModuleProc proc = GetProcAddress(self->handle, name);
-#else
-    RDModuleProc proc = dlsym(self->handle, name);
-#endif
-
-    // data-pointer vs function-pointer size can be different
-    // in some platforms, check the size.
-    static_assert(sizeof(proc) == sizeof(RDModuleCreate),
-                  "function pointer size mismatch");
-    memcpy(sym, (char*)&proc, sizeof(proc));
 }
 
 static void _rd_module_errmsg(void) {
@@ -67,15 +58,24 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
         goto fail;
     }
 
-    _rd_module_sym(self, RD_PLUGIN_CREATE, (void*)&self->create);
+    self->descr =
+        (const RDModuleDescriptor*)_rd_module_sym(self, RD_MODULE_SYMBOL);
 
-    if(!self->create) {
+    if(!self->descr) {
         RD_LOG_FAIL("'%s' is not a valid plugin", filepath);
         goto fail;
     }
 
-    _rd_module_sym(self, RD_PLUGIN_DESTROY, (void*)&self->destroy);
+    if(self->descr->api_version != RD_API_VERSION) {
+        RD_LOG_FAIL("'%s': API mismatch, expected v%u.%u, got v%u.%u", filepath,
+                    RD_VERSION_MAJOR, RD_VERSION_MINOR,
+                    RD_API_VERSION_MAJOR(self->descr->api_version),
+                    RD_API_VERSION_MINOR(self->descr->api_version));
+        goto fail;
+    }
 
+    // copy API Version to public interface
+    self->base.api_version = self->descr->api_version;
     return self;
 
 fail:

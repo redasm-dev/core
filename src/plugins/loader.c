@@ -111,7 +111,7 @@ RDTestResultSlice rd_test(const char* filepath) {
 }
 
 bool rd_register_loader(const RDLoaderPlugin* l) {
-    if(!rd_i_validate_plugin(l->level, l->id, "loader")) return false;
+    if(!rd_i_validate_plugin(l->id, "loader")) return false;
 
     if(!l->get_name) {
         RD_LOG_FAIL("loader '%s' requires a name", l->id);

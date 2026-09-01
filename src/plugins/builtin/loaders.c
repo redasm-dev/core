@@ -27,7 +27,6 @@ static bool _builtin_binary_load(RDLoader* ldr, RDContext* ctx) {
 }
 
 static const RDLoaderPlugin BUILTIN_BINARY = {
-    .level = RD_API_LEVEL,
     .id = RD_BINARY_LOADER_ID,
     .flags = RD_LF_MANUAL | RD_PF_LAST,
     .get_name = _builtin_binary_get_name,

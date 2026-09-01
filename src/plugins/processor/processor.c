@@ -163,7 +163,7 @@ bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
 }
 
 bool rd_register_processor(const RDProcessorPlugin* p) {
-    if(!rd_i_validate_plugin_with_name(p->level, p->id, p->name, "processor"))
+    if(!rd_i_validate_plugin_with_name(p->id, p->name, "processor"))
         return false;
 
     if(!p->decode) {

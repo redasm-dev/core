@@ -1,7 +1,0 @@
-#pragma once
-
-// clang-format off
-#define RD_API_LEVEL @REDASM_API_LEVEL@
-#define RD_VERSION "@REDASM_VERSION@"
-#define RD_BUILD_VERSION "@REDASM_BUILD_VERSION@"
-// clang-format on

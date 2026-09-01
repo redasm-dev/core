@@ -57,7 +57,7 @@ void rd_i_analyzeritemvect_destroy(RDAnalyzerItemVect* self) {
 }
 
 bool rd_register_analyzer(const RDAnalyzerPlugin* a) {
-    if(!rd_i_validate_plugin_with_name(a->level, a->id, a->name, "analyzer"))
+    if(!rd_i_validate_plugin_with_name(a->id, a->name, "analyzer"))
         return false;
 
     if(!a->execute) {

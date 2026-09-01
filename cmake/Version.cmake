@@ -43,17 +43,15 @@ else()
     set(REDASM_BUILD_VERSION "${REDASM_VERSION}-${REDASM_BUILD_TIMESTAMP}.${REDASM_GIT_VERSION}")
 endif()
 
-math(EXPR REDASM_API_LEVEL "${REDASM_VERSION_MINOR} + 1")
-
 function(redasm_generate_version)
     configure_file(
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/redasm/level.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/level.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/redasm/abi.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/abi.h
         @ONLY
     )
 
     install(
-        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/level.h 
+        FILES ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/abi.h 
         DESTINATION include/redasm
     )
 endfunction()

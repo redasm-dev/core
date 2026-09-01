@@ -96,8 +96,7 @@ RDCommandValue rd_command_run(RDContext* ctx, const char* name,
 }
 
 bool rd_register_command(const RDCommandPlugin* c) {
-    if(!rd_i_validate_plugin_with_name(c->level, c->id, c->name, "command"))
-        return false;
+    if(!rd_i_validate_plugin_with_name(c->id, c->name, "command")) return false;
 
     if(!c->execute) {
         RD_LOG_FAIL("command '%s' requires an executor", c->id);

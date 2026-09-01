@@ -19,7 +19,7 @@ RDGlobalState rd_i_state = {0};
 static void _rd_i_state_unload_modules(void) {
     RDModuleFull** m;
     vect_each(m, &rd_i_state.modules) {
-        if((*m)->destroy) (*m)->destroy();
+        if((*m)->descr->unload) (*m)->descr->unload();
         rd_i_module_destroy(*m);
     }
 
@@ -157,7 +157,7 @@ bool rd_module_load(const char* filepath) {
 
     if(m) {
         vect_push(&rd_i_state.modules, m);
-        m->create();
+        if(m->descr->load) m->descr->load();
         return true;
     }
 

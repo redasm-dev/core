@@ -1,7 +1,7 @@
 #pragma once
 
+#include <redasm/abi.h>
 #include <redasm/config.h>
-#include <redasm/level.h>
 
 typedef struct RDVersion {
     int major;

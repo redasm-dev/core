@@ -18,16 +18,10 @@ typedef HMODULE RDModuleHandle;
 typedef void* RDModuleHandle;
 #endif
 
-typedef void (*RDModuleCreate)(void);
-typedef void (*RDModuleDestroy)(void);
-typedef const char* (*RDModuleVersion)(void);
-
 typedef struct RDModuleFull {
     RDModule base;
-
     RDModuleHandle handle;
-    RDModuleCreate create;
-    RDModuleDestroy destroy;
+    const RDModuleDescriptor* descr;
 } RDModuleFull;
 
 RDModuleFull* rd_i_module_create(const char* filepath);
