@@ -16,7 +16,7 @@ static const void* _rd_module_sym(const RDModuleFull* self, const char* name) {
     FARPROC proc = GetProcAddress(self->handle, name);
     static_assert(sizeof(proc) == sizeof(void*), "pointer size mismatch");
     const void* out;
-    memcpy(&out, &proc, sizeof(proc));
+    memcpy(&out, &proc, sizeof(out));
     return out;
 #else
     return dlsym(self->handle, name); // POSIX guarantees data-pointer-safe
