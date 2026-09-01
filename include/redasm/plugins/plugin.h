@@ -31,7 +31,6 @@ typedef struct RDPluginSlice {
 
 typedef struct RDModule {
     const char* path;
-    const char* version;
 } RDModule;
 
 typedef struct RDModuleSlice {
@@ -52,4 +51,3 @@ RD_API const RDCommandPlugin* rd_command_find(const char* id);
 // Plugin entry points
 RD_API void rd_plugin_create(void);
 RD_API void rd_plugin_destroy(void);
-RD_API const char* rd_plugin_version(void);

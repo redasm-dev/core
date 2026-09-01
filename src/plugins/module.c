@@ -10,7 +10,6 @@
 
 #define RD_PLUGIN_CREATE "rd_plugin_create"
 #define RD_PLUGIN_DESTROY "rd_plugin_destroy"
-#define RD_PLUGIN_VERSION "rd_plugin_version"
 
 #if defined(_WIN32)
 typedef FARPROC RDModuleProc;
@@ -77,14 +76,6 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
 
     _rd_module_sym(self, RD_PLUGIN_DESTROY, (void*)&self->destroy);
 
-    RDModuleVersion module_ver;
-    _rd_module_sym(self, RD_PLUGIN_VERSION, (void*)&module_ver);
-
-    if(module_ver) self->base.version = rd_strdup(module_ver());
-
-    if(!self->base.version)
-        self->base.version = rd_strdup(RD_MODULE_VERSION_NONE);
-
     return self;
 
 fail:
@@ -103,7 +94,6 @@ void rd_i_module_destroy(RDModuleFull* self) {
 #endif
     }
 
-    rd_free((char*)self->base.version);
     rd_free((char*)self->base.path);
     rd_free(self);
 }
