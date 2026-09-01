@@ -45,7 +45,6 @@ typedef struct RDModuleDescriptor {
 
 typedef struct RDModule {
     const char* path;
-    u32 api_version;
 } RDModule;
 
 typedef struct RDModuleSlice {

@@ -74,8 +74,6 @@ RDModuleFull* rd_i_module_create(const char* filepath) {
         goto fail;
     }
 
-    // copy API Version to public interface
-    self->base.api_version = self->descr->api_version;
     return self;
 
 fail:
