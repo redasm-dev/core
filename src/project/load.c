@@ -11,7 +11,7 @@
 #include <tomlc17.h>
 
 typedef struct RDProjectManifest {
-    RDVersion version;
+    u32 api_version;
     const char* file_name;
 
     const RDLoaderPlugin* loaderplugin;
@@ -50,7 +50,7 @@ static const RDTomlSchema ANALYZER_SCHEMA[] = {
 };
 
 static const RDTomlSchema MANIFEST_SCHEMA[] = {
-    {.key = "format.version", .type = TOML_STRING},
+    {.key = "format.api_version", .type = TOML_INT64},
     {.key = "format.flags_compression", .type = TOML_STRING, .string_values = flags_compression_schema},
     {.key = "format.file_name", .type = TOML_STRING},
 
@@ -142,17 +142,14 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     if(!rd_i_toml_validate_schema(out->toml.toptab, MANIFEST_SCHEMA))
         return false;
 
-    const char* ver = toml_seek(out->toml.toptab, "format.version").u.s;
+    out->api_version =
+        (u32)toml_seek(out->toml.toptab, "format.api_version").u.int64;
 
-    if(!rd_version_parse(ver, &out->version)) {
-        RD_LOG_FAIL("invalid formatting for version '%s'", ver);
-        return false;
-    }
-
-    // NOTE: retain project compatibility between major?
-    if(out->version.major != rd_version().major) {
-        RD_LOG_FAIL("expected %s as project version, got %s",
-                    rd_version_string(), ver);
+    if(out->api_version != RD_API_VERSION) {
+        RD_LOG_FAIL("project built with API v%u.%u, this build is v%u.%u",
+                    RD_API_VERSION_MAJOR(out->api_version),
+                    RD_API_VERSION_MINOR(out->api_version), RD_VERSION_MAJOR,
+                    RD_VERSION_MINOR);
         return false;
     }
 
