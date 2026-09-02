@@ -385,6 +385,10 @@ bool rd_function_is_same(const RDFunction* self, const RDFunction* f) {
 
 RDGraph* rd_function_get_graph(const RDFunction* self) { return self->graph; }
 
+const RDTypeDef* rd_function_get_type(const RDFunction* self) {
+    return self->type_def;
+}
+
 RDAddress rd_function_get_address(const RDFunction* self) {
     return self->address;
 }

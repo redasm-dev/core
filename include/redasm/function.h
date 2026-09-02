@@ -2,6 +2,7 @@
 
 #include <redasm/config.h>
 #include <redasm/graph/graph.h>
+#include <redasm/types/def.h>
 
 typedef struct RDFunction RDFunction;
 
@@ -20,6 +21,7 @@ typedef struct RDFunctionChunk {
 
 RD_API bool rd_function_is_same(const RDFunction* self, const RDFunction* f);
 RD_API RDGraph* rd_function_get_graph(const RDFunction* self);
+RD_API const RDTypeDef* rd_function_get_type(const RDFunction* self);
 RD_API RDAddress rd_function_get_address(const RDFunction* self);
 RD_API usize rd_function_get_n_instructions(const RDFunction* self);
 RD_API const char* rd_function_generate_dot(const RDFunction* self);
