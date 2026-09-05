@@ -800,7 +800,19 @@ void rd_destroy(RDContext* self) {
     rd_free(self);
 }
 
-RDReader* rd_get_reader(const RDContext* self) { return self->reader; }
+RDReader* rd_get_reader(const RDContext* self) {
+    // initialize memory reader by seeking to the first address
+    if(!self->reader->buffer) {
+        const RDSegmentFullVect* segments = rd_i_db_get_segments(self);
+
+        if(!vect_is_empty(segments)) {
+            rd_reader_seek(self->reader,
+                           (*vect_first(segments))->base.start_address);
+        }
+    }
+
+    return self->reader;
+}
 
 RDReader* rd_get_input_reader(const RDContext* self) {
     return self->input_reader;
