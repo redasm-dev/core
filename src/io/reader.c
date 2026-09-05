@@ -177,6 +177,38 @@ bool rd_reader_read_be64(RDReader* self, u64* v) {
     return !self->error;
 }
 
+bool rd_reader_read_uleb128(RDReader* self, RDULeb128* v) {
+    if(v) *v = (RDULeb128){0};
+    if(self->error) return false;
+
+    RDULeb128 leb;
+
+    if(!rd_i_buffer_read_uleb128(self->buffer, self->position, &leb)) {
+        self->error = true;
+        return false;
+    }
+
+    self->position += leb.length;
+    if(v) *v = leb;
+    return true;
+}
+
+bool rd_reader_read_sleb128(RDReader* self, RDSLeb128* v) {
+    if(v) *v = (RDSLeb128){0};
+    if(self->error) return false;
+
+    RDSLeb128 leb;
+
+    if(!rd_i_buffer_read_sleb128(self->buffer, self->position, &leb)) {
+        self->error = true;
+        return false;
+    }
+
+    self->position += leb.length;
+    if(v) *v = leb;
+    return true;
+}
+
 const char* rd_reader_read_str(RDReader* self, usize* len) {
     if(self->error || self->position >= self->buffer->length) return NULL;
 
@@ -246,6 +278,20 @@ bool rd_reader_peek_be32(const RDReader* self, u32* v) {
 bool rd_reader_peek_be64(const RDReader* self, u64* v) {
     return !self->error && self->position < self->buffer->length &&
            rd_i_buffer_read_be64(self->buffer, self->position, v);
+}
+
+bool rd_reader_peek_uleb128(const RDReader* self, RDULeb128* v) {
+    if(v) *v = (RDULeb128){0};
+    if(self->error) return false;
+
+    return rd_i_buffer_read_uleb128(self->buffer, self->position, v);
+}
+
+bool rd_reader_peek_sleb128(const RDReader* self, RDSLeb128* v) {
+    if(v) *v = (RDSLeb128){0};
+    if(self->error) return false;
+
+    return rd_i_buffer_read_sleb128(self->buffer, self->position, v);
 }
 
 const char* rd_reader_peek_str(RDReader* self, usize* len) {

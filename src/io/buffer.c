@@ -5,6 +5,7 @@
 #include <string.h>
 
 #define RD_STR_BUF_MIN_CAPACITY 1024
+#define RD_LEB128_MAX_BYTES 10 // ceil(64 / 7)
 
 static inline RDByteBuffer* _rd_as_bytebuffer(RDBuffer* self) {
     return (RDByteBuffer*)self;
@@ -173,6 +174,61 @@ bool rd_i_buffer_expect_be32(const RDBuffer* self, usize idx, u32 v) {
 bool rd_i_buffer_expect_be64(const RDBuffer* self, usize idx, u64 v) {
     u64 r;
     return rd_i_buffer_read_be64(self, idx, &r) && r == v;
+}
+
+bool rd_i_buffer_read_uleb128(const RDBuffer* self, usize idx, RDULeb128* v) {
+    if(v) *v = (RDULeb128){0};
+
+    u64 res = 0;
+    unsigned shift = 0;
+
+    for(usize i = 0; i < RD_LEB128_MAX_BYTES; i++) {
+        u8 b;
+        if(self->read_bytes(self, idx + i, &b, 1) != 1) return false;
+
+        if(shift >= 64) {
+            if(b & 0x7F) return false;
+        }
+        else {
+            u64 bits = (u64)(b & 0x7F);
+            if(shift == 63 && bits > 1) return false;
+            res |= bits << shift;
+        }
+
+        if(!(b & 0x80)) {
+            if(v) *v = (RDULeb128){.value = res, .length = i + 1};
+            return true;
+        }
+
+        shift += 7;
+    }
+
+    return false;
+}
+
+bool rd_i_buffer_read_sleb128(const RDBuffer* self, usize idx, RDSLeb128* v) {
+    if(v) *v = (RDSLeb128){0};
+
+    u64 res = 0;
+    unsigned shift = 0;
+
+    for(usize i = 0; i < RD_LEB128_MAX_BYTES; i++) {
+        u8 b;
+        if(self->read_bytes(self, idx + i, &b, 1) != 1) return false;
+
+        if(shift < 64) res |= (u64)(b & 0x7F) << shift;
+        shift += 7;
+
+        if(!(b & 0x80)) {
+            // sign-extend from bit 6 of the terminating byte
+            if(shift < 64 && (b & 0x40)) res |= ~(u64)0 << shift;
+
+            if(v) *v = (RDSLeb128){.value = (i64)res, .length = i + 1};
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool rd_i_buffer_read_primitive(const RDBuffer* self, usize idx,

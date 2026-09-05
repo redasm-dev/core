@@ -43,6 +43,9 @@ bool rd_i_buffer_expect_be64(const RDBuffer* self, usize idx, u64 v);
 const char* rd_i_buffer_read_str(RDBuffer* self, usize idx, usize* len);
 usize rd_i_buffer_read(const RDBuffer* self, usize idx, void* ptr, usize n);
 
+bool rd_i_buffer_read_uleb128(const RDBuffer* self, usize idx, RDULeb128* v);
+bool rd_i_buffer_read_sleb128(const RDBuffer* self, usize idx, RDSLeb128* v);
+
 bool rd_i_buffer_read_primitive(const RDBuffer* self, usize idx,
                                 const char* name, bool big, u64* v);
 

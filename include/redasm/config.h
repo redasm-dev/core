@@ -63,3 +63,13 @@ typedef intptr_t iptr;
 
 typedef u64 RDAddress;
 typedef u64 RDOffset;
+
+typedef struct RDSLeb128 {
+    i64 value;
+    usize length;
+} RDSLeb128;
+
+typedef struct RDULeb128 {
+    u64 value;
+    usize length;
+} RDULeb128;
