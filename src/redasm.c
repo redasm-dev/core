@@ -116,6 +116,14 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
         RD_LOG_INFO("selected loader '%s' and processor '%s'",
                     res.context->loaderplugin->id,
                     res.context->processorplugin->id);
+
+        // initialize memory reader by seeking to the first address
+        const RDSegmentFullVect* segments = rd_i_db_get_segments(res.context);
+
+        if(!vect_is_empty(segments)) {
+            rd_reader_seek(res.context->reader,
+                           (*vect_first(segments))->base.start_address);
+        }
     }
     else {
         rd_destroy(res.context);
