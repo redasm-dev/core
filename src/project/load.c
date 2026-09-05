@@ -292,6 +292,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
     ctx->engine.step = RD_WS_DONE;
     rd_i_db_load(ctx);
+    rd_i_processor_setup(ctx);
 
     return ctx;
 

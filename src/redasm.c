@@ -112,6 +112,8 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     rd_i_set_processor(res.context, pplugin);
 
     if(res.context->loaderplugin->load(tr->loader, res.context)) {
+        rd_i_processor_setup(res.context);
+
         res.status = RD_ACCEPT_OK;
         RD_LOG_INFO("selected loader '%s' and processor '%s'",
                     res.context->loaderplugin->id,

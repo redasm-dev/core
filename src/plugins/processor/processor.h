@@ -12,6 +12,7 @@ typedef struct RDInstructionVect {
 
 RDProcessor* rd_i_processor_create(const RDProcessorPlugin* plugin);
 void rd_i_processor_destroy(const RDProcessorPlugin* plugin, RDProcessor* p);
+void rd_i_processor_setup(RDContext* self);
 
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
                                    int idx, RDProcessor* p);

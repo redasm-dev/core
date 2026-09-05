@@ -26,6 +26,11 @@ void rd_i_processor_destroy(const RDProcessorPlugin* plugin, RDProcessor* p) {
     if(!plugin->create && plugin->instance_size) rd_free(p);
 }
 
+void rd_i_processor_setup(RDContext* self) {
+    if(self->processorplugin->setup)
+        self->processorplugin->setup(self, self->processor);
+}
+
 bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
                                    int idx, RDProcessor* p) {
     RD_UNUSED(p);
