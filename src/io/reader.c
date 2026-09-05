@@ -97,15 +97,28 @@ bool rd_reader_at_end(const RDReader* self) {
     return self->error || self->position >= self->buffer->length;
 }
 
-bool rd_reader_read(RDReader* self, void* v, usize n) {
-    if(!self->error && self->position < self->buffer->length &&
-       rd_i_buffer_read(self->buffer, self->position, v, n)) {
-        self->position += n;
-        return true;
+usize rd_reader_read(RDReader* self, void* v, usize n) {
+    if(self->error || !n) return 0;
+
+    usize r = rd_i_buffer_read(self->buffer, self->position, v, n);
+    self->position += r;
+    return r;
+}
+
+bool rd_reader_read_exact(RDReader* self, void* v, usize n) {
+    if(self->error) return false;
+    if(!n) return true;
+
+    usize r = rd_i_buffer_read(self->buffer, self->position, v, n);
+
+    if(r != n) {
+        memset(v, 0, n);
+        self->error = true;
+        return false;
     }
 
-    self->error = true;
-    return false;
+    self->position += r;
+    return true;
 }
 
 bool rd_reader_read_byte(RDReader* self, u8* v) {
@@ -178,6 +191,26 @@ const char* rd_reader_read_str(RDReader* self, usize* len) {
         self->error = true;
 
     return s;
+}
+
+usize rd_reader_peek(RDReader* self, void* v, usize n) {
+    if(self->error || !n) return 0;
+    return rd_i_buffer_read(self->buffer, self->position, v, n);
+}
+
+bool rd_reader_peek_exact(RDReader* self, void* v, usize n) {
+    if(self->error) return false;
+    if(!n) return true;
+
+    usize r = rd_i_buffer_read(self->buffer, self->position, v, n);
+
+    if(r != n) {
+        memset(v, 0, n);
+        self->error = true;
+        return false;
+    }
+
+    return true;
 }
 
 bool rd_reader_peek_byte(const RDReader* self, u8* v) {

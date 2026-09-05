@@ -1,4 +1,4 @@
-#include "hash.h"
+#include "murmur3.h"
 
 #define MURMUR3_C1 (u32)(0xcc9e2d51)
 #define MURMUR3_C2 (u32)(0x1b873593)

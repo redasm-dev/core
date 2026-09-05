@@ -1,6 +1,7 @@
 #include "buffer.h"
 #include "support/containers.h"
 #include <redasm/allocator.h>
+#include <redasm/support/byteorder.h>
 #include <string.h>
 
 #define RD_STR_BUF_MIN_CAPACITY 1024
@@ -100,64 +101,42 @@ bool rd_i_buffer_read_byte(const RDBuffer* self, usize idx, u8* v) {
 bool rd_i_buffer_read_le16(const RDBuffer* self, usize idx, u16* v) {
     u8 b[sizeof(u16)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v) *v = (u16)(((u16)b[0] << 0) | ((u16)b[1] << 8));
+    if(v) *v = rd_loadle16(b);
     return true;
 }
 
 bool rd_i_buffer_read_le32(const RDBuffer* self, usize idx, u32* v) {
     u8 b[sizeof(u32)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v) {
-        *v = ((u32)b[0] << 0) | ((u32)b[1] << 8) | ((u32)b[2] << 16) |
-             ((u32)b[3] << 24);
-    }
-
+    if(v) *v = rd_loadle32(b);
     return true;
 }
 
 bool rd_i_buffer_read_le64(const RDBuffer* self, usize idx, u64* v) {
     u8 b[sizeof(u64)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v) {
-        *v = ((u64)b[0] << 0) | ((u64)b[1] << 8) | ((u64)b[2] << 16) |
-             ((u64)b[3] << 24) | ((u64)b[4] << 32) | ((u64)b[5] << 40) |
-             ((u64)b[6] << 48) | ((u64)b[7] << 56);
-    }
-
+    if(v) *v = rd_loadle64(b);
     return true;
 }
 
 bool rd_i_buffer_read_be16(const RDBuffer* self, usize idx, u16* v) {
     u8 b[sizeof(u16)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v) *v = (u16)(((u16)b[0] << 8) | ((u16)b[1] << 0));
+    if(v) *v = rd_loadbe16(b);
     return true;
 }
 
 bool rd_i_buffer_read_be32(const RDBuffer* self, usize idx, u32* v) {
     u8 b[sizeof(u32)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v)
-        *v = ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) |
-             ((u32)b[3] << 0);
-
+    if(v) *v = rd_loadbe32(b);
     return true;
 }
 
 bool rd_i_buffer_read_be64(const RDBuffer* self, usize idx, u64* v) {
     u8 b[sizeof(u64)];
     if(self->read_bytes(self, idx, b, sizeof(b)) != sizeof(b)) return false;
-
-    if(v)
-        *v = ((u64)b[0] << 56) | ((u64)b[1] << 48) | ((u64)b[2] << 40) |
-             ((u64)b[3] << 32) | ((u64)b[4] << 24) | ((u64)b[5] << 16) |
-             ((u64)b[6] << 8) | ((u64)b[7] << 0);
-
+    if(v) *v = rd_loadbe64(b);
     return true;
 }
 
@@ -245,63 +224,43 @@ bool rd_i_buffer_write_u8(RDBuffer* self, usize idx, u8 v) {
 }
 
 bool rd_i_buffer_write_le16(RDBuffer* self, usize idx, u16 v) {
-    u8 b[sizeof(u16)] = {(u8)(v >> 0), (u8)(v >> 8)};
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u16)];
+    rd_storele16(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_le32(RDBuffer* self, usize idx, u32 v) {
-    u8 b[sizeof(u32)] = {
-        (u8)(v >> 0),
-        (u8)(v >> 8),
-        (u8)(v >> 16),
-        (u8)(v >> 24),
-    };
-
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u32)];
+    rd_storele32(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_le64(RDBuffer* self, usize idx, u64 v) {
-    u8 b[sizeof(u64)] = {
-        (u8)(v >> 0),  (u8)(v >> 8),  (u8)(v >> 16), (u8)(v >> 24),
-        (u8)(v >> 32), (u8)(v >> 40), (u8)(v >> 48), (u8)(v >> 56),
-    };
-
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u64)];
+    rd_storele64(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be16(RDBuffer* self, usize idx, u16 v) {
-    u8 b[sizeof(u16)] = {(u8)(v >> 8), (u8)(v >> 0)};
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u16)];
+    rd_storebe16(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be32(RDBuffer* self, usize idx, u32 v) {
-    u8 b[sizeof(u32)] = {
-        (u8)(v >> 24),
-        (u8)(v >> 16),
-        (u8)(v >> 8),
-        (u8)(v >> 0),
-    };
-
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u32)];
+    rd_storebe32(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }
 
 bool rd_i_buffer_write_be64(RDBuffer* self, usize idx, u64 v) {
-    u8 b[sizeof(u64)] = {
-        (u8)(v >> 56), (u8)(v >> 48), (u8)(v >> 40), (u8)(v >> 32),
-        (u8)(v >> 24), (u8)(v >> 16), (u8)(v >> 8),  (u8)(v >> 0),
-    };
-
-    if(idx + sizeof(b) > self->length) return false;
-
+    u8 b[sizeof(u64)];
+    rd_storebe64(b, v);
+    if(self->length < sizeof(b) || idx > self->length - sizeof(b)) return false;
     return self->write_bytes(self, idx, b, sizeof(b)) == sizeof(b);
 }

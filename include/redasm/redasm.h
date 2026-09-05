@@ -19,6 +19,8 @@
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
+#include <redasm/support/byteorder.h>
+#include <redasm/support/hash.h>
 #include <redasm/support/lexer.h>
 #include <redasm/support/logging.h>
 #include <redasm/support/scratch.h>

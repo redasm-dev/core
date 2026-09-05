@@ -1,6 +1,6 @@
 #include "graph.h"
 #include "support/containers.h"
-#include "support/hash.h"
+#include "support/hash/murmur3.h"
 #include <redasm/allocator.h>
 #include <redasm/support/logging.h>
 #include <redasm/support/utils.h>

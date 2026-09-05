@@ -56,10 +56,12 @@ target_sources(${PROJECT_NAME}
         src/rdil/opcodes.c
         src/rdil/rdil.c
         src/rdil/renderer.c
-        src/support/byteorder.c
         src/support/containers.c
         src/support/error.c
-        src/support/hash.c
+        src/support/hash/adler32.c
+        src/support/hash/hash.c
+        src/support/hash/murmur3.c
+        src/support/hash/sha1.c
         src/support/lexer.c
         src/support/logging.c
         src/support/scratch.c

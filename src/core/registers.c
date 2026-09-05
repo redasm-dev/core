@@ -1,7 +1,7 @@
 #include "registers.h"
 #include "core/context.h"
 #include "support/containers.h"
-#include "support/hash.h"
+#include "support/hash/murmur3.h"
 
 static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
     RDQueryReg q = {.kind = RD_QUERY_REG_BY_ID, .id = id};

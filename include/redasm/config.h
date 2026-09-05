@@ -37,6 +37,12 @@
 #define RD_MSVC_CHECK
 #endif
 
+#if defined(__cplusplus)
+#define RD_CAST(T, x) static_cast<T>(x)
+#else
+#define RD_CAST(T, x) ((T)(x))
+#endif
+
 // NOLINTBEGIN
 typedef uint8_t u8;
 typedef uint16_t u16;
