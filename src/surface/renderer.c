@@ -12,6 +12,14 @@
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
 #define RD_SURFACE_ROW_INITIAL_SIZE 1024
 
+static bool _rd_renderer_can_autoname(const RDSegmentFull* seg, usize idx) {
+    return rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
+           rd_flagsbuffer_has_type(seg->flags, idx) ||
+           rd_flagsbuffer_has_func(seg->flags, idx) ||
+           rd_flagsbuffer_has_field(seg->flags, idx) ||
+           rd_flagsbuffer_has_item(seg->flags, idx);
+}
+
 static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
                                         int row, int col) {
     if(row >= (int)vect_length(rows)) return NULL;
@@ -459,10 +467,7 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
             if(seg) {
                 usize idx = rd_i_address2index(seg, address);
 
-                // auto-generated name with inbound refs/types/functions
-                if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
-                   rd_flagsbuffer_has_type(seg->flags, idx) ||
-                   rd_flagsbuffer_has_func(seg->flags, idx))
+                if(_rd_renderer_can_autoname(seg, idx))
                     hasname = rd_i_get_name(self->context, address, true, &n);
             }
         }

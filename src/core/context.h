@@ -53,6 +53,7 @@ typedef struct RDContext {
     RDXRefVect und_xrefs;
 
     RDCharVect autoname_buf;
+    RDCharVect nameaddr_buf;
     RDCharVect name_buf;
     RDCharVect str_buf;
     RDCharVect sym_buf;
@@ -132,6 +133,8 @@ void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* plugin);
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);
+bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
+                      RDName* n, RDCharVect* buf);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c);
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
