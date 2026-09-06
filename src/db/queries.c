@@ -535,7 +535,6 @@ bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address) {
 
 bool _rd_i_db_query_get_address(RDContext* ctx, const char* name,
                                 RDAddress* address) {
-    assert(address && "address is NULL");
     assert(name && "name is NULL");
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ADDRESS, "\
@@ -547,7 +546,7 @@ bool _rd_i_db_query_get_address(RDContext* ctx, const char* name,
     _rd_db_bind_param_str(ctx, stmt, ":name", name);
 
     if(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        *address = (RDAddress)sqlite3_column_int64(stmt, 0);
+        if(address) *address = (RDAddress)sqlite3_column_int64(stmt, 0);
         return true;
     }
 
