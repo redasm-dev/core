@@ -3,6 +3,7 @@
 #include "db/types.h"
 #include "plugins/processor/processor.h"
 #include "support/utils.h"
+#include "surface/layout.h"
 #include "surface/row.h"
 #include <redasm/config.h>
 #include <redasm/surface/common.h>
@@ -23,6 +24,7 @@ typedef struct RDRenderer {
     RDCharVect type_buf;
     RDXRefVect xrefs;
     RDInstructionVect instr_buf;
+    RDRowDescVect layout_buf;
     char* hl_word;
 } RDRenderer;
 

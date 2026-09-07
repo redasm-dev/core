@@ -1,69 +1,7 @@
 #include "row.h"
 #include "core/context.h"
-#include "io/flagsbuffer.h"
 #include "support/error.h"
-#include "surface/items.h"
 #include <inttypes.h>
-
-static usize _rd_row_code_last_sub_line(const RDSegmentFull* seg, usize idx) {
-    usize last = rd_i_row_code_instr_sub_line(seg, idx);
-    if(rd_flagsbuffer_has_noret(seg->flags, idx)) last++;
-    return last;
-}
-
-// mirror of _rd_render_item_unknown's slot layout, keep in lockstep
-static usize _rd_row_unknown_last_sub_line(const RDSegmentFull* seg,
-                                           usize idx) {
-    return (rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
-            rd_flagsbuffer_has_name(seg->flags, idx))
-               ? 1
-               : 0;
-}
-
-/*
- * The CODE slot layout, single source of truth
- * mirror of _rd_render_item_code, keep in lockstep.
- *
- *  Consumers: the renderer's dispatch, backward stepping (below), and the
- *             jump-arrow builder (path.c), which needs to target the
- *             instruction row specifically.
- */
-usize rd_i_row_code_instr_sub_line(const RDSegmentFull* seg, usize idx) {
-    return (rd_flagsbuffer_has_func(seg->flags, idx) ||
-            rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
-               ? 1
-               : 0;
-}
-
-/*
- * The last row ordinal at a DATA head, counted by the SAME function the
- * forward dispatch uses to render them (rd_i_data_chain_row): the last
- * link that exists, shifted by one when a banner occupies row 0. Never
- * derive this from a raw resolver depth.
- * Row ordinals and schema depths are different quantities (a field reached
- * through an outer member at a nonzero offset is row 0 at its own head, yet
- * sits at depth >= 1).
- */
-usize rd_i_row_data_last_sub_line(RDContext* ctx, const RDSegmentFull* seg,
-                                  usize idx) {
-    RDDataHead head;
-    rd_i_data_head_get(ctx, seg, idx, &head);
-
-    // a banner over a solid root is the whole rendering: one row
-    if(head.has_banner && !rd_i_type_has_more(&head.root)) return 0;
-
-    usize first = head.has_banner ? 1 : 0; // the banner occupies row 0
-
-    RDResolveResult res;
-    bool ok = rd_i_data_chain_row(ctx, &head, 0, &res);
-    panic_if(!ok, "unresolvable data head @ %s+%zx", seg->base.name, idx);
-
-    usize last = first; // chain[0] always exists past this point
-    while(rd_i_data_chain_row(ctx, &head, (last - first) + 1, &res))
-        last++;
-
-    return last;
-}
 
 void rd_i_rowvect_destroy(RDRowVect* self) {
     RDRow* row;
@@ -97,28 +35,19 @@ void rd_i_row_push(RDRow* self, u32 cp, RDThemeKind fg, RDThemeKind bg) {
     vect_push(&self->data, self->curr_data);
 }
 
-bool rd_i_row_step_back(RDContext* ctx, const RDSegmentFull** seg,
+bool rd_i_row_step_back(RDContext* ctx, RDRenderFlags flags,
+                        RDRowDescVect* scratch, const RDSegmentFull** seg,
                         usize* seg_idx, usize* idx, usize* sub_line) {
     const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
-    // (1) already sitting past the segment row's own slot?
-    // just go one sub_line shallower, same address, no flags touched at all.
-    if(*sub_line != RD_SUB_LINE_NONE && *sub_line > 0) {
+    // (1) not at the item's first row: just go shallower.
+    if(*sub_line > 0) {
         (*sub_line)--;
         return true;
     }
 
-    // (2) at sub_line 0 of this address
-    // one more step back is the segment row itself, IF this address owns one.
-    // Same idx, sentinel.
-    if(*sub_line == 0 && *idx == 0) {
-        *sub_line = RD_SUB_LINE_NONE;
-        return true;
-    }
-
-    // (3) either already at the segment row (RD_SUB_LINE_NONE), or this
-    // address never had one, genuinely cross to a new address.
-    if((*idx) == 0) {
+    // (2) cross to the previous head.
+    if(*idx == 0) {
         if(*seg_idx == 0) return false;
 
         (*seg_idx)--;
@@ -140,23 +69,8 @@ bool rd_i_row_step_back(RDContext* ctx, const RDSegmentFull** seg,
                  "item spans segment boundary");
     }
 
-    usize before = 0, after = 0;
-    if(rd_i_flagsbuffer_has_comment((*seg)->flags, *idx)) {
-        RDAddress addr = (*seg)->base.start_address + *idx;
-        before = rd_i_db_get_comment_count(ctx, addr, RD_COMMENT_BEFORE);
-        after = rd_i_db_get_comment_count(ctx, addr, RD_COMMENT_AFTER);
-    }
-
-    // clang-format off
-    if(rd_flagsbuffer_has_code((*seg)->flags, *idx))
-        *sub_line = before + _rd_row_code_last_sub_line(*seg, *idx) + after;
-    else if(rd_flagsbuffer_has_unknown((*seg)->flags, *idx))
-        *sub_line = before + _rd_row_unknown_last_sub_line(*seg, *idx) + after;
-    else if(rd_flagsbuffer_has_data((*seg)->flags, *idx))
-        *sub_line = before + rd_i_row_data_last_sub_line(ctx, *seg, *idx) + after;
-    else
-        unreachable();
-    // clang-format on
-
+    // (3) land on that head's last row.
+    rd_i_item_layout(ctx, flags, *seg, *idx, scratch);
+    *sub_line = vect_length(scratch) - 1;
     return true;
 }

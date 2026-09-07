@@ -3,6 +3,7 @@
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
+#include "surface/layout.h"
 #include <ctype.h>
 #include <inttypes.h>
 
@@ -58,6 +59,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     if(!strcmp(t->def->name, "char") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
         usize i = 0;
+
         for(; i < t->count - 1; i++) {
             u8 v;
 
@@ -71,6 +73,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             rd_renderer_text(r, rd_i_escape_char((char)v, true),
                              RD_THEME_STRING, RD_THEME_BACKGROUND);
         }
+
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
 
         if(term) { // render string terminator
@@ -88,12 +91,14 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             else
                 rd_renderer_muted(r, "?");
         }
+
         return;
     }
 
     // char16 array - render as string
     if(!strcmp(t->def->name, "char16") && t->count > 0) {
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
+
         for(usize i = 0; i < t->count; i++) {
             bool ok = false;
             u16 v;
@@ -113,11 +118,14 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             rd_renderer_text(r, rd_i_escape_char16(v, true), RD_THEME_STRING,
                              RD_THEME_BACKGROUND);
         }
+
         rd_renderer_text(r, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
+
         if(term) {
             rd_renderer_norm(r, ",");
             rd_renderer_num(r, 0, 10, 0, RD_NUM_DEFAULT);
         }
+
         return;
     }
 
@@ -125,11 +133,13 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
     if(!strcmp(t->def->name, "char")) {
         u8 v;
         rd_renderer_norm(r, "'");
+
         if(rd_i_buffer_read_byte(flags, idx, &v))
             rd_renderer_text(r, rd_i_escape_char((char)v, false),
                              RD_THEME_STRING, RD_THEME_BACKGROUND);
         else
             rd_renderer_muted(r, "?");
+
         rd_renderer_norm(r, "'");
         return;
     }
@@ -160,6 +170,12 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             (unsigned int)rd_i_size_of(r->context, t->def->name, 0, t->mod);
         panic_if(!sz, "type '%s' has unresolved size", t->def->name);
 
+        /*
+         * FIXME: a pointer-sized integer is not necessarily a pointer.
+         * DEX index fields (class_idx, proto_idx, name_idx) resolve to
+         * unrelated addresses purely because their width matches. The
+         * evidence should be an outgoing RD_DR_ADDRESS xref, not the size.
+         */
         if(sz == PTR_SIZE)
             rd_renderer_loc(r, (RDAddress)v, sz * 2, RD_NUM_DEFAULT);
         else
@@ -246,42 +262,40 @@ static void _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
     }
 }
 
-static void _rd_render_comment_item(RDRenderer* r, const RDSegmentFull* seg,
-                                    usize idx, usize sub_line,
-                                    const char* comment, usize indent) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
+static void _rd_render_segment_row(RDRenderer* r, const RDSegmentFull* seg,
+                                   usize idx, usize sub_line) {
+    const RDProcessorPlugin* p = r->context->processorplugin;
+    rd_i_renderer_new_row(r, seg, idx, sub_line, 0);
 
+    if(p->render_segment) {
+        p->render_segment(r, (const RDSegment*)seg, r->context->processor);
+        return;
+    }
+
+    const unsigned int INT_SIZE = rd_get_ptr_size(r->context);
+    const unsigned int F = INT_SIZE * 2;
+
+    rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, " (start: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+    rd_renderer_num(r, (i64)seg->base.start_address, 16, F, RD_NUM_NOADDR);
+    rd_renderer_text(r, ", end: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+    rd_renderer_num(r, (i64)seg->base.end_address, 16, F, RD_NUM_NOADDR);
+    rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+}
+
+static void _rd_render_comment_row(RDRenderer* r, const RDSegmentFull* seg,
+                                   usize idx, usize sub_line,
+                                   const char* comment, usize indent) {
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
-    if(!comment || !(*comment)) return; // it's just an empty line
+    if(!comment || !(*comment)) return; // just an empty line
 
     rd_renderer_text(r, "; ", RD_THEME_MUTED, RD_THEME_BACKGROUND);
     rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
-static bool _rd_render_comment_line(RDRenderer* r, const RDSegmentFull* seg,
-                                    usize idx, usize sub_line, usize local_line,
-                                    RDCommentPlacement p, usize* out_n) {
-    if(out_n) *out_n = 0;
-
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return false;
-    if(!rd_i_flagsbuffer_has_comment(seg->flags, idx)) return false;
-
-    RDAddress address = seg->base.start_address + idx;
-    usize n = rd_i_db_get_comment_count(r->context, address, p);
-    if(out_n) *out_n = n;
-
-    if(local_line < n) {
-        const char* text =
-            rd_i_db_get_comment(r->context, address, p, local_line);
-        _rd_render_comment_item(r, seg, idx, sub_line, text, 0);
-        return true;
-    }
-
-    return false;
-}
-
-static void _rd_render_label_item(RDRenderer* r, const RDSegmentFull* seg,
-                                  usize idx, usize sub_line) {
+static void _rd_render_label_row(RDRenderer* r, const RDSegmentFull* seg,
+                                 usize idx, usize sub_line) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 6);
 
     RDName n;
@@ -292,10 +306,8 @@ static void _rd_render_label_item(RDRenderer* r, const RDSegmentFull* seg,
     rd_renderer_text(r, ":", RD_THEME_LOCATION, RD_THEME_BACKGROUND);
 }
 
-static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
-                                     usize idx, usize sub_line) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_FUNCTION)) return;
-
+static void _rd_render_function_row(RDRenderer* r, const RDSegmentFull* seg,
+                                    usize idx, usize sub_line) {
     const RDProcessorPlugin* p = r->context->processorplugin;
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 4);
 
@@ -344,9 +356,11 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
             const RDParam* arg;
             vect_each(arg, &f_type->args.value) {
                 assert(arg->name);
-                if(arg != vect_first(&f_type->args.value))
+
+                if(arg != vect_first(&f_type->args.value)) {
                     rd_renderer_text(r, ",", RD_THEME_FUNCTION,
                                      RD_THEME_BACKGROUND);
+                }
 
                 rd_renderer_text(r, rd_i_type_to_str(&arg->type, &r->type_buf),
                                  RD_THEME_FUNCTION, RD_THEME_BACKGROUND);
@@ -360,8 +374,8 @@ static void _rd_render_function_item(RDRenderer* r, const RDSegmentFull* seg,
     }
 }
 
-static void _rd_render_instruction_item(RDRenderer* r, const RDSegmentFull* seg,
-                                        usize idx, usize sub_line) {
+static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
+                                       usize idx, usize sub_line) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
 
     switch(r->mode) {
@@ -374,14 +388,45 @@ static void _rd_render_instruction_item(RDRenderer* r, const RDSegmentFull* seg,
     _rd_render_comment_inline(r, address);
 }
 
+static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
+                                   usize idx, usize sub_line, usize len) {
+    rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+
+    usize lead = (seg->base.start_address + idx) % RD_SURFACE_HEX_LINE;
+    if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
+
+    for(usize i = 0; i < len; i++) {
+        u8 v;
+
+        if(rd_flagsbuffer_get_value(seg->flags, idx + i, &v))
+            rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
+        else
+            rd_renderer_muted(r, "??");
+
+        rd_renderer_ws(r, 1);
+    }
+
+    if(lead + len < RD_SURFACE_HEX_LINE)
+        rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - lead - len) * 3);
+
+    if(lead) rd_renderer_ws(r, lead); // ascii column: 1 char per byte
+
+    for(usize i = 0; i < len; i++) {
+        char ptr[2] = {0};
+
+        if(rd_flagsbuffer_get_value(seg->flags, idx + i, (u8*)&ptr))
+            rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
+        else
+            rd_renderer_muted(r, "?");
+    }
+
+    if(lead + len < RD_SURFACE_HEX_LINE)
+        rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - len);
+}
+
 static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
                                 usize idx, usize sub_line, bool is_banner,
                                 const RDResolveResult* res) {
-    // indentation is a schema property (depth), not a row ordinal: the
-    // same field indents identically whether reached from its root's
-    // address or its own (first.x under the root, first.y at its own
-    // head: both depth 1, both at the same column).
-    // The banner sits one level above depth 0
     usize indent = is_banner ? 8 : 8 + ((res->depth + 1) * 2);
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
@@ -397,9 +442,6 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
     const RDTypeDef* tdef = t.def;
     assert(tdef);
 
-    // an unnamed result that crossed an array IS the element: show [n].
-    // Named members never show the index - the index belongs to the
-    // element's own row, wherever that renders
     bool is_element = res->item_idx.has_value && !name;
     bool skip_type_name = (is_element && tdef->kind == RD_TKIND_PRIM) ||
                           tdef->kind == RD_TKIND_FUNC;
@@ -457,366 +499,91 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         rd_renderer_norm(r, "]");
     }
 
-    // 6. value
-    // (only for primitives, functions and pointers, not compound heads)
+    // 6. value (primitives, functions and pointers only, not compound heads)
     if(tdef->kind == RD_TKIND_PRIM || tdef->kind == RD_TKIND_FUNC ||
        rd_type_is_ptr(&res->field.type)) {
         rd_renderer_ws(r, 1);
         rd_renderer_norm(r, "=");
         rd_renderer_ws(r, 1);
-        _rd_render_value(r, address, &t, true);
+
+        RDTypeFull tf = {.base = t};
+        _rd_render_value(r, address, &tf.base, true);
     }
 
     _rd_render_comment_inline(r, address);
 }
 
-static RDRenderItemResult _rd_render_item_unknown(RDRenderer* r,
-                                                  const RDSegmentFull* seg,
-                                                  usize idx, usize sub_line) {
-    usize curridx = idx;
+void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
+                     usize sub_line, const RDRowDesc* d) {
+    usize before = vect_length(&r->rows_back);
 
-    // walk forward once to get the chunk's real width, needed by
-    // every row at this idx, not just the hex-dump one
-    while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
-        if(!rd_flagsbuffer_has_unknown(seg->flags, curridx)) break;
-        if(curridx != idx && rd_i_is_hexchunk_head(seg, curridx)) break;
-        curridx++;
-    }
+    switch(d->kind) {
+        case RD_ROWKIND_SEGMENT:
+            _rd_render_segment_row(r, seg, idx, sub_line);
+            break;
 
-    usize before, item_len = curridx - idx;
+        case RD_ROWKIND_COMMENT_BEFORE:
+        case RD_ROWKIND_COMMENT_AFTER: {
+            RDAddress address = seg->base.start_address + idx;
 
-    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
-                               RD_COMMENT_BEFORE, &before)) {
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = item_len,
-        };
-    }
+            RDCommentPlacement p = (d->kind == RD_ROWKIND_COMMENT_BEFORE)
+                                       ? RD_COMMENT_BEFORE
+                                       : RD_COMMENT_AFTER;
 
-    usize slot = before;
+            const char* text =
+                rd_i_db_get_comment(r->context, address, p, d->comment_idx);
 
-    if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
-       rd_flagsbuffer_has_name(seg->flags, idx)) {
-        if(sub_line == slot) {
-            _rd_render_label_item(r, seg, idx, sub_line);
-            return (RDRenderItemResult){.status = RD_ROW_OK,
-                                        .length = item_len};
+            _rd_render_comment_row(r, seg, idx, sub_line, text, 0);
+            break;
         }
 
-        slot++;
+        case RD_ROWKIND_FUNCTION:
+            _rd_render_function_row(r, seg, idx, sub_line);
+            break;
+
+        case RD_ROWKIND_LABEL:
+            _rd_render_label_row(r, seg, idx, sub_line);
+            break;
+
+        case RD_ROWKIND_INSTRUCTION:
+            _rd_render_instruction_row(r, seg, idx, sub_line);
+            break;
+
+        case RD_ROWKIND_NORET:
+            _rd_render_comment_row(r, seg, idx, sub_line, "does not return", 8);
+            break;
+
+        case RD_ROWKIND_HEXDUMP:
+            _rd_render_hexdump_row(r, seg, idx, sub_line, d->length);
+            break;
+
+        case RD_ROWKIND_DATA_BANNER:
+        case RD_ROWKIND_DATA_LINK:
+            _rd_render_data_row(r, seg, idx, sub_line,
+                                d->kind == RD_ROWKIND_DATA_BANNER, &d->resolve);
+            break;
+
+        default: unreachable();
     }
 
-    if(sub_line == slot) {
-        rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+    panic_if(vect_length(&r->rows_back) != before + 1,
+             "row body for kind %d emitted %zu rows, expected 1", d->kind,
+             vect_length(&r->rows_back) - before);
 
-        usize lead = (seg->base.start_address + idx) % RD_SURFACE_HEX_LINE;
-        if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
-
-        // hex part
-        for(usize i = 0; i < item_len; i++) {
-            u8 v;
-            if(rd_flagsbuffer_get_value(seg->flags, idx + i, &v))
-                rd_renderer_norm(r, rd_i_to_hex(v, sizeof(u8)));
-            else
-                rd_renderer_muted(r, "??");
-            rd_renderer_ws(r, 1);
-        }
-
-        if(lead + item_len < RD_SURFACE_HEX_LINE)
-            rd_renderer_ws(r, (RD_SURFACE_HEX_LINE - lead - item_len) * 3);
-
-        curridx = idx;
-
-        if(lead) rd_renderer_ws(r, lead); // ascii column: 1 char per byte
-
-        // ascii part
-        for(usize i = 0; i < item_len; i++) {
-            char ptr[2] = {0};
-            if(rd_flagsbuffer_get_value(seg->flags, idx + i, (u8*)&ptr))
-                rd_renderer_norm(r, isprint(*ptr) ? ptr : ".");
-            else
-                rd_renderer_muted(r, "?");
-        }
-
-        if(lead + item_len < RD_SURFACE_HEX_LINE)
-            rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - item_len);
-
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = item_len,
-        };
-    }
-
-    slot++;
-
-    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line - slot,
-                               RD_COMMENT_AFTER, NULL)) {
-        return (RDRenderItemResult){.status = RD_ROW_OK, .length = item_len};
-    }
-
-    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+    vect_last(&r->rows_back)->kind = d->kind;
 }
 
-static RDRenderItemResult _rd_render_item_data(RDRenderer* r,
-                                               const RDSegmentFull* seg,
-                                               usize idx, usize sub_line) {
-    RDDataHead head;
-    rd_i_data_head_get(r->context, seg, idx, &head);
-    usize whole_len = rd_type_size(&head.root, r->context);
+void rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg, usize idx,
+                      usize sub_line) {
+    rd_i_item_layout(r->context, r->flags, seg, idx, &r->layout_buf);
+    if(sub_line >= vect_length(&r->layout_buf)) return;
 
-    usize before;
-    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
-                               RD_COMMENT_BEFORE, &before))
-        return (RDRenderItemResult){.status = RD_ROW_OK, .length = whole_len};
-
-    usize inner_last = rd_i_row_data_last_sub_line(r->context, seg, idx);
-
-    if(sub_line <= before + inner_last) {
-        RDResolveResult res = {0};
-        bool is_head = head.has_banner && sub_line == before;
-        bool ok;
-
-        if(is_head) {
-            res.field = (RDParam){.type = head.root, .name = NULL};
-            ok = true;
-        }
-        else if(head.has_banner && !rd_i_type_has_more(&head.root)) {
-            ok = false; // solid root: the banner was the whole rendering
-        }
-        else {
-            usize link =
-                head.has_banner ? (sub_line - before - 1) : (sub_line - before);
-            ok = rd_i_data_chain_row(r->context, &head, link, &res);
-        }
-
-        if(!ok) return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
-
-        // string-like types (aka char[n], char16[n] ...) are not expanded
-        // but rendered as a single line + terminator
-        if(!is_head && sub_line > before && rd_type_is_string(&head.root))
-            return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
-
-        _rd_render_data_row(r, seg, idx, sub_line, is_head, &res);
-
-        // the deepest chain entity is the narrowest:
-        // on EXHAUSTED the fill loop advances by the LAST OK row's length,
-        // which is exactly the step from this head to the next one
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = rd_type_size(&res.field.type, r->context),
-        };
-    }
-
-    // after-range: re-resolve the LAST real row, ordinary known-valid call,
-    // to get its correct length for the after-comment's .length
-    usize last_link = head.has_banner ? (inner_last - 1) : inner_last;
-    RDResolveResult last_res;
-    rd_i_data_chain_row(r->context, &head, last_link, &last_res);
-    usize after_len = rd_type_size(&last_res.field.type, r->context);
-
-    if(_rd_render_comment_line(r, seg, idx, sub_line,
-                               sub_line - (before + inner_last + 1),
-                               RD_COMMENT_AFTER, NULL)) {
-        return (RDRenderItemResult){.status = RD_ROW_OK, .length = after_len};
-    }
-
-    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
+    rd_i_render_row(r, seg, idx, sub_line, vect_at(&r->layout_buf, sub_line));
 }
 
-static RDRenderItemResult _rd_render_item_code(RDRenderer* r,
-                                               const RDSegmentFull* seg,
-                                               usize idx, usize sub_line) {
-    usize item_len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
-    usize before;
+void rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg, usize idx) {
+    rd_i_item_layout(r->context, r->flags, seg, idx, &r->layout_buf);
 
-    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line,
-                               RD_COMMENT_BEFORE, &before)) {
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = item_len,
-        };
-    }
-
-    usize slot = before;
-
-    if(rd_flagsbuffer_has_func(seg->flags, idx)) {
-        if(sub_line == slot) {
-            _rd_render_function_item(r, seg, idx, sub_line);
-
-            return (RDRenderItemResult){
-                .status = RD_ROW_OK,
-                .length = item_len,
-            };
-        }
-        slot++;
-    }
-    else if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx)) {
-        if(sub_line == slot) {
-            _rd_render_label_item(r, seg, idx, sub_line);
-            return (RDRenderItemResult){
-                .status = RD_ROW_OK,
-                .length = item_len,
-            };
-        }
-        slot++;
-    }
-
-    if(sub_line == slot) {
-        _rd_render_instruction_item(r, seg, idx, sub_line);
-
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = item_len,
-        };
-    }
-
-    slot++;
-
-    if(rd_flagsbuffer_has_noret(seg->flags, idx)) {
-        if(sub_line == slot) {
-            _rd_render_comment_item(r, seg, idx, sub_line, "does not return",
-                                    8);
-
-            return (RDRenderItemResult){
-                .status = RD_ROW_OK,
-                .length = item_len,
-            };
-        }
-
-        slot++;
-    }
-
-    if(_rd_render_comment_line(r, seg, idx, sub_line, sub_line - slot,
-                               RD_COMMENT_AFTER, NULL)) {
-        return (RDRenderItemResult){
-            .status = RD_ROW_OK,
-            .length = item_len,
-        };
-    }
-
-    return (RDRenderItemResult){.status = RD_ROW_EXHAUSTED};
-}
-
-bool rd_i_render_segment_item(RDRenderer* r, const RDSegmentFull* seg) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_SEGMENT)) return false;
-
-    const RDProcessorPlugin* p = r->context->processorplugin;
-    rd_i_renderer_new_row(r, seg, 0, RD_SUB_LINE_NONE, 0);
-
-    if(p->render_segment) {
-        p->render_segment(r, (const RDSegment*)seg, r->context->processor);
-    }
-    else {
-        const unsigned int INT_SIZE = rd_get_ptr_size(r->context);
-        const unsigned int F = INT_SIZE * 2;
-
-        rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT,
-                         RD_THEME_BACKGROUND);
-        rd_renderer_text(r, " (start: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, (i64)seg->base.start_address, 16, F, RD_NUM_NOADDR);
-        rd_renderer_text(r, ", end: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-        rd_renderer_num(r, (i64)seg->base.end_address, 16, F, RD_NUM_NOADDR);
-        rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-    }
-
-    return true;
-}
-
-/*
- * A hex chunk head is the first byte of an unknown run, a byte
- * on a hex-line boundary, or a labeled byte.
- * All three are decidable from the byte and its predecessor, so the backward
- * walk is bounded by one line and chunk boundaries never depend on where
- * rendering started.
- */
-bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx) {
-    if(!rd_flagsbuffer_has_unknown(seg->flags, idx)) return false;
-    if(idx == 0) return true;
-    if(!rd_flagsbuffer_has_unknown(seg->flags, idx - 1)) return true;
-
-    if(((seg->base.start_address + idx) % RD_SURFACE_HEX_LINE) == 0)
-        return true;
-
-    return rd_i_flagsbuffer_has_info(seg->flags, idx);
-}
-
-void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
-                        RDDataHead* out) {
-    RDAddress address = seg->base.start_address + idx;
-
-    if(rd_flagsbuffer_has_type(seg->flags, idx)) {
-        RDTypeFull t;
-        bool got = rd_i_db_get_type(ctx, address, &t);
-        panic_if(!got, "type not found @ %s:%x", seg->base.name, address);
-
-        *out = (RDDataHead){.root = t.base, .offset = 0, .has_banner = true};
-        return;
-    }
-
-    if(rd_flagsbuffer_has_field(seg->flags, idx) ||
-       rd_flagsbuffer_has_item(seg->flags, idx)) {
-        RDAddress root_address = address;
-        RDType root;
-        bool got = rd_i_db_get_root_type(ctx, &root_address, &root);
-        panic_if(!got, "root type not found @ %s:%x", seg->base.name, address);
-
-        *out = (RDDataHead){.root = root, .offset = address - root_address};
-        return;
-    }
-
-    unreachable();
-}
-
-bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
-                         RDResolveResult* out) {
-    RDResolveResult probe;
-    if(!rd_type_resolve_offset(ctx, &head->root, head->offset, 0, &probe))
-        return false;
-
-    if(link == 0) {
-        *out = probe;
-        return true;
-    }
-
-    usize want = probe.depth + link;
-    if(!rd_type_resolve_offset(ctx, &head->root, head->offset, want, out))
-        return false;
-
-    return out->depth == want; // shallower: the chain ended before this link
-}
-
-RDRenderItemResult rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg,
-                                    usize idx, usize sub_line) {
-    panic_if(rd_flagsbuffer_has_tail(seg->flags, idx),
-             "tail detected @ %" PRIX64 ", sub_line %zu",
-             seg->base.start_address + idx, sub_line);
-
-    if(rd_flagsbuffer_has_unknown(seg->flags, idx))
-        return _rd_render_item_unknown(r, seg, idx, sub_line);
-
-    if(rd_flagsbuffer_has_data(seg->flags, idx))
-        return _rd_render_item_data(r, seg, idx, sub_line);
-
-    if(rd_flagsbuffer_has_code(seg->flags, idx))
-        return _rd_render_item_code(r, seg, idx, sub_line);
-
-    unreachable();
-}
-
-RDRenderItemResult rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg,
-                                        usize idx) {
-    usize sub_line = 0;
-
-    if(!rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS) &&
-       rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
-        RDAddress address = seg->base.start_address + idx;
-        sub_line =
-            rd_i_db_get_comment_count(r->context, address, RD_COMMENT_BEFORE);
-    }
-
-    if(rd_flagsbuffer_has_code(seg->flags, idx))
-        sub_line += rd_i_row_code_instr_sub_line(seg, idx);
-
-    return rd_i_render_item(r, seg, idx, sub_line);
+    usize sub_line = rd_i_item_layout_content(&r->layout_buf);
+    rd_i_render_row(r, seg, idx, sub_line, vect_at(&r->layout_buf, sub_line));
 }

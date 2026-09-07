@@ -240,8 +240,7 @@ bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
         const RDSegmentFull* seg = rd_i_db_find_segment(ctx, *addr);
         assert(seg);
 
-        rd_i_renderer_new_row(r, seg, rd_i_address2index(seg, *addr),
-                              RD_SUB_LINE_INSTRUCTION, 0);
+        rd_i_renderer_new_row(r, seg, rd_i_address2index(seg, *addr), 0, 0);
         rd_i_processor_render_instruction(r, &dec->instr);
         rd_i_renderer_swap(r);
         rd_i_renderer_write_text(r, &rd_i_state.instr_text_buf);

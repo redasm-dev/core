@@ -9,6 +9,7 @@
 #include "support/utils.h"
 #include <inttypes.h>
 
+#define RD_SURFACE_LAY_INITIAL_SIZE 32
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
 #define RD_SURFACE_ROW_INITIAL_SIZE 1024
 
@@ -84,6 +85,7 @@ RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags) {
 
     vect_reserve(&self->text_buf, RD_SURFACE_BUF_INITIAL_SIZE);
     vect_reserve(&self->comment_buf, RD_SURFACE_BUF_INITIAL_SIZE);
+    vect_reserve(&self->layout_buf, RD_SURFACE_LAY_INITIAL_SIZE);
     return self;
 }
 
@@ -98,6 +100,7 @@ void rd_i_renderer_destroy(RDRenderer* self) {
     vect_destroy(&self->rows_back);
     vect_destroy(&self->rows_front);
     vect_destroy(&self->instr_buf);
+    vect_destroy(&self->layout_buf);
     rd_free(self->hl_word);
     rd_free(self);
 }

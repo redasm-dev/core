@@ -1,8 +1,8 @@
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
-#include "support/error.h"
 #include "surface/items.h"
+#include "surface/layout.h"
 #include "surface/path.h"
 #include "surface/renderer.h"
 #include "surface/state.h"
@@ -36,76 +36,51 @@ static void _rd_surface_render_finalize(RDSurface* self) {
     rd_i_renderer_swap(self->renderer);
 }
 
+static bool _rd_surface_step_back(RDSurface* self, const RDSegmentFull** seg,
+                                  usize* seg_idx, usize* idx, usize* sub_line) {
+    return rd_i_row_step_back(self->renderer->context, self->renderer->flags,
+                              &self->renderer->layout_buf, seg, seg_idx, idx,
+                              sub_line);
+}
+
 static bool _rd_surface_render(RDSurface* self, usize seg_idx, usize idx,
                                usize sub_line) {
-    const RDSegmentFullVect* segments =
-        rd_i_db_get_segments(self->renderer->context);
+    RDRenderer* r = self->renderer;
+    RDContext* ctx = r->context;
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
 
     if(seg_idx == vect_length(segments)) return false;
 
-    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
-
     while(seg_idx < vect_length(segments)) {
-        usize nrows = vect_length(&self->renderer->rows_back);
-        if(nrows >= self->max_rows) break;
+        if(vect_length(&r->rows_back) >= self->max_rows) break;
 
-        seg = *vect_at(segments, seg_idx);
+        const RDSegmentFull* seg = *vect_at(segments, seg_idx);
 
         // fixup to head
         if(rd_flagsbuffer_has_tail(seg->flags, idx))
             rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
-        if(sub_line == RD_SUB_LINE_NONE) {
-            // the segment banner is owed only at the segment's first byte.
-            // Any other landing simply starts at the head's row 0.
-            // Never let RD_SUB_LINE_NONE reach the dispatch
-            if(idx == 0) rd_i_render_segment_item(self->renderer, seg);
-            sub_line = 0;
-        }
-
-        usize last_len = 0;
-
-        /*
-         * One head can yield many rows. Dispatch contract:
-         *   OK        -> the row exists; .length is its byte width
-         *   EXHAUSTED -> no such row; advance idx by the LAST OK row's
-         *                width (for DATA that is the chain's deepest,
-         *                narrowest entity, exactly the step to the
-         *                next head).
-         *                Every head must yield a row at sub_line 0.
-         */
         while(idx < rd_flagsbuffer_get_length(seg->flags)) {
-            if(vect_length(&self->renderer->rows_back) >= self->max_rows) break;
+            usize advance =
+                rd_i_item_layout(ctx, r->flags, seg, idx, &r->layout_buf);
 
-            RDRenderItemResult r =
-                rd_i_render_item(self->renderer, seg, idx, sub_line);
+            usize nrows = vect_length(&r->layout_buf);
 
-            if(r.status == RD_ROW_OK) {
-                panic_if(r.length == 0,
-                         "rd_i_render_item returned OK with zero length @ "
-                         "%s+%zx sub_line=%zu",
-                         seg->base.name, idx, sub_line);
+            for(; sub_line < nrows; sub_line++) {
+                if(vect_length(&r->rows_back) >= self->max_rows) return true;
 
-                // stamp the row's byte width for rd_surface_get_byte_span.
-                // Some renderers return OK without emitting a row under
-                // RD_RF_* flags, hence the count check
-                if(vect_length(&self->renderer->rows_back) > nrows) {
-                    vect_last(&self->renderer->rows_back)->bytes_length =
-                        r.length;
-                }
-
-                last_len = r.length;
-                sub_line++;
+                const RDRowDesc* d = vect_at(&r->layout_buf, sub_line);
+                rd_i_render_row(r, seg, idx, sub_line, d);
+                vect_last(&r->rows_back)->bytes_length = d->length;
             }
-            else {
-                sub_line = 0;
-                idx += last_len;
-            }
+
+            sub_line = 0;
+            idx += advance;
         }
 
-        sub_line = RD_SUB_LINE_NONE;
         seg_idx++;
         idx = 0;
+        sub_line = 0;
     }
 
     return true;
@@ -123,8 +98,7 @@ static int _rd_surface_find_row(const RDSurface* self, RDAddress address) {
 
     const RDRow* row;
     vect_each(row, &self->renderer->rows_front) {
-        if(row->sub_line != RD_SUB_LINE_NONE && row->address == address)
-            return i;
+        if(row->kind != RD_ROWKIND_SEGMENT && row->address == address) return i;
         i++;
     }
 
@@ -274,9 +248,7 @@ bool rd_surface_get_cell_data_under_pos(const RDSurface* self,
 }
 
 bool rd_surface_render(RDSurface* self, RDAddress address) {
-    // repaint path: no history semantics (jumps go through
-    // rd_surface_jump_to, which pushes history and centers)
-    return _rd_surface_render_at(self, address, RD_SUB_LINE_NONE);
+    return _rd_surface_render_at(self, address, 0);
 }
 
 bool rd_surface_repaint(RDSurface* self) {
@@ -330,9 +302,7 @@ bool rd_surface_scroll(RDSurface* self, int n) {
     usize seg_idx;
     if(!rd_i_db_find_segment_index(ctx, r->address, &seg_idx)) return false;
 
-    const RDSegmentFullVect* segments =
-        rd_i_db_get_segments(self->renderer->context);
-
+    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
     const RDSegmentFull* seg = *vect_at(segments, seg_idx);
     usize idx = rd_i_address2index(seg, r->address);
     usize sub_line = r->sub_line;
@@ -340,7 +310,7 @@ bool rd_surface_scroll(RDSurface* self, int n) {
     bool moved = false;
 
     for(; n < 0; n++) {
-        if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+        if(!_rd_surface_step_back(self, &seg, &seg_idx, &idx, &sub_line)) break;
         moved = true;
     }
 
@@ -378,13 +348,12 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
     }
 
     // destination off-screen: center it by stepping back half a viewport
-    // of ROWS from its head (row-granular: multi-row heads, banners and
-    // hex chunks all count as the rows they render as)
     usize sub_line = 0;
     usize steps = self->max_rows / 2;
 
     for(usize i = 0; i < steps; i++) {
-        if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+        if(!_rd_surface_step_back(self, &seg, &seg_idx, &idx, &sub_line)) break;
+        break;
     }
 
     if(!_rd_surface_render_from(self, seg, seg_idx, idx, sub_line))
@@ -405,7 +374,9 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
         bool moved = false;
 
         for(usize i = 0; i < deficit; i++) {
-            if(!rd_i_row_step_back(ctx, &seg, &seg_idx, &idx, &sub_line)) break;
+            if(!_rd_surface_step_back(self, &seg, &seg_idx, &idx, &sub_line))
+                break;
+
             moved = true;
         }
 

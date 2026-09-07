@@ -26,35 +26,16 @@ static bool _rd_surfacepath_exists(const RDSurfacePath* self, int fromrow,
     return false;
 }
 
-/*
- * Is this row the INSTRUCTION row of a CODE head?
- * A code head can also carry label and noret-comment rows, arrows attach to the
- * instruction.
- * Which sub_line that is comes from the single slot-layout source
- * in row.c (rd_i_code_instr_sub_line).
- */
 static bool _rd_row_is_instruction(RDContext* ctx, const RDRow* row,
                                    const RDSegmentFull** out_seg,
                                    usize* out_idx) {
-    if(row->sub_line == RD_SUB_LINE_NONE) return false;
+    if(row->kind != RD_ROWKIND_INSTRUCTION) return false;
 
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
     if(!seg) return false;
 
-    usize idx = rd_i_address2index(seg, row->address);
-    if(!rd_flagsbuffer_has_code(seg->flags, idx)) return false;
-
-    usize before = 0;
-    if(rd_i_flagsbuffer_has_comment(seg->flags, idx)) {
-        before =
-            rd_i_db_get_comment_count(ctx, row->address, RD_COMMENT_BEFORE);
-    }
-
-    if(row->sub_line != before + rd_i_row_code_instr_sub_line(seg, idx))
-        return false;
-
     if(out_seg) *out_seg = seg;
-    if(out_idx) *out_idx = idx;
+    if(out_idx) *out_idx = rd_i_address2index(seg, row->address);
     return true;
 }
 

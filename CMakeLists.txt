@@ -69,6 +69,7 @@ target_sources(${PROJECT_NAME}
         src/support/stringpool.c
         src/support/tomlschema.c
         src/surface/graph.c
+        src/surface/layout.c
         src/surface/items.c
         src/surface/path.c
         src/surface/renderer.c

@@ -56,13 +56,14 @@ void rd_surfacegraph_destroy(RDSurfaceGraph* self) {
  */
 static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
                                           RDAddress end) {
-    RDContext* ctx = self->renderer->context;
+    RDRenderer* r = self->renderer;
+    RDContext* ctx = r->context;
 
     const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
     panic_if(!seg, "chunk start outside any segment @ %" PRIX64, start);
 
-    // 'endidx' is calculated manually because
-    // it can trigger rd_i_address2index assertion if is EXACTLY at end
+    // 'endidx' is calculated manually because it can trigger
+    // rd_i_address2index's assertion if it is EXACTLY at end
     usize idx = rd_i_address2index(seg, start);
     usize endidx = end - seg->base.start_address;
     usize len = rd_flagsbuffer_get_length(seg->flags);
@@ -72,28 +73,18 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
     if(rd_flagsbuffer_has_tail(seg->flags, idx))
         rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
-    usize sub_line = 0, last_len = 0;
-
     while(idx < endidx) {
-        RDRenderItemResult r =
-            rd_i_render_item(self->renderer, seg, idx, sub_line);
+        usize advance =
+            rd_i_item_layout(ctx, r->flags, seg, idx, &r->layout_buf);
 
-        if(r.status == RD_ROW_OK) {
-            panic_if(r.length == 0,
-                     "rd_i_render_item returned OK with zero length @ "
-                     "%s+%zx sub_line=%zu",
-                     seg->base.name, idx, sub_line);
+        for(usize sub_line = 0; sub_line < vect_length(&r->layout_buf);
+            sub_line++) {
+            const RDRowDesc* d = vect_at(&r->layout_buf, sub_line);
+            rd_i_render_row(r, seg, idx, sub_line, d);
+            vect_last(&r->rows_back)->bytes_length = d->length;
+        }
 
-            last_len = r.length;
-            sub_line++;
-        }
-        else {
-            panic_if(sub_line == 0,
-                     "render stuck: head yields no rows @ %s+%zx",
-                     seg->base.name, idx);
-            sub_line = 0;
-            idx += last_len;
-        }
+        idx += advance;
     }
 }
 
