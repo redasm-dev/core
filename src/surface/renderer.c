@@ -385,7 +385,7 @@ void rd_renderer_str(RDRenderer* self, const char* s, bool quoted) {
     if(quoted)
         rd_renderer_text(self, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
 
-    rd_renderer_text(self, s, RD_THEME_STRING, RD_THEME_FOREGROUND);
+    rd_renderer_text(self, s, RD_THEME_STRING, RD_THEME_BACKGROUND);
 
     if(quoted)
         rd_renderer_text(self, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
