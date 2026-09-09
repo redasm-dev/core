@@ -3,6 +3,38 @@
 #include "support/error.h"
 #include <inttypes.h>
 
+static void _rd_step_back_to_packed_head(RDContext* ctx,
+                                         const RDSegmentFull* seg, usize* idx) {
+    RDDataHead head;
+    rd_i_data_head_get(ctx, seg, *idx, &head);
+
+    RDResolveResultVect chain = {0};
+    if(!rd_i_type_resolve_chain(ctx, &head.root, head.offset, &chain)) return;
+
+    const RDResolveResult* elem = NULL;
+    const RDResolveResult* r;
+
+    vect_each(r, &chain) {
+        if(r->at_offset) elem = r;
+    }
+
+    if(!elem || !rd_i_link_is_packable(elem)) goto done;
+
+    usize elem_size = rd_type_size(&elem->field.type, ctx);
+    if(!elem_size) goto done;
+
+    usize item_idx = elem->item_idx.value;
+
+    while(item_idx &&
+          !rd_i_is_packed_element_head(seg, *idx, elem_size, item_idx)) {
+        *idx -= elem_size;
+        item_idx--;
+    }
+
+done:
+    vect_destroy(&chain);
+}
+
 void rd_i_rowvect_destroy(RDRowVect* self) {
     RDRow* row;
     vect_each(row, self) {
@@ -68,6 +100,8 @@ bool rd_i_row_step_back(RDContext* ctx, RDRenderFlags flags,
         panic_if(rd_flagsbuffer_has_tail((*seg)->flags, *idx),
                  "item spans segment boundary");
     }
+    else if(rd_flagsbuffer_has_item((*seg)->flags, *idx))
+        _rd_step_back_to_packed_head(ctx, *seg, idx);
 
     // (3) land on that head's last row.
     rd_i_item_layout(ctx, flags, *seg, *idx, scratch);

@@ -66,6 +66,7 @@ typedef struct RDContext {
     RDFunctionChunkVect chunk_buf;
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
+    RDResolveResultVect resolve_buf;
     RDSymbolVect symbols;
 
     u32 func_gen;

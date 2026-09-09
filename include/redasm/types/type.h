@@ -7,12 +7,18 @@
 typedef struct RDResolveResult {
     RDParam field;
     usize depth;
+    bool at_offset;
 
     struct {
         usize value;
         bool has_value;
     } item_idx;
 } RDResolveResult;
+
+typedef struct RDResolveResultSlice {
+    const RDResolveResult* data;
+    usize length;
+} RDResolveResultSlice;
 
 RD_API bool rd_type_init(RDType* self, const char* name, usize n,
                          RDTypeModifier mod, RDContext* ctx);
@@ -23,9 +29,9 @@ RD_API bool rd_type_is_void(const RDType* t);
 RD_API usize rd_type_size(const RDType* self, const RDContext* ctx);
 RD_API bool rd_type_is_string(const RDType* t);
 RD_API bool rd_type_equals(const RDType* self, const RDType* t);
-RD_API bool rd_type_resolve_offset(RDContext* ctx, const RDType* type,
-                                   usize offset, usize min_depth,
-                                   RDResolveResult* out_r);
+RD_API RDResolveResultSlice rd_type_resolve_chain(RDContext* ctx,
+                                                  const RDType* root,
+                                                  usize offset);
 
 static inline bool rd_type_is_ptr(const RDType* self) {
     return self->mod == RD_TYPE_PTR || self->mod == RD_TYPE_CPTR;

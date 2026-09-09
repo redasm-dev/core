@@ -4,6 +4,8 @@
 #include <redasm/surface/common.h>
 #include <redasm/types/type.h>
 
+#define RD_SURFACE_HEX_LINE 0x10
+
 typedef enum RDRowKind {
     RD_ROWKIND_NONE = 0,
     RD_ROWKIND_SEGMENT,
@@ -15,6 +17,7 @@ typedef enum RDRowKind {
     RD_ROWKIND_HEXDUMP,
     RD_ROWKIND_DATA_BANNER, // the FL_TYPE root, rendered as its own row
     RD_ROWKIND_DATA_LINK,   // one entity of the coincidence chain
+    RD_ROWKIND_DATA_ELEMENTS,
     RD_ROWKIND_COMMENT_AFTER,
 } RDRowKind;
 
@@ -24,10 +27,16 @@ typedef enum RDRowKind {
 typedef struct RDRowDesc {
     RDRowKind kind;
     usize length;
+    usize indent;
 
     union {
         usize comment_idx;
         RDResolveResult resolve;
+
+        struct {
+            RDType type;
+            usize count;
+        } elements;
     };
 } RDRowDesc;
 
@@ -48,6 +57,7 @@ usize rd_i_item_layout(RDContext* ctx, RDRenderFlags flags,
 usize rd_i_item_layout_content(const RDRowDescVect* rows);
 void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
                         RDDataHead* out);
-bool rd_i_data_chain_row(RDContext* ctx, const RDDataHead* head, usize link,
-                         RDResolveResult* out);
 bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx);
+bool rd_i_link_is_packable(const RDResolveResult* res);
+bool rd_i_is_packed_element_head(const RDSegmentFull* seg, usize idx,
+                                 usize elem_size, usize item_idx);

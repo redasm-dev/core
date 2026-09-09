@@ -52,39 +52,8 @@ static void _rd_unroll_type(RDContext* ctx, const RDSegmentFull* seg,
         *idx += sz;
 }
 
-/*
- * One step of the resolution walk.
- *
- * Each step locates the child containing `offset` and computes
- * rel = offset - child_start.
- * Exactly two situations exist:
- *
- *   rel != 0  the offset is INSIDE the child.
- *             The child cannot be the answer (interiors are never entities),
- *             so descent is MANDATORY: min_depth is not consulted on this path.
- *
- *   rel == 0  the offset is on the child's edge: the child IS a valid
- *             answer, but a deeper one may share the byte (coincidence).
- *             Stop here if the walk is deep enough (depth >= min_depth),
- *             or unconditionally if the child is solid: declining a
- *             solid child would cross a wall into nothing, fabricating
- *             a depth that was never reached (the "phantom" bug).
- *
- * out_r->depth is a check of what actually crossed; the wrapper
- * zeroed it.
- * On success with depth < min_depth the caller learns the
- * schema ended before the requested floor, that is the honest
- * exhaustion signal the renderer's chain walk relies on.
- *
- * The terminal branches (pointer / solid leaf) carry no min_depth check
- * on purpose: they are only ever entered through a mandatory rel != 0
- * descent (the offset proved structure exists) or as the top-level call
- * itself: in both cases "the thing at its own edge" is the only answer
- * there is, at whatever depth the odometer honestly shows.
- */
 static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
-                             usize min_depth, RDResolveResult* out_r) {
-
+                             usize depth, RDResolveResultVect* out) {
     // array: the child is items[offset / item_size]
     if(type->count > 0) {
         RDType item_type = *type;
@@ -99,19 +68,19 @@ static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
             return false;
         }
 
-        out_r->item_idx.has_value = true;
-        out_r->item_idx.value = item_idx;
-
         usize rel = offset - (item_idx * item_size);
 
-        if(rel == 0 &&
-           (out_r->depth >= min_depth || !rd_i_type_has_more(&item_type))) {
-            out_r->field = (RDParam){.type = item_type, .name = NULL};
-            return true;
-        }
+        RDResolveResult r = {
+            .field = {.type = item_type, .name = NULL},
+            .depth = depth,
+            .item_idx = {.has_value = true, .value = item_idx},
+            .at_offset = (rel == 0),
+        };
 
-        out_r->depth++;
-        return _rd_type_resolve(ctx, &item_type, rel, min_depth, out_r);
+        vect_push(out, r);
+
+        if(rel == 0 && !rd_i_type_has_more(&item_type)) return true;
+        return _rd_type_resolve(ctx, &item_type, rel, depth + 1, out);
     }
 
     // pointer: opaque
@@ -121,13 +90,19 @@ static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
             return false;
         }
 
-        out_r->field = (RDParam){.type = *type, .name = NULL};
+        RDResolveResult r = {
+            .field = {.type = *type, .name = NULL},
+            .depth = depth,
+            .at_offset = true,
+        };
+
+        vect_push(out, r);
         return true;
     }
 
     const RDTypeDef* tdef_struct = rd_i_type_check_struct(type);
 
-    // solid leaf (primitve, enum, union)
+    // solid leaf (primitive, enum, union)
     if(!tdef_struct) {
         if(offset != 0) {
             RD_LOG_FAIL("offset %zu inside opaque type '%s'", offset,
@@ -135,11 +110,17 @@ static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
             return false;
         }
 
-        out_r->field = (RDParam){.type = *type, .name = NULL};
+        RDResolveResult r = {
+            .field = {.type = *type, .name = NULL},
+            .depth = depth,
+            .at_offset = true,
+        };
+
+        vect_push(out, r);
         return true;
     }
 
-    // struct: the child is the member whose span overs 'offset'
+    // struct: the child is the member whose span covers 'offset'
     const RDParam* m;
     if(!rd_typedef_resolve_offset(ctx, tdef_struct, offset, &m)) {
         RD_LOG_FAIL("offset %zu not covered by '%s'", offset,
@@ -149,14 +130,16 @@ static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
 
     usize rel = offset - m->field_offset;
 
-    if(rel == 0 &&
-       (out_r->depth >= min_depth || !rd_i_type_has_more(&m->type))) {
-        out_r->field = *m;
-        return true;
-    }
+    RDResolveResult r = {
+        .field = *m,
+        .depth = depth,
+        .at_offset = (rel == 0),
+    };
 
-    out_r->depth++;
-    return _rd_type_resolve(ctx, &m->type, rel, min_depth, out_r);
+    vect_push(out, r);
+
+    if(rel == 0 && !rd_i_type_has_more(&m->type)) return true;
+    return _rd_type_resolve(ctx, &m->type, rel, depth + 1, out);
 }
 
 usize rd_i_size_of(const RDContext* ctx, const char* name, usize n,
@@ -252,6 +235,53 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
         default: break;
     }
 
+    return buf->data;
+}
+
+const char* rd_i_type_path(RDContext* ctx, RDAddress address, RDCharVect* buf) {
+    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    if(!seg) return NULL;
+
+    usize idx = rd_i_address2index(seg, address);
+
+    if(!rd_flagsbuffer_has_type(seg->flags, idx) &&
+       !rd_flagsbuffer_has_field(seg->flags, idx) &&
+       !rd_flagsbuffer_has_item(seg->flags, idx))
+        return NULL;
+
+    RDAddress root_address = address;
+    RDType root;
+    if(!rd_i_db_get_root_type(ctx, &root_address, &root)) return NULL;
+
+    str_clear(buf);
+    str_append(buf, root.def->name);
+
+    RDResolveResultVect chain = {0};
+
+    if(rd_i_type_resolve_chain(ctx, &root, address - root_address, &chain)) {
+        const RDResolveResult* r;
+
+        vect_each(r, &chain) {
+            if(r->field.name) {
+                str_push(buf, '.');
+                str_append(buf, r->field.name);
+            }
+            else if(r->item_idx.has_value) {
+                str_push(buf, '[');
+                str_append(buf, rd_i_to_dec((i64)r->item_idx.value));
+                str_push(buf, ']');
+            }
+
+            /*
+             * Stop at the first entity that actually starts here: anything
+             * deeper is a coincidence sharing the byte, not part of this
+             * address's description.
+             */
+            if(r->at_offset) break;
+        }
+    }
+
+    vect_destroy(&chain);
     return buf->data;
 }
 
@@ -361,6 +391,16 @@ const RDTypeDef* rd_i_type_check_struct(const RDType* t) {
     return t->def->kind == RD_TKIND_STRUCT ? t->def : NULL;
 }
 
+bool rd_i_type_resolve_chain(RDContext* ctx, const RDType* root, usize offset,
+                             RDResolveResultVect* out) {
+    if(!root || !out) return false;
+
+    vect_clear(out);
+    if(!_rd_type_resolve(ctx, root, offset, 0, out)) return false;
+
+    return !vect_is_empty(out);
+}
+
 bool rd_i_type_has_more(const RDType* t) {
     if(t->mod != RD_TYPE_NONE) return false; // pointers are opaque
     if(rd_type_is_string(t)) return false;   // strings are one item
@@ -374,43 +414,10 @@ bool rd_type_is_string(const RDType* t) {
     return !strcmp(t->def->name, "char") || !strcmp(t->def->name, "char16");
 }
 
-/*
- * Resolve the entity at byte `offset` inside `type`.
- *
- * Because entities can share a starting byte (a struct's edge is also its
- * first member's edge, recursively: the coincidence stack), the question has
- * multiple valid answers:
- * - `min_depth` picks among them: it is a FLOOR,
- * - "refuse answers shallower than this many descents".
- * - 0 returns the shallowest entity at the offset;
- * - each increment peels one more edge;
- * - RD_MAX_DEPTH reaches the innermost leaf.
- *
- * Returns:
- *   false    malformed input (offset out of bounds, offset inside
- *            an opaque type, bad arguments).
- *            Logged, never panics: this is plugin facing.
- *
- *   true     out_r->field is the entity,
- *            out_r->depth the number of descents taken,
- *            out_r->item_idx the last array index crossed (if any).
- *            If out_r->depth < min_depth, the schema ended before
- *            the requested floor: there IS no deeper entity.
- *            This is a defined, expected outcome: it is how callers
- *            enumerate a coincidence stack to its end.
- *
- * - min_depth only ever skips OPTIONAL stops.
- * - offsets that fall inside a child force descent regardless,
- *   so the first genuine answer at an offset may sit deeper than 0
- *   (e.g. a member reached through an outer field at a nonzero relative
- *   offset).
- */
-bool rd_type_resolve_offset(RDContext* ctx, const RDType* type, usize offset,
-                            usize min_depth, RDResolveResult* out_r) {
-    if(!type || !out_r) return false;
+RDResolveResultSlice rd_type_resolve_chain(RDContext* ctx, const RDType* root,
+                                           usize offset) {
+    if(!rd_i_type_resolve_chain(ctx, root, offset, &ctx->resolve_buf))
+        return (RDResolveResultSlice){0};
 
-    *out_r = (RDResolveResult){0};
-
-    if(!out_r) return false;
-    return _rd_type_resolve(ctx, type, offset, min_depth, out_r);
+    return vect_to_slice(RDResolveResultSlice, &ctx->resolve_buf);
 }

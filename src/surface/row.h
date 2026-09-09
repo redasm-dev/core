@@ -6,8 +6,6 @@
 #include <assert.h>
 #include <redasm/surface/common.h>
 
-#define RD_SURFACE_HEX_LINE 0x10
-
 typedef struct RDCellVect {
     RDCell* data;
     usize length; // padded length

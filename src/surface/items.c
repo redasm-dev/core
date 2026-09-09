@@ -170,13 +170,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             (unsigned int)rd_i_size_of(r->context, t->def->name, 0, t->mod);
         panic_if(!sz, "type '%s' has unresolved size", t->def->name);
 
-        /*
-         * FIXME: a pointer-sized integer is not necessarily a pointer.
-         * DEX index fields (class_idx, proto_idx, name_idx) resolve to
-         * unrelated addresses purely because their width matches. The
-         * evidence should be an outgoing RD_DR_ADDRESS xref, not the size.
-         */
-        if(sz == PTR_SIZE)
+        if(sz == PTR_SIZE && rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
             rd_renderer_loc(r, (RDAddress)v, sz * 2, RD_NUM_DEFAULT);
         else
             rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
@@ -263,9 +257,9 @@ static void _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
 }
 
 static void _rd_render_segment_row(RDRenderer* r, const RDSegmentFull* seg,
-                                   usize idx, usize sub_line) {
+                                   usize idx, usize sub_line, usize indent) {
     const RDProcessorPlugin* p = r->context->processorplugin;
-    rd_i_renderer_new_row(r, seg, idx, sub_line, 0);
+    rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     if(p->render_segment) {
         p->render_segment(r, (const RDSegment*)seg, r->context->processor);
@@ -295,8 +289,8 @@ static void _rd_render_comment_row(RDRenderer* r, const RDSegmentFull* seg,
 }
 
 static void _rd_render_label_row(RDRenderer* r, const RDSegmentFull* seg,
-                                 usize idx, usize sub_line) {
-    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 6);
+                                 usize idx, usize sub_line, usize indent) {
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     RDName n;
     bool hasname = rd_i_get_name(r->context, address, true, &n);
@@ -307,9 +301,9 @@ static void _rd_render_label_row(RDRenderer* r, const RDSegmentFull* seg,
 }
 
 static void _rd_render_function_row(RDRenderer* r, const RDSegmentFull* seg,
-                                    usize idx, usize sub_line) {
+                                    usize idx, usize sub_line, usize indent) {
     const RDProcessorPlugin* p = r->context->processorplugin;
-    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 4);
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     // RDFunction may be NULL (eg. during intermediate state analysis)
     const RDFunction* f = rd_i_find_function(r->context, address);
@@ -374,9 +368,33 @@ static void _rd_render_function_row(RDRenderer* r, const RDSegmentFull* seg,
     }
 }
 
+static void _rd_render_elements_row(RDRenderer* r, const RDSegmentFull* seg,
+                                    usize idx, usize sub_line,
+                                    const RDRowDesc* d) {
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, d->indent);
+
+    if(r->mode == RD_RM_FLAGS) {
+        rd_i_renderer_flags(r, address);
+        return;
+    }
+
+    usize sz = rd_type_size(&d->elements.type, r->context);
+
+    usize lead = (address % RD_SURFACE_HEX_LINE) / sz;
+    if(lead) rd_renderer_ws(r, lead * ((sz * 2) + 1));
+
+    for(usize i = 0; i < d->elements.count; i++) {
+        if(i) rd_renderer_ws(r, 1);
+        _rd_render_value(r, address + (i * sz), &d->elements.type, false);
+    }
+
+    _rd_render_comment_inline(r, address);
+}
+
 static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
-                                       usize idx, usize sub_line) {
-    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+                                       usize idx, usize sub_line,
+                                       usize indent) {
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     switch(r->mode) {
         case RD_RM_RDIL: rd_i_renderer_rdil(r, address); break;
@@ -389,8 +407,9 @@ static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
 }
 
 static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
-                                   usize idx, usize sub_line, usize len) {
-    rd_i_renderer_new_row(r, seg, idx, sub_line, 8);
+                                   usize idx, usize sub_line, usize len,
+                                   usize indent) {
+    rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     usize lead = (seg->base.start_address + idx) % RD_SURFACE_HEX_LINE;
     if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
@@ -426,8 +445,7 @@ static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
 
 static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
                                 usize idx, usize sub_line, bool is_banner,
-                                const RDResolveResult* res) {
-    usize indent = is_banner ? 8 : 8 + ((res->depth + 1) * 2);
+                                const RDResolveResult* res, usize indent) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     if(r->mode == RD_RM_FLAGS) {
@@ -478,18 +496,23 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         RDName n;
         bool hasname = rd_i_get_name(r->context, address, true, &n);
         assert(hasname && "cannot get type name");
-        rd_renderer_norm(r, n.value);
+        if(hasname) rd_renderer_norm(r, n.value);
     }
-    else {
-        if(is_element) {
+    else if(is_element) {
+        RDName n;
+
+        if(rd_i_typedef_is_compound(tdef) &&
+           rd_i_db_get_name(r->context, address, &n))
+            rd_renderer_norm(r, n.value);
+        else {
             rd_renderer_norm(r, "[");
             rd_renderer_text(r, rd_i_to_dec((i64)res->item_idx.value),
                              RD_THEME_NUMBER, RD_THEME_BACKGROUND);
             rd_renderer_norm(r, "]");
         }
-
-        if(name) rd_renderer_norm(r, name);
     }
+    else if(name)
+        rd_renderer_norm(r, name);
 
     // 5. array size
     if(t.count > 0) {
@@ -499,15 +522,21 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         rd_renderer_norm(r, "]");
     }
 
-    // 6. value (primitives, functions and pointers only, not compound heads)
-    if(tdef->kind == RD_TKIND_PRIM || tdef->kind == RD_TKIND_FUNC ||
-       rd_type_is_ptr(&res->field.type)) {
+    // 6. value
+    bool has_children = rd_i_type_has_more(&res->field.type);
+
+    bool has_value = !has_children && (tdef->kind == RD_TKIND_PRIM ||
+                                       tdef->kind == RD_TKIND_FUNC ||
+                                       rd_type_is_ptr(&res->field.type));
+
+    if(has_children || has_value) {
         rd_renderer_ws(r, 1);
         rd_renderer_norm(r, "=");
-        rd_renderer_ws(r, 1);
+    }
 
-        RDTypeFull tf = {.base = t};
-        _rd_render_value(r, address, &tf.base, true);
+    if(has_value) {
+        rd_renderer_ws(r, 1);
+        _rd_render_value(r, address, &t, true);
     }
 
     _rd_render_comment_inline(r, address);
@@ -519,7 +548,7 @@ void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
 
     switch(d->kind) {
         case RD_ROWKIND_SEGMENT:
-            _rd_render_segment_row(r, seg, idx, sub_line);
+            _rd_render_segment_row(r, seg, idx, sub_line, d->indent);
             break;
 
         case RD_ROWKIND_COMMENT_BEFORE:
@@ -533,34 +562,42 @@ void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
             const char* text =
                 rd_i_db_get_comment(r->context, address, p, d->comment_idx);
 
-            _rd_render_comment_row(r, seg, idx, sub_line, text, 0);
+            _rd_render_comment_row(r, seg, idx, sub_line, text, d->indent);
             break;
         }
 
         case RD_ROWKIND_FUNCTION:
-            _rd_render_function_row(r, seg, idx, sub_line);
+            _rd_render_function_row(r, seg, idx, sub_line, d->indent);
             break;
 
         case RD_ROWKIND_LABEL:
-            _rd_render_label_row(r, seg, idx, sub_line);
+            _rd_render_label_row(r, seg, idx, sub_line, d->indent);
             break;
 
         case RD_ROWKIND_INSTRUCTION:
-            _rd_render_instruction_row(r, seg, idx, sub_line);
+            _rd_render_instruction_row(r, seg, idx, sub_line, d->indent);
             break;
 
-        case RD_ROWKIND_NORET:
-            _rd_render_comment_row(r, seg, idx, sub_line, "does not return", 8);
+        case RD_ROWKIND_NORET: {
+            _rd_render_comment_row(r, seg, idx, sub_line, "does not return",
+                                   d->indent);
             break;
+        }
 
         case RD_ROWKIND_HEXDUMP:
-            _rd_render_hexdump_row(r, seg, idx, sub_line, d->length);
+            _rd_render_hexdump_row(r, seg, idx, sub_line, d->length, d->indent);
             break;
 
         case RD_ROWKIND_DATA_BANNER:
-        case RD_ROWKIND_DATA_LINK:
+        case RD_ROWKIND_DATA_LINK: {
             _rd_render_data_row(r, seg, idx, sub_line,
-                                d->kind == RD_ROWKIND_DATA_BANNER, &d->resolve);
+                                d->kind == RD_ROWKIND_DATA_BANNER, &d->resolve,
+                                d->indent);
+            break;
+        }
+
+        case RD_ROWKIND_DATA_ELEMENTS:
+            _rd_render_elements_row(r, seg, idx, sub_line, d);
             break;
 
         default: unreachable();

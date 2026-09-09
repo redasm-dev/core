@@ -219,18 +219,13 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
         RDAddress orig_address = address;
         usize item_idx = SIZE_MAX;
 
-        if(rd_flagsbuffer_has_item(seg->flags, idx)) {
+        if(rd_flagsbuffer_has_item(seg->flags, idx) ||
+           rd_flagsbuffer_has_field(seg->flags, idx)) {
             RDAddress root_address = address;
             RDType root;
-            bool got = rd_i_db_get_root_type(self, &root_address, &root);
 
-            if(got) {
-                if(root.def->size) // guard: divide by zero
-                    item_idx = (address - root_address) / root.def->size;
-
-                address = root_address;
-                idx = root_address - seg->base.start_address;
-            }
+            if(rd_i_db_get_root_type(self, &root_address, &root))
+                s = rd_i_type_path(self, address, &self->autoname_buf);
         }
 
         if(rd_flagsbuffer_has_type(seg->flags, idx)) {
@@ -809,6 +804,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->und_xrefs);
     vect_destroy(&self->xrefs_from);
     vect_destroy(&self->lift_buf);
+    vect_destroy(&self->resolve_buf);
     vect_destroy(&self->chunk_buf);
     vect_destroy(&self->externals);
     vect_destroy(&self->string_terminators);
