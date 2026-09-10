@@ -100,7 +100,14 @@ bool rd_i_row_step_back(RDContext* ctx, RDRenderFlags flags,
         panic_if(rd_flagsbuffer_has_tail((*seg)->flags, *idx),
                  "item spans segment boundary");
     }
-    else if(rd_flagsbuffer_has_item((*seg)->flags, *idx))
+
+    /*
+     * Outside the chain above: a multi-byte element's last byte is a TAIL,
+     * so stepping back into an i32 array takes the tail branch and lands on
+     * an element head that may still be mid-run.
+     * Byte-wide elements have no tails and land here directly.
+     */
+    if(rd_flagsbuffer_has_item((*seg)->flags, *idx))
         _rd_step_back_to_packed_head(ctx, *seg, idx);
 
     // (3) land on that head's last row.
