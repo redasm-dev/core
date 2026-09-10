@@ -899,6 +899,20 @@ bool rd_read_be64(const RDContext* self, RDAddress address, u64* v) {
     return rd_i_buffer_read_be64((const RDBuffer*)s->flags, idx, v);
 }
 
+bool rd_read_uleb128(const RDContext* self, RDAddress address, RDULeb128* v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_read_uleb128((const RDBuffer*)s->flags, idx, v);
+}
+
+bool rd_read_sleb128(const RDContext* self, RDAddress address, RDSLeb128* v) {
+    const RDSegmentFull* s = rd_i_db_find_segment(self, address);
+    if(!s) return false;
+    usize idx = rd_i_address2index(s, address);
+    return rd_i_buffer_read_sleb128((const RDBuffer*)s->flags, idx, v);
+}
+
 bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
     return _rd_read_ptr(ctx, rd_get_ptr_size(ctx), address, v);
 }

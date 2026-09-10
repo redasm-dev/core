@@ -205,6 +205,8 @@ RD_API bool rd_read_le64(const RDContext* self, RDAddress address, u64* v);
 RD_API bool rd_read_be16(const RDContext* self, RDAddress address, u16* v);
 RD_API bool rd_read_be32(const RDContext* self, RDAddress address, u32* v);
 RD_API bool rd_read_be64(const RDContext* self, RDAddress address, u64* v);
+RD_API bool rd_read_uleb128(const RDContext* self, RDAddress address, RDULeb128* v);
+RD_API bool rd_read_sleb128(const RDContext* self, RDAddress address, RDSLeb128* v);
 RD_API const char* rd_read_str(const RDContext* self, RDAddress address, usize* n);
 RD_API usize rd_read(const RDContext* self, RDAddress address, void* data, usize n);
 RD_API bool rd_expect_u8(const RDContext* self, RDAddress address, u8 v);
