@@ -207,7 +207,6 @@ const char* rd_integral_from_size(unsigned int size) {
         default: break;
     }
 
-    RD_LOG_FAIL("integral type not found for size: %u", size);
     return NULL;
 }
 
@@ -265,11 +264,6 @@ const char* rd_i_type_path(RDContext* ctx, RDAddress address, RDCharVect* buf) {
             if(r->field.name) {
                 str_push(buf, '.');
                 str_append(buf, r->field.name);
-            }
-            else if(r->item_idx.has_value) {
-                str_push(buf, '[');
-                str_append(buf, rd_i_to_dec((i64)r->item_idx.value));
-                str_push(buf, ']');
             }
 
             /*
