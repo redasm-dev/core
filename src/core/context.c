@@ -219,15 +219,6 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
         RDAddress orig_address = address;
         usize item_idx = SIZE_MAX;
 
-        if(rd_flagsbuffer_has_item(seg->flags, idx) ||
-           rd_flagsbuffer_has_field(seg->flags, idx)) {
-            RDAddress root_address = address;
-            RDType root;
-
-            if(rd_i_db_get_root_type(self, &root_address, &root))
-                s = rd_i_type_path(self, address, &self->autoname_buf);
-        }
-
         if(rd_flagsbuffer_has_type(seg->flags, idx)) {
             RDTypeFull t;
             if(rd_i_db_get_type(self, address, &t)) {
@@ -235,12 +226,17 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
                     s = "str";
                 else if(!strcmp(t.base.def->name, "char16") && t.base.count > 0)
                     s = "str16";
-                else {
+                else
                     s = t.base.def->name;
-                    // array head: element 0, for consistency with its siblings
-                    if(t.base.count > 0 && item_idx == SIZE_MAX) item_idx = 0;
-                }
             }
+        }
+        else if(rd_flagsbuffer_has_item(seg->flags, idx) ||
+                rd_flagsbuffer_has_field(seg->flags, idx)) {
+            RDAddress root_address = address;
+            RDType root;
+
+            if(rd_i_db_get_root_type(self, &root_address, &root))
+                s = rd_i_type_path(self, address, &self->autoname_buf);
         }
         else if(rd_flagsbuffer_has_func(seg->flags, idx))
             s = "sub";
