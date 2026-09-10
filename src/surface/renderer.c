@@ -67,6 +67,77 @@ static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
     rd_renderer_text(self, rd_i_to_base(c, &p), fg, RD_THEME_BACKGROUND);
 }
 
+static void _rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
+                              RDThemeKind bg, bool escape_str) {
+    assert(s && "invalid chunk string");
+
+    RDRow* r = vect_last(&self->rows_back);
+    r->curr_data.group_idx = ++self->group_idx;
+
+    /*
+     * `escape_str` is used to replace escape sequences to its visual
+     * presentations.
+     * When in "normal" rendering mode those characters are replaced with
+     * whitespaces.
+     * This is very useful especially with \n character in order to
+     * prevent misuses and create "fake new lines" from processor's renderer.
+     */
+    while(*s) {
+        u32 cp;
+        s += rd_i_utf8_decode(s, &cp);
+
+        if(cp == '\t') {
+            if(escape_str) {
+                rd_i_row_push(r, '\\', fg, bg);
+                rd_i_row_push(r, 't', fg, bg);
+                continue;
+            }
+
+            cp = (u32)' ';
+        }
+
+        if(cp == '\n') {
+            if(escape_str) {
+                rd_i_row_push(r, '\\', fg, bg);
+                rd_i_row_push(r, 'n', fg, bg);
+                continue;
+            }
+
+            cp = (u32)' ';
+        }
+
+        if(cp == '\r') {
+            if(escape_str) {
+                rd_i_row_push(r, '\\', fg, bg);
+                rd_i_row_push(r, 'r', fg, bg);
+                continue;
+            }
+
+            cp = (u32)' ';
+        }
+
+        if(cp == '\v') {
+            if(escape_str) {
+                rd_i_row_push(r, '\\', fg, bg);
+                rd_i_row_push(r, 'v', fg, bg);
+                continue;
+            }
+
+            cp = (u32)' ';
+        }
+
+        if(cp == ' ') { // un-data whitespaces
+            RDCellData olddata = r->curr_data;
+            r->curr_data = rd_i_default_cell_data();
+            rd_i_row_push(r, ' ', fg, bg);
+            r->curr_data = olddata;
+            continue;
+        }
+
+        rd_i_row_push(r, cp, fg, bg);
+    }
+}
+
 const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
                                                 RDAddress address) {
     const RDSegmentFull* seg = rd_i_db_find_segment(self->context, address);
@@ -262,48 +333,7 @@ RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
 
 void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                       RDThemeKind bg) {
-    assert(s && "invalid chunk string");
-
-    RDRow* r = vect_last(&self->rows_back);
-    r->curr_data.group_idx = ++self->group_idx;
-
-    while(*s) {
-        u32 cp;
-        s += rd_i_utf8_decode(s, &cp);
-
-        switch(cp) {
-            case '\t':
-                rd_i_row_push(r, '\\', fg, bg);
-                rd_i_row_push(r, 't', fg, bg);
-                break;
-
-            case '\n':
-                rd_i_row_push(r, '\\', fg, bg);
-                rd_i_row_push(r, 'n', fg, bg);
-                break;
-
-            case '\r':
-                rd_i_row_push(r, '\\', fg, bg);
-                rd_i_row_push(r, 'r', fg, bg);
-                break;
-
-            case '\v':
-                rd_i_row_push(r, '\\', fg, bg);
-                rd_i_row_push(r, 'v', fg, bg);
-                break;
-
-            case ' ': {
-                // un-data whitespaces
-                RDCellData olddata = r->curr_data;
-                r->curr_data = rd_i_default_cell_data();
-                rd_i_row_push(r, ' ', fg, bg);
-                r->curr_data = olddata;
-                break;
-            }
-
-            default: rd_i_row_push(r, cp, fg, bg); break;
-        }
-    }
+    _rd_renderer_text(self, s, fg, bg, false);
 }
 
 void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
@@ -385,7 +415,7 @@ void rd_renderer_str(RDRenderer* self, const char* s, bool quoted) {
     if(quoted)
         rd_renderer_text(self, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
 
-    rd_renderer_text(self, s, RD_THEME_STRING, RD_THEME_BACKGROUND);
+    _rd_renderer_text(self, s, RD_THEME_STRING, RD_THEME_BACKGROUND, true);
 
     if(quoted)
         rd_renderer_text(self, "\"", RD_THEME_STRING, RD_THEME_BACKGROUND);
