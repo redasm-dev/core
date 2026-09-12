@@ -151,6 +151,7 @@ static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
                         head_indent, out);
 
     usize advance = whole_len;
+    bool first = true;
 
     if(has_banner) {
         RDRowDesc d = {
@@ -158,9 +159,11 @@ static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
             .length = whole_len,
             .indent = RD_INDENT_CONTENT,
             .resolve = {.field = {.type = head.root, .name = NULL}},
+            .is_head_row = true,
         };
 
         vect_push(out, d);
+        first = false;
 
         // a solid root: the banner is the whole rendering
         if(!rd_i_type_has_more(&head.root)) {
@@ -189,9 +192,11 @@ static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
                 .length = n * elem_size,
                 .indent = RD_INDENT_DATA(res->depth),
                 .elements = {.type = res->field.type, .count = n},
+                .is_head_row = first,
             };
 
             vect_push(out, d);
+            first = false;
             advance = d.length;
             break;
         }
@@ -201,10 +206,11 @@ static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
             .length = elem_size,
             .indent = RD_INDENT_DATA(res->depth),
             .resolve = *res,
+            .is_head_row = first,
         };
 
         vect_push(out, d);
-
+        first = false;
         advance = elem_size;
 
         if(is_string) break;

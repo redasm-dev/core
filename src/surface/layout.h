@@ -28,6 +28,7 @@ typedef struct RDRowDesc {
     RDRowKind kind;
     usize length;
     usize indent;
+    bool is_head_row; // the first row at this address
 
     union {
         usize comment_idx;

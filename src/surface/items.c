@@ -444,23 +444,24 @@ static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
 }
 
 static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
-                                usize idx, usize sub_line, bool is_banner,
-                                const RDResolveResult* res, usize indent) {
-    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
+                                usize idx, usize sub_line, const RDRowDesc* d) {
+    bool is_banner = d->kind == RD_ROWKIND_DATA_BANNER;
+    RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, d->indent);
 
     if(r->mode == RD_RM_FLAGS) {
         rd_i_renderer_flags(r, address);
         return;
     }
 
-    _rd_render_modifiers(r, seg, idx, RD_THEME_TYPE, RD_THEME_BACKGROUND);
+    if(d->is_head_row)
+        _rd_render_modifiers(r, seg, idx, RD_THEME_TYPE, RD_THEME_BACKGROUND);
 
-    RDType t = res->field.type;
-    const char* name = res->field.name;
+    RDType t = d->resolve.field.type;
+    const char* name = d->resolve.field.name;
     const RDTypeDef* tdef = t.def;
     assert(tdef);
 
-    bool is_element = res->item_idx.has_value && !name;
+    bool is_element = d->resolve.item_idx.has_value && !name;
     bool skip_type_name = (is_element && tdef->kind == RD_TKIND_PRIM) ||
                           tdef->kind == RD_TKIND_FUNC;
 
@@ -487,7 +488,7 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
         rd_renderer_text(r, tdef->name, RD_THEME_TYPE, RD_THEME_BACKGROUND);
 
         // 3. pointer modifier
-        if(rd_type_is_ptr(&res->field.type)) rd_renderer_norm(r, "*");
+        if(rd_type_is_ptr(&d->resolve.field.type)) rd_renderer_norm(r, "*");
         rd_renderer_ws(r, 1);
     }
 
@@ -506,7 +507,7 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
             rd_renderer_norm(r, n.value);
         else {
             rd_renderer_norm(r, "[");
-            rd_renderer_text(r, rd_i_to_dec((i64)res->item_idx.value),
+            rd_renderer_text(r, rd_i_to_dec((i64)d->resolve.item_idx.value),
                              RD_THEME_NUMBER, RD_THEME_BACKGROUND);
             rd_renderer_norm(r, "]");
         }
@@ -523,11 +524,11 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
     }
 
     // 6. value
-    bool has_children = rd_i_type_has_more(&res->field.type);
+    bool has_children = rd_i_type_has_more(&d->resolve.field.type);
 
     bool has_value = !has_children && (tdef->kind == RD_TKIND_PRIM ||
                                        tdef->kind == RD_TKIND_FUNC ||
-                                       rd_type_is_ptr(&res->field.type));
+                                       rd_type_is_ptr(&d->resolve.field.type));
 
     if(has_children || has_value) {
         rd_renderer_ws(r, 1);
@@ -590,9 +591,7 @@ void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
 
         case RD_ROWKIND_DATA_BANNER:
         case RD_ROWKIND_DATA_LINK: {
-            _rd_render_data_row(r, seg, idx, sub_line,
-                                d->kind == RD_ROWKIND_DATA_BANNER, &d->resolve,
-                                d->indent);
+            _rd_render_data_row(r, seg, idx, sub_line, d);
             break;
         }
 
