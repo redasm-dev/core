@@ -18,6 +18,12 @@ typedef struct RDCharVect {
     usize capacity;
 } RDCharVect;
 
+typedef struct RDStringVect {
+    const char** data;
+    usize length;
+    usize capacity;
+} RDStringVect;
+
 typedef struct RDPathVect {
     char** data;
     usize length;

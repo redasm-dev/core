@@ -1,5 +1,7 @@
 #pragma once
 
+#include <redasm/config.h>
+
 typedef struct RDContext RDContext;
 
 typedef enum {
@@ -26,3 +28,8 @@ typedef enum {
 #define rd_slice_each(it, self)                                                \
     for((it) = (self).data;                                                    \
         (self).data && ((it) < (self).data + (self).length); (it)++)
+
+typedef struct RDStringSlice {
+    const char** data;
+    usize length;
+} RDStringSlice;

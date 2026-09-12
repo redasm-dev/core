@@ -2,13 +2,12 @@
 #include "kb/kb.h"
 #include "plugins/builtin/loaders.h"
 #include "plugins/builtin/processors.h"
-#include "plugins/loader.h"
+#include "plugins/loader/loader.h"
 #include "plugins/module.h"
 #include "support/containers.h"
 #include <inttypes.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
-#include <redasm/plugins/loader.h>
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/plugins/processor/processor.h>
 #include <redasm/support/logging.h>
@@ -48,12 +47,14 @@ RDTestResult* rd_i_testresult_create(const RDLoaderPlugin* loaderplugin,
         .filepath = rd_strdup(filepath),
     };
 
+    rd_i_loader_option_init(&self->loader_options);
     return self;
 }
 
 void rd_i_testresult_destroy(RDTestResult* self) {
     if(!self) return;
 
+    rd_i_loader_option_deinit(&self->loader_options);
     rd_i_loader_destroy(self->loaderplugin, self->loader);
     rd_free(self->loader_name);
     rd_free(self->filepath);
@@ -71,8 +72,9 @@ void rd_i_state_init(const RDInitParams* params) {
 }
 
 void rd_i_state_deinit(void) {
-    rd_destroy(rd_i_state.encode_ctx);
+    vect_destroy(&rd_i_state.optgroup_buf);
     vect_destroy(&rd_i_state.encode_buf.impl);
+    rd_destroy(rd_i_state.encode_ctx);
 
     RDPlugin** it;
     vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }

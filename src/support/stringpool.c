@@ -25,15 +25,15 @@ void rd_i_strpool_init(RDStringPool* self) {
         .hash = _rd_strpool_hash,
         .equal = _rd_strpool_equal,
     };
-
-    hmap_reserve(self, RD_STRINGPOOL_INITIAL_CAPACITY);
 }
 
 const char* rd_i_strpool_intern(RDStringPool* self, const char* s) {
     if(!s) return NULL;
 
-    RDStringPoolEntry key = {.value = s};
+    // initialize capacity on first interning, if needed
+    if(!hmap_capacity(self)) hmap_reserve(self, RD_STRINGPOOL_INITIAL_CAPACITY);
 
+    RDStringPoolEntry key = {.value = s};
     const RDStringPoolEntry* found = hmap_get(self, &key);
     if(found) return found->value;
 
@@ -42,7 +42,7 @@ const char* rd_i_strpool_intern(RDStringPool* self, const char* s) {
     return key.value;
 }
 
-void rd_i_strpool_destroy(RDStringPool* self) {
+void rd_i_strpool_deinit(RDStringPool* self) {
     RDStringPoolEntry* it;
     hmap_each(it, self) { rd_free((char*)it->value); }
     hmap_destroy(self);

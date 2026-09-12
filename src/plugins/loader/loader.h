@@ -1,6 +1,7 @@
 #pragma once
 
 #include "io/buffer.h"
+#include "plugins/loader/option.h"
 #include <redasm/redasm.h>
 
 typedef struct RDParseResult {
@@ -13,6 +14,7 @@ typedef struct RDTestResult {
     RDByteBuffer* input_buffer;
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
+    RDLoaderOptionBuilder loader_options;
     char* loader_name;
     RDLoader* loader;
 } RDTestResult;

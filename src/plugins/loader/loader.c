@@ -45,8 +45,6 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
         RDParseResult pr = rd_i_parse(loaderplugin, inputbuf, filepath);
         if(!pr.processorplugin) continue;
 
-        assert(loaderplugin->get_name);
-
         RDTestResult* tr = rd_i_testresult_create(
             loaderplugin, pr.processorplugin, inputbuf, filepath);
         tr->loader = pr.loader;
@@ -55,16 +53,15 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
         if(!tr->loader_name) tr->loader_name = rd_strdup(loaderplugin->id);
         assert(tr->loader_name);
 
+        if(loaderplugin->get_options)
+            loaderplugin->get_options(tr->loader, &tr->loader_options);
+
         vect_push(&rd_i_state.tests, tr);
     }
 
     // Sort results by flags
     vect_stable_part(&rd_i_state.tests, _rd_part_loaders);
-
-    return (RDTestResultSlice){
-        .data = (const RDTestResult**)rd_i_state.tests.data,
-        .length = rd_i_state.tests.length,
-    };
+    return vect_to_slice(RDTestResultSlice, &rd_i_state.tests);
 }
 
 RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,

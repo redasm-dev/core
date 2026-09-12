@@ -4,7 +4,7 @@
 #include <redasm/io/buffer.h>
 #include <redasm/mapping.h>
 #include <redasm/plugins/analyzer.h>
-#include <redasm/plugins/loader.h>
+#include <redasm/plugins/loader/loader.h>
 #include <redasm/plugins/plugin.h>
 #include <redasm/plugins/processor/processor.h>
 #include <redasm/segment.h>

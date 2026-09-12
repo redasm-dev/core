@@ -2,6 +2,7 @@
 
 #include <redasm/common.h>
 #include <redasm/io/reader.h>
+#include <redasm/plugins/loader/option.h>
 #include <redasm/plugins/plugin.h>
 
 typedef struct RDLoader RDLoader;
@@ -29,6 +30,7 @@ typedef struct RDLoaderPlugin {
     bool (*load)(RDLoader*, RDContext*);
     const char* (*get_name)(const RDLoader*);
     const char* (*get_processor)(const RDLoader*);
+    void (*get_options)(RDLoader* self, RDLoaderOptionBuilder* b);
 } RDLoaderPlugin;
 
 RD_API bool rd_register_loader(const RDLoaderPlugin* l);

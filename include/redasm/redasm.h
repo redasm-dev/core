@@ -14,7 +14,7 @@
 #include <redasm/mapping.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
-#include <redasm/plugins/loader.h>
+#include <redasm/plugins/loader/loader.h>
 #include <redasm/plugins/processor/processor.h>
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
@@ -63,7 +63,7 @@ typedef struct RDInitParams {
 } RDInitParams;
 
 typedef struct RDTestResultSlice {
-    const RDTestResult** data;
+    RDTestResult* const* data;
     usize length;
 } RDTestResultSlice;
 
@@ -91,4 +91,8 @@ RD_API const RDLoaderPlugin* rd_testresult_get_loader_plugin(const RDTestResult*
 RD_API const RDProcessorPlugin* rd_testresult_get_processor_plugin(const RDTestResult* self);
 RD_API const char* rd_testresult_get_loader_name(const RDTestResult* self);
 RD_API const char* rd_testresult_get_filepath(const RDTestResult* self);
+RD_API RDLoaderOptionSlice rd_testresult_get_options(const RDTestResult* self);
+RD_API RDLoaderOptionSlice rd_testresult_get_options_by_group(const RDTestResult* self, const char* group);
+RD_API RDStringSlice rd_testresult_get_option_groups(const RDTestResult* self);
+RD_API bool rd_testresult_set_option_bool(RDTestResult* self, const char* id, bool v);
 // clang-format on

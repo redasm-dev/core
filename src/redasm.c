@@ -1,6 +1,6 @@
 #include "core/context.h"
 #include "core/state.h"
-#include "plugins/loader.h"
+#include "plugins/loader/loader.h"
 #include "support/containers.h"
 #include "support/utils.h"
 #include "surface/renderer.h"
@@ -111,7 +111,11 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     rd_reader_seek(res.context->input_reader, 0);
     rd_i_set_processor(res.context, pplugin);
 
-    if(res.context->loaderplugin->load(tr->loader, res.context)) {
+    res.context->testresult = tr;
+    bool ok = res.context->loaderplugin->load(tr->loader, res.context);
+    res.context->testresult = NULL;
+
+    if(ok) {
         rd_i_processor_setup(res.context);
 
         res.status = RD_ACCEPT_OK;
@@ -282,4 +286,50 @@ const char* rd_testresult_get_loader_name(const RDTestResult* self) {
 
 const char* rd_testresult_get_filepath(const RDTestResult* self) {
     return self->filepath;
+}
+
+RDLoaderOptionSlice rd_testresult_get_options(const RDTestResult* self) {
+    return vect_to_slice(RDLoaderOptionSlice, &self->loader_options.options);
+}
+
+RDLoaderOptionSlice rd_testresult_get_options_by_group(const RDTestResult* self,
+                                                       const char* group) {
+    if(!self) return (RDLoaderOptionSlice){0};
+
+    vect_clear(&rd_i_state.optgroup_buf);
+
+    const RDLoaderOption* opt;
+    vect_each(opt, &self->loader_options.options) {
+        bool match = group ? (opt->group && !strcmp(opt->group, group))
+                           : (opt->group == NULL);
+
+        if(match) vect_push(&rd_i_state.optgroup_buf, *opt);
+    }
+
+    return vect_to_slice(RDLoaderOptionSlice, &rd_i_state.optgroup_buf);
+}
+
+RDStringSlice rd_testresult_get_option_groups(const RDTestResult* self) {
+    return vect_to_slice(RDStringSlice, &self->loader_options.groups);
+}
+
+bool rd_testresult_set_option_bool(RDTestResult* self, const char* id, bool v) {
+    if(!self || !id) return false;
+
+    RDLoaderOption* opt;
+
+    vect_each(opt, &self->loader_options.options) {
+        if(strcmp(opt->id, id) != 0) continue;
+
+        if(opt->kind != RD_LOPT_BOOL) {
+            RD_LOG_FAIL("loader option '%s' is not a boolean", id);
+            return false;
+        }
+
+        opt->value = v;
+        return true;
+    }
+
+    RD_LOG_FAIL("unknown loader option '%s'", id);
+    return false;
 }

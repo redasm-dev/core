@@ -18,5 +18,5 @@ typedef struct RDStringPool {
 } RDStringPool;
 
 void rd_i_strpool_init(RDStringPool* self);
+void rd_i_strpool_deinit(RDStringPool* self);
 const char* rd_i_strpool_intern(RDStringPool* self, const char* s);
-void rd_i_strpool_destroy(RDStringPool* self);

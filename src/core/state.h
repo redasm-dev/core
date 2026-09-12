@@ -1,5 +1,6 @@
 #pragma once
 
+#include "plugins/loader/option.h"
 #include "support/scratch.h"
 #include "support/utils.h"
 #include "theme.h"
@@ -41,8 +42,8 @@ typedef struct RDGlobalState {
     RDCharVect instr_dump_buf;
     RDCharVect mnem_buf;
 
+    RDLoaderOptionVect optgroup_buf;
     RDScratchBuffer encode_buf;
-
     RDContext* encode_ctx;
 
     struct {

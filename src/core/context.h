@@ -41,6 +41,7 @@ typedef struct RDStringTerminatorVect {
 } RDStringTerminatorVect;
 
 typedef struct RDContext {
+    const RDTestResult* testresult; // live only during loaderplugin->load()
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
     RDAnalyzerItemVect analyzerplugins;

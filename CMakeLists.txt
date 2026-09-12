@@ -44,12 +44,13 @@ target_sources(${PROJECT_NAME}
         src/kb/schema.c
         src/plugins/builtin/loaders.c
         src/plugins/builtin/processors.c
+        src/plugins/loader/loader.c
+        src/plugins/loader/option.c
         src/plugins/processor/instruction.c
         src/plugins/processor/processor.c
         src/plugins/analyzer.c
         src/plugins/command.c
         src/plugins/common.c
-        src/plugins/loader.c
         src/plugins/module.c
         src/project/save.c
         src/project/load.c
