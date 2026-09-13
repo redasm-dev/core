@@ -312,6 +312,8 @@ RDAcceptResult rd_project_load(const char* filepath, const char* workingdir) {
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
+    RD_LOG_INFO("loading project '%s'", filepath);
+
     RDAcceptResult res = {.status = RD_ACCEPT_FAIL};
     RDProjectManifest manifest = {0};
     RDProjectPaths paths = {0};
@@ -332,7 +334,6 @@ RDAcceptResult rd_project_load(const char* filepath, const char* workingdir) {
     if(!res.context) goto cleanup;
 
     res.status = RD_ACCEPT_OK;
-    RD_LOG_INFO("loading project '%s'", filepath);
 
 cleanup:
     if(res.status != RD_ACCEPT_OK) {

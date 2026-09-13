@@ -111,6 +111,8 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     rd_reader_seek(res.context->input_reader, 0);
     rd_i_set_processor(res.context, pplugin);
 
+    RD_LOG_INFO("loading '%s' with '%s'", tr->filepath, tr->loader_name);
+
     res.context->testresult = tr;
     bool ok = res.context->loaderplugin->load(tr->loader, res.context);
     res.context->testresult = NULL;
@@ -119,11 +121,12 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
         rd_i_processor_setup(res.context);
 
         res.status = RD_ACCEPT_OK;
-        RD_LOG_INFO("selected loader '%s' and processor '%s'",
+        RD_LOG_INFO("accepted loader '%s' and processor '%s'",
                     res.context->loaderplugin->id,
                     res.context->processorplugin->id);
     }
     else {
+        RD_LOG_FAIL("loader '%s' failed", tr->loaderplugin->id);
         rd_destroy(res.context);
         res.context = NULL;
         res.status = RD_ACCEPT_FAIL;
