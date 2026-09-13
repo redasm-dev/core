@@ -190,6 +190,15 @@ static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
     rd_kbobject_each_pair(name, def, types) {
         if(!rd_i_kb_validate_compound(def)) continue;
 
+        /*
+         * Already present?
+         *   On project reload the DB restores every typedef
+         *   before a processor's setup() gets a chance to load its KB, so the
+         *   definitions are the same ones arriving twice.
+         * Not a conflict.
+         */
+        if(rd_i_typedef_find(ctx, name)) continue;
+
         RDTypeDef* tdef = NULL;
 
         if(kind == RD_TKIND_STRUCT)
