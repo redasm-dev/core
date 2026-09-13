@@ -39,6 +39,8 @@ const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
 const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx);
 
 bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m);
+const RDInputMapping* rd_i_db_find_mapping(const RDContext* ctx,
+                                           RDOffset offset);
 const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx);
 
 void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp);

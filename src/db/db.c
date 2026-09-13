@@ -300,6 +300,17 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m) {
     return true;
 }
 
+const RDInputMapping* rd_i_db_find_mapping(const RDContext* ctx,
+                                           RDOffset offset) {
+    const RDInputMapping* m;
+    vect_each(m, &ctx->db->mappings) {
+        usize n = m->end_address - m->start_address;
+        if(offset >= m->offset && offset < m->offset + n) return m;
+    }
+
+    return NULL;
+}
+
 const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx) {
     return &ctx->db->mappings;
 }

@@ -453,7 +453,11 @@ bool rd_to_address(const RDContext* self, RDOffset offset, RDAddress* address) {
 }
 
 bool rd_is_address(const RDContext* self, RDAddress address) {
-    return rd_find_segment(self, address) != NULL;
+    return rd_i_db_find_segment(self, address) != NULL;
+}
+
+bool rd_is_offset(const RDContext* self, RDOffset offset) {
+    return rd_i_db_find_mapping(self, offset) != NULL;
 }
 
 bool rd_has_refs_from(const RDContext* self, RDAddress address) {

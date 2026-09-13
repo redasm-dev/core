@@ -150,6 +150,7 @@ RD_API const RDLoaderPlugin* rd_get_loader_plugin(const RDContext* self);
 RD_API const RDProcessorPlugin* rd_get_processor_plugin(const RDContext* self);
 RD_API RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self);
 RD_API bool rd_is_address(const RDContext* self, RDAddress address);
+RD_API bool rd_is_offset(const RDContext* self, RDOffset offset);
 RD_API const char* rd_get_name(RDContext* self, RDAddress address);
 RD_API const char* rd_to_dec(i64 v);
 RD_API const char* rd_to_hex(i64 v);
