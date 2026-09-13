@@ -29,5 +29,5 @@ RD_API void rd_loader_options_set_group(RDLoaderOptionBuilder* self,
 RD_API void rd_loader_options_add_bool(RDLoaderOptionBuilder* self,
                                        const char* id, const char* name,
                                        const char* desc, bool v);
-RD_API bool rd_get_loader_option_bool(const RDContext* ctx, const char* id,
-                                      bool* v);
+RD_API bool rd_loader_options_get_bool(const RDContext* ctx, const char* id,
+                                       bool* v);

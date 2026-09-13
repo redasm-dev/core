@@ -63,7 +63,7 @@ void rd_loader_options_add_bool(RDLoaderOptionBuilder* self, const char* id,
               });
 }
 
-bool rd_get_loader_option_bool(const RDContext* ctx, const char* id, bool* v) {
+bool rd_loader_options_get_bool(const RDContext* ctx, const char* id, bool* v) {
     if(!ctx || !id) return false;
 
     if(!ctx->testresult) {
