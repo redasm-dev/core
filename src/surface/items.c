@@ -402,8 +402,10 @@ static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
         default: rd_i_renderer_instr(r, address); break;
     }
 
-    _rd_render_refs(r, address);
-    _rd_render_comment_inline(r, address);
+    if(r->mode != RD_RM_FLAGS) {
+        _rd_render_refs(r, address);
+        _rd_render_comment_inline(r, address);
+    }
 }
 
 static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
