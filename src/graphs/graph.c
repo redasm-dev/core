@@ -1,10 +1,38 @@
 #include "graph.h"
 #include "support/containers.h"
 #include "support/hash/murmur3.h"
+#include "support/scratch.h"
 #include <redasm/allocator.h>
 #include <redasm/support/logging.h>
 #include <redasm/support/utils.h>
 #include <redasm/theme.h>
+
+typedef struct {
+    RDGraphNode node;
+    u64 weight;
+} RDGraphOrd;
+
+typedef struct RDGraphOrdVect {
+    RDGraphOrd* data;
+    usize length;
+    usize capacity;
+} RDGraphOrdVect;
+
+static int _rd_graph_ord_cmp(const void* a, const void* b) {
+    const RDGraphOrd* x = a;
+    const RDGraphOrd* y = b;
+    if(x->weight != y->weight) return x->weight < y->weight ? -1 : 1;
+    if(x->node != y->node) return x->node < y->node ? -1 : 1;
+    return 0;
+}
+
+static int _rd_graph_edge_ord_cmp(const void* a, const void* b) {
+    const RDGraphEdge* x = a;
+    const RDGraphEdge* y = b;
+    if(x->src != y->src) return x->src < y->src ? -1 : 1;
+    if(x->dst != y->dst) return x->dst < y->dst ? -1 : 1;
+    return 0;
+}
 
 static void _rd_graph_destroy_edge_attribute(RDEdgeAttributes* ea) {
     vect_destroy(&ea->arrow);
@@ -20,6 +48,47 @@ static void _rd_graph_destroy_edge_attributes(RDGraph* self) {
     vect_each(it, &self->edge_attributes) {
         _rd_graph_destroy_edge_attribute(it);
     }
+}
+
+static const char* _rd_graph_generate_dot_to(const RDGraph* self,
+                                             RDCharVect* buf,
+                                             RDGraphPropCallback cb,
+                                             void* userdata) {
+    str_clear(buf);
+    str_append(buf, "digraph G {\n");
+
+    const RDNodeVect* nodes = rd_i_graph_get_nodes_ordered(self);
+
+    const RDGraphNode* n;
+    vect_each(n, nodes) {
+        str_append(buf, "\t\"#");
+        str_append(buf, rd_i_to_dec((i64)rd_graph_get_node_order(self, *n)));
+        str_append(buf, "\"");
+
+        if(cb) {
+            const char* prop = cb(self, *n, userdata);
+            if(prop) {
+                str_push(buf, ' ');
+                str_append(buf, prop);
+            }
+        }
+
+        str_append(buf, ";\n");
+    }
+
+    if(!vect_is_empty(&self->edges)) str_push(buf, '\n');
+
+    const RDGraphEdge* e;
+    vect_each(e, &self->ordered_edges) {
+        str_append(buf, "\t\"#");
+        str_append(buf, rd_i_to_dec((i64)e->src));
+        str_append(buf, "\" -> \"#");
+        str_append(buf, rd_i_to_dec((i64)e->dst));
+        str_append(buf, "\";\n");
+    }
+
+    str_push(buf, '}');
+    return self->dot_buf.data;
 }
 
 static RDEdgeAttributes* _rd_graph_find_edge_attributes(const RDGraph* self,
@@ -54,6 +123,14 @@ RDNodeAttributes* rd_i_graph_get_node_attributes(RDGraph* self, RDGraphNode n) {
 
     RD_LOG_WARN("node out of range");
     return NULL;
+}
+
+const RDNodeVect* rd_i_graph_get_nodes_ordered(const RDGraph* self) {
+    return self->is_ordered ? &self->ordered_nodes : &self->nodes;
+}
+
+const RDEdgeVect* rd_i_graph_get_edges_ordered(const RDGraph* self) {
+    return self->is_ordered ? &self->ordered_edges : &self->edges;
 }
 
 const RDEdgeVect* rd_i_graph_get_outgoing_edges(const RDGraph* self,
@@ -121,8 +198,11 @@ void rd_graph_destroy(RDGraph* self) {
     vect_destroy(&self->node_attributes);
     vect_destroy(&self->incoming_edges);
     vect_destroy(&self->outgoing_edges);
+    vect_destroy(&self->ordered_edges);
     vect_destroy(&self->edges);
     vect_destroy(&self->nodes);
+    vect_destroy(&self->ordered_nodes);
+    vect_destroy(&self->hash_dot_buf);
     vect_destroy(&self->dot_buf);
     self->node_id = 0;
     self->root = 0;
@@ -238,8 +318,16 @@ RDNodeSlice rd_graph_get_nodes(const RDGraph* self) {
     return vect_to_slice(RDNodeSlice, &self->nodes);
 }
 
+RDNodeSlice rd_graph_get_nodes_ordered(const RDGraph* self) {
+    return vect_to_slice(RDNodeSlice, rd_i_graph_get_nodes_ordered(self));
+}
+
 RDEdgeSlice rd_graph_get_edges(const RDGraph* self) {
     return vect_to_slice(RDEdgeSlice, &self->edges);
+}
+
+RDEdgeSlice rd_graph_get_edges_ordered(const RDGraph* self) {
+    return vect_to_slice(RDEdgeSlice, rd_i_graph_get_edges_ordered(self));
 }
 
 RDEdgeSlice rd_graph_get_outgoing_edges(const RDGraph* self, RDGraphNode n) {
@@ -303,6 +391,13 @@ int rd_graph_get_node_height(const RDGraph* self, RDGraphNode n) {
 
     RD_LOG_WARN("cannot get height, node out of range");
     return -1;
+}
+
+u64 rd_graph_get_node_order(const RDGraph* self, RDGraphNode n) {
+    if(!n || !self->is_ordered) return n;
+    const RDNodeAttributes* na =
+        rd_i_graph_get_node_attributes((RDGraph*)self, n);
+    return na && na->ord ? na->ord : n;
 }
 
 void rd_graph_set_node_x(RDGraph* self, RDGraphNode n, int x) {
@@ -416,51 +511,66 @@ bool rd_graph_is_same(const RDGraph* self, const RDGraph* g) {
 
 u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
                       void* userdata) {
-    rd_graph_generate_dot((RDGraph*)self, cb, userdata);
-    return rd_i_murmur3(self->dot_buf.data, (u32)vect_length(&self->dot_buf));
+    _rd_graph_generate_dot_to((RDGraph*)self, (RDCharVect*)&self->hash_dot_buf,
+                              cb, userdata);
+    return rd_i_murmur3(self->hash_dot_buf.data,
+                        (u32)vect_length(&self->hash_dot_buf));
 }
 
 const char* rd_graph_generate_dot(const RDGraph* self, RDGraphPropCallback cb,
                                   void* userdata) {
-    RDCharVect* buf = (RDCharVect*)&self->dot_buf;
+    return _rd_graph_generate_dot_to(self, (RDCharVect*)&self->dot_buf, cb,
+                                     userdata);
+}
 
-    str_clear(buf);
-    str_append(buf, "digraph G {\n");
+const char* rd_graph_generate_dot_to(const RDGraph* self, RDScratchBuffer* buf,
+                                     RDGraphPropCallback cb, void* userdata) {
+    return _rd_graph_generate_dot_to(self, &buf->impl, cb, userdata);
+}
+
+bool rd_graph_order(RDGraph* self, RDGraphOrderCallback cb, void* userdata) {
+    if(!cb) return false;
+
+    RDGraphOrdVect ord_nodes = {0};
+    vect_reserve(&ord_nodes, vect_length(&self->nodes));
 
     const RDGraphNode* n;
     vect_each(n, &self->nodes) {
-        str_append(buf, "\t\"#");
-        str_append(buf, rd_i_to_dec((i64)*n));
-        str_append(buf, "\"");
-
-        if(cb) {
-            const char* prop = cb(self, *n, userdata);
-            if(prop) {
-                str_push(buf, ' ');
-                str_append(buf, prop);
-            }
-        }
-
-        str_append(buf, ";\n");
+        vect_push(&ord_nodes, (RDGraphOrd){
+                                  .node = *n,
+                                  .weight = cb(self, *n, userdata),
+                              });
     }
 
-    if(!vect_is_empty(&self->edges)) str_push(buf, '\n');
+    vect_sort(&ord_nodes, _rd_graph_ord_cmp);
 
-    vect_each(n, &self->nodes) {
-        const RDEdgeVect* edges = rd_i_graph_get_outgoing_edges(self, *n);
+    vect_clear(&self->ordered_nodes);
+    vect_clear(&self->ordered_edges);
+    vect_reserve(&self->ordered_nodes, vect_length(&self->nodes));
+    vect_reserve(&self->ordered_edges, vect_length(&self->edges));
 
-        const RDGraphEdge* e;
-        vect_each(e, edges) {
-            str_append(buf, "\t\"#");
-            str_append(buf, rd_i_to_dec((i64)e->src));
-
-            str_append(buf, "\" -> \"#");
-            str_append(buf, rd_i_to_dec((i64)e->dst));
-
-            str_append(buf, "\";\n");
-        }
+    // order nodes
+    usize i = 0;
+    const RDGraphOrd* o;
+    vect_each(o, &ord_nodes) {
+        RDNodeAttributes* na = rd_i_graph_get_node_attributes(self, o->node);
+        if(na) na->ord = (RDGraphNode)++i;
+        vect_push(&self->ordered_nodes, o->node);
     }
 
-    str_push(buf, '}');
-    return self->dot_buf.data;
+    // order edges
+    const RDGraphEdge* e;
+    vect_each(e, &self->edges) {
+        vect_push(&self->ordered_edges,
+                  (RDGraphEdge){
+                      .src = (RDGraphNode)rd_graph_get_node_order(self, e->src),
+                      .dst = (RDGraphNode)rd_graph_get_node_order(self, e->dst),
+                  });
+    }
+
+    vect_sort(&self->ordered_edges, _rd_graph_edge_ord_cmp);
+
+    self->is_ordered = true;
+    vect_destroy(&ord_nodes);
+    return true;
 }

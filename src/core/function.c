@@ -20,6 +20,14 @@ typedef struct RDFunctionWorkVect {
     usize capacity;
 } RDFunctionWorkVect;
 
+static u64 _rd_function_block_weight(const RDGraph* g, RDGraphNode n,
+                                     void* ud) {
+    (void)ud;
+    const RDFunctionChunk* c = (const RDFunctionChunk*)rd_graph_get_data(g, n);
+    assert(c);
+    return c->start;
+}
+
 static int _rd_function_kcmp_pred(const void* key, const void* item) {
     RDAddress address = *(const RDAddress*)key;
     const RDFunction* f = *(const RDFunction**)item;
@@ -267,6 +275,8 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     vect_destroy(&refs);
     vect_destroy(&w);
 
+    rd_graph_order(g, _rd_function_block_weight, NULL);
+
     RDGraph* oldgraph = self->graph;
     self->graph = g;
     if(oldgraph) rd_graph_destroy(oldgraph);
@@ -417,6 +427,16 @@ u32 rd_function_get_hash(const RDFunction* self) {
                                  (RDFunction*)self);
     }
 
+    return 0;
+}
+
+const char* rd_function_generate_dot_layout(const RDFunction* self) {
+    if(self->graph) return rd_graph_generate_dot(self->graph, NULL, NULL);
+    return NULL;
+}
+
+u32 rd_function_get_hash_layout(const RDFunction* self) {
+    if(self->graph) return rd_graph_get_hash(self->graph, NULL, NULL);
     return 0;
 }
 

@@ -2,6 +2,7 @@
 
 #include <redasm/common.h>
 #include <redasm/config.h>
+#include <redasm/support/scratch.h>
 
 typedef struct RDGraph RDGraph;
 typedef usize RDGraphNode;
@@ -32,6 +33,8 @@ typedef struct RDGraphPointSlice {
 
 typedef const char* (*RDGraphPropCallback)(const RDGraph* self, RDGraphNode n,
                                            void* userdata);
+typedef u64 (*RDGraphOrderCallback)(const RDGraph* self, RDGraphNode n,
+                                    void* userdata);
 
 RD_API RDGraph* rd_graph_create(void);
 RD_API void rd_graph_destroy(RDGraph* self);
@@ -41,6 +44,12 @@ RD_API u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
 RD_API const char* rd_graph_generate_dot(const RDGraph* self,
                                          RDGraphPropCallback cb,
                                          void* userdata);
+RD_API const char* rd_graph_generate_dot_to(const RDGraph* self,
+                                            RDScratchBuffer* buf,
+                                            RDGraphPropCallback cb,
+                                            void* userdata);
+RD_API bool rd_graph_order(RDGraph* self, RDGraphOrderCallback cb,
+                           void* userdata);
 RD_API RDGraphNode rd_graph_add_node(RDGraph* self);
 RD_API RDGraphEdge rd_graph_add_edge(RDGraph* self, RDGraphNode src,
                                      RDGraphNode dst);
@@ -50,7 +59,9 @@ RD_API bool rd_graph_is_empty(const RDGraph* self);
 RD_API bool rd_graph_set_root(RDGraph* self, RDGraphNode n);
 RD_API RDGraphNode rd_graph_get_root(const RDGraph* self);
 RD_API RDNodeSlice rd_graph_get_nodes(const RDGraph* self);
+RD_API RDNodeSlice rd_graph_get_nodes_ordered(const RDGraph* self);
 RD_API RDEdgeSlice rd_graph_get_edges(const RDGraph* self);
+RD_API RDEdgeSlice rd_graph_get_edges_ordered(const RDGraph* self);
 RD_API RDEdgeSlice rd_graph_get_outgoing_edges(const RDGraph* self,
                                                RDGraphNode n);
 RD_API RDEdgeSlice rd_graph_get_incoming_edges(const RDGraph* self,
@@ -72,6 +83,8 @@ RD_API int rd_graph_get_node_x(const RDGraph* self, RDGraphNode n);
 RD_API int rd_graph_get_node_y(const RDGraph* self, RDGraphNode n);
 RD_API int rd_graph_get_node_width(const RDGraph* self, RDGraphNode n);
 RD_API int rd_graph_get_node_height(const RDGraph* self, RDGraphNode n);
+
+RD_API u64 rd_graph_get_node_order(const RDGraph* self, RDGraphNode n);
 
 RD_API void rd_graph_set_node_x(RDGraph* self, RDGraphNode n, int x);
 RD_API void rd_graph_set_node_y(RDGraph* self, RDGraphNode n, int y);

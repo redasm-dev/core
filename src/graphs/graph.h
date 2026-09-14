@@ -24,6 +24,7 @@ typedef struct RDGraphPointVect {
 typedef struct RDNodeAttributes {
     int x, y, width, height;
     RDNodeData data;
+    usize ord; // 0 = unset, fallback to the node-id
 } RDNodeAttributes;
 
 typedef struct RDEdgeAttributes {
@@ -36,12 +37,16 @@ typedef struct RDEdgeAttributes {
 
 typedef struct RDGraph {
     u32 gen;
+    bool is_ordered;
     RDCharVect dot_buf;
+    RDCharVect hash_dot_buf;
 
     RDGraphNode node_id;
     RDGraphNode root;
     RDNodeVect nodes;
+    RDNodeVect ordered_nodes;
     RDEdgeVect edges;
+    RDEdgeVect ordered_edges;
     RDEdgeVect incoming_edges;
     RDEdgeVect outgoing_edges;
 
@@ -76,7 +81,6 @@ const RDEdgeVect* rd_i_graph_get_outgoing_edges(const RDGraph* self,
 const RDEdgeVect* rd_i_graph_get_incoming_edges(const RDGraph* self,
                                                 RDGraphNode n);
 const RDNodeVect* rd_i_graph_get_nodes(const RDGraph* self);
-const char* rd_i_graph_generate_dot(RDGraph* self,
-                                    void (*props)(RDGraph*, RDGraphNode n,
-                                                  RDCharVect* buf,
-                                                  void* userdata));
+const RDNodeVect* rd_i_graph_get_nodes_ordered(const RDGraph* self);
+const RDEdgeVect* rd_i_graph_get_edges(const RDGraph* self);
+const RDEdgeVect* rd_i_graph_get_edges_ordered(const RDGraph* self);
