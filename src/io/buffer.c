@@ -32,17 +32,31 @@ static usize _rd_bytebuffer_write_bytes(RDBuffer* self, usize idx,
 }
 
 static void _rd_bytebuffer_destroy(RDBuffer* self) {
-    rd_free(_rd_as_bytebuffer(self)->data);
+    if(_rd_as_bytebuffer(self)->data_owned)
+        rd_free(_rd_as_bytebuffer(self)->data);
     rd_free(self);
 }
 
 RDByteBuffer* rd_i_buffer_create(usize n) {
+    RDByteBuffer* self =
+        rd_i_buffer_create_from_data(rd_alloc0(n, sizeof(*self->data)), n);
+    if(self) self->data_owned = true;
+    return self;
+}
+
+RDByteBuffer* rd_i_buffer_create_from_data(const void* data, usize n) {
+    if(!data || !n) return NULL;
+
+    // UB if someone writes in a non-owned data.
+    // Currently used only by RDReader, so it's prevented by design.
+
     RDByteBuffer* self = rd_alloc0(1, sizeof(*self));
     self->base.read_bytes = _rd_bytebuffer_read_bytes;
     self->base.write_bytes = _rd_bytebuffer_write_bytes;
     self->base.destroy = _rd_bytebuffer_destroy;
     self->base.length = n;
-    self->data = rd_alloc0(n, sizeof(*self->data));
+    self->data = (u8*)data;
+    self->data_owned = false;
     return self;
 }
 

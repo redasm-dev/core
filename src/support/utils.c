@@ -88,13 +88,15 @@ int rd_i_strcmp_key_pred(const void* key, const void* s) {
     return strcmp((const char*)key, *(const char**)s);
 }
 
-RDByteBuffer* rd_i_fromdata(const char* bytes, usize n) {
+RDByteBuffer* rd_i_fromdata(const void* data, usize n) {
     RDByteBuffer* b = rd_i_buffer_create(n);
-    memcpy(b->data, bytes, n);
+    memcpy(b->data, data, n);
     return b;
 }
 
 RDByteBuffer* rd_i_readfile(const char* filepath) {
+    if(!filepath) return NULL;
+
     FILE* fp = fopen(filepath, "rb");
     if(!fp) return NULL;
 

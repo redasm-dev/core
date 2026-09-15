@@ -2,6 +2,7 @@
 #include "core/context.h"
 #include "core/segment.h"
 #include "support/error.h"
+#include "support/utils.h"
 #include <redasm/support/logging.h>
 
 typedef struct RDFlagsReader {
@@ -47,6 +48,12 @@ RDReader* rd_i_reader_create(RDBuffer* buf) {
     return self;
 }
 
+RDReader* rd_i_reader_create_owned(RDBuffer* buf) {
+    RDReader* self = rd_i_reader_create(buf);
+    if(self) self->buffer_owned = true;
+    return self;
+}
+
 RDReader* rd_i_reader_create_flags(RDContext* ctx) {
     RDFlagsReader* self = rd_alloc(sizeof(*self));
 
@@ -69,7 +76,27 @@ void rd_i_reader_destroy(RDReader* self) {
         RD_LOG_WARN("reader stack is not empty (save/restore mismatch)");
 
     vect_destroy(&self->stack);
+
+    if(self->buffer_owned) rd_i_buffer_destroy(self->buffer);
     rd_free(self);
+}
+
+bool rd_reader_close(RDReader* self) {
+    if(!self) return false;
+
+    bool ok = !self->error;
+    rd_i_reader_destroy(self);
+    return ok;
+}
+
+RDReader* rd_reader_open(const char* filepath) {
+    RDByteBuffer* buf = rd_i_readfile(filepath);
+    return buf ? rd_i_reader_create_owned((RDBuffer*)buf) : NULL;
+}
+
+RDReader* rd_reader_open_data(const void* data, usize n) {
+    RDByteBuffer* buf = rd_i_buffer_create_from_data(data, n);
+    return buf ? rd_i_reader_create_owned((RDBuffer*)buf) : NULL;
 }
 
 void rd_reader_save(RDReader* self) {

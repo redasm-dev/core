@@ -9,6 +9,7 @@ typedef struct RDReader {
     const RDSegmentFull* segment;
     RDBuffer* buffer;
     usize position;
+    bool buffer_owned;
     bool error;
 
     struct {
@@ -22,5 +23,6 @@ typedef struct RDReader {
 } RDReader;
 
 RDReader* rd_i_reader_create(RDBuffer* buf);
+RDReader* rd_i_reader_create_owned(RDBuffer* buf);
 RDReader* rd_i_reader_create_flags(RDContext* ctx);
 void rd_i_reader_destroy(RDReader* self);

@@ -4,6 +4,9 @@
 
 typedef struct RDReader RDReader;
 
+RD_API RDReader* rd_reader_open(const char* filepath);
+RD_API RDReader* rd_reader_open_data(const void* data, usize n);
+RD_API bool rd_reader_close(RDReader* self);
 RD_API void rd_reader_save(RDReader* self);
 RD_API u64 rd_reader_restore(RDReader* self);
 RD_API void rd_reader_seek(RDReader* self, u64 pos);

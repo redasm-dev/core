@@ -20,9 +20,11 @@ typedef struct RDBuffer {
 typedef struct RDByteBuffer {
     RDBuffer base;
     u8* data;
+    bool data_owned;
 } RDByteBuffer;
 
 RDByteBuffer* rd_i_buffer_create(usize n);
+RDByteBuffer* rd_i_buffer_create_from_data(const void* data, usize n);
 void rd_i_buffer_destroy(RDBuffer* self);
 bool rd_i_buffer_is_empty(const RDBuffer* self);
 usize rd_i_buffer_get_length(const RDBuffer* self);
