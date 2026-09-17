@@ -10,6 +10,7 @@
 #include "kb/kb.h"
 #include "plugins/analyzer.h"
 #include "plugins/processor/processor.h"
+#include "support/error.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
 #include <redasm/redasm.h>
@@ -68,7 +69,8 @@ typedef struct RDContext {
     RDOvrOperandVect ovr_ops_buf;
     RDInstructionVect lift_buf;
     RDResolveResultVect resolve_buf;
-    RDSymbolVect symbols;
+    RDProblemsVect problems_buf;
+    RDSymbolVect symbols_buf;
 
     u32 func_gen;
     u32 graph_gen;
@@ -82,6 +84,7 @@ typedef struct RDContext {
 
     bool scan_char16;
     int min_string;
+    RDAddress base_address;
     RDLoadAddressing addressing;
 
     RDDB* db;
@@ -96,12 +99,12 @@ typedef struct RDContext {
     RDStringTerminatorVect string_terminators;
 
     struct {
-        RDAddress value;
+        RDRelAddress value;
         bool has_value;
     } entry_point;
 
     struct {
-        const RDSegmentFull* segment;
+        const RDSegment* segment;
         RDDelaySlotInfo dslot_info;
         RDEngineQueue qdirty;
         RDEngineQueue qjump;
@@ -111,20 +114,26 @@ typedef struct RDContext {
         unsigned int step;
         clock_t emulate_start;
     } engine;
-
-    struct {
-        RDProblem* data;
-        usize length;
-        usize capacity;
-    } problems;
 } RDContext;
 
-static inline bool rd_i_segment_contains(const RDSegmentFull* seg,
-                                         RDAddress addr) {
-    return addr >= seg->base.start_address && addr < seg->base.end_address;
+static inline RDAddress rd_i_abs(const RDContext* ctx, RDRelAddress rel) {
+    RDAddress result = (RDAddress)(rel + ctx->base_address);
+    panic_if(result < rel, "relative address %llX overflows", rel);
+    return result;
 }
 
-void rd_i_expand_range(RDContext* self, const RDSegmentFull* seg, usize* start,
+static inline RDRelAddress rd_i_rel(const RDContext* ctx, RDAddress abs) {
+    panic_if(abs < ctx->base_address,
+             "absolute address %llX underflows base address %llX", abs,
+             ctx->base_address);
+    return abs - ctx->base_address;
+}
+
+static inline bool rd_i_segment_contains(const RDSegment* seg, RDAddress addr) {
+    return addr >= rd_segment_get_start(seg) && addr < rd_segment_get_end(seg);
+}
+
+void rd_i_expand_range(RDContext* self, const RDSegment* seg, usize* start,
                        usize* end);
 
 RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,

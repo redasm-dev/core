@@ -54,11 +54,11 @@ typedef struct RDDataHead {
 } RDDataHead;
 
 usize rd_i_item_layout(RDContext* ctx, RDRenderFlags flags,
-                       const RDSegmentFull* seg, usize idx, RDRowDescVect* out);
+                       const RDSegment* seg, usize idx, RDRowDescVect* out);
 usize rd_i_item_layout_content(const RDRowDescVect* rows);
-void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
+void rd_i_data_head_get(RDContext* ctx, const RDSegment* seg, usize idx,
                         RDDataHead* out);
-bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx);
+bool rd_i_is_hexchunk_head(const RDSegment* seg, usize idx);
 bool rd_i_link_is_packable(const RDResolveResult* res);
-bool rd_i_is_packed_element_head(const RDSegmentFull* seg, usize idx,
+bool rd_i_is_packed_element_head(const RDSegment* seg, usize idx,
                                  usize elem_size, usize item_idx);

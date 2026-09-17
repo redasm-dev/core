@@ -9,15 +9,15 @@ PRAGMA foreign_keys = ON; \
 PRAGMA temp_store = MEMORY; \
 \
 CREATE TABLE IF NOT EXISTS Segments ( \
-    name          TEXT NOT NULL, \
-    start_address INTEGER NOT NULL, \
-    end_address   INTEGER NOT NULL, \
-    perm          INTEGER NOT NULL \
+    name      TEXT NOT NULL, \
+    rel_start INTEGER NOT NULL, \
+    rel_end   INTEGER NOT NULL, \
+    perm      INTEGER NOT NULL \
 ); \
 CREATE TABLE IF NOT EXISTS InputMappings ( \
-    offset        INTEGER NOT NULL, \
-    start_address INTEGER NOT NULL, \
-    end_address   INTEGER NOT NULL \
+    offset    INTEGER NOT NULL, \
+    rel_start INTEGER NOT NULL, \
+    rel_end   INTEGER NOT NULL \
 ); \
 \
 CREATE TABLE IF NOT EXISTS Comments ( \

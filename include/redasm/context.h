@@ -12,18 +12,6 @@
 #include <redasm/version.h>
 
 typedef enum {
-    RD_SP_NONE = 0,
-    RD_SP_R = 1 << 0,
-    RD_SP_W = 1 << 1,
-    RD_SP_X = 1 << 2,
-
-    RD_SP_RW = RD_SP_R | RD_SP_W,
-    RD_SP_RX = RD_SP_R | RD_SP_X,
-    RD_SP_RWX = RD_SP_R | RD_SP_W | RD_SP_X,
-    RD_SP_WX = RD_SP_W | RD_SP_X,
-} RDSegmentPerm;
-
-typedef enum {
     RD_XR_NONE = 0,
     RD_DR_READ,
     RD_DR_WRITE,
@@ -46,8 +34,8 @@ typedef enum {
 } RDExportFormat;
 
 typedef struct RDProblem {
-    RDAddress from_address;
-    RDAddress address;
+    RDRelAddress from_address;
+    RDRelAddress address;
     const char* message;
 } RDProblem;
 
@@ -130,10 +118,10 @@ RD_API bool rd_encode(RDContext* ctx, RDAddress address, const char* s, RDScratc
 RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_decode_n(RDContext* ctx, RDAddress address, RDInstruction* instrs, usize n);
 RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr);
+RD_API bool rd_has_problems(const RDContext* self);
 RD_API RDProblemSlice rd_get_all_problems(const RDContext* self);
 RD_API RDTypeDefSlice rd_get_all_type_defs(const RDContext* self);
 RD_API RDAddressSlice rd_get_all_address_by_type(const RDContext* self, const char* filter);
-RD_API RDAddressSlice rd_get_all_functions_address(const RDContext* self);
 RD_API RDFunctionSlice rd_get_all_functions(const RDContext* self);
 RD_API RDExternalSlice rd_get_all_externals(const RDContext* self, RDExternalKind kind);
 RD_API RDSymbolSlice rd_get_all_symbols(const RDContext* self);
@@ -141,6 +129,8 @@ RD_API RDSegmentSlice rd_get_all_segments(const RDContext* self);
 RD_API RDAddressSpace rd_get_address_space(const RDContext* ctx);
 RD_API RDInputMappingSlice rd_get_all_mappings(const RDContext* self);
 RD_API RDLoadAddressing rd_get_load_addressing(const RDContext* self);
+RD_API RDAddress rd_get_base_address(const RDContext* self);
+RD_API bool rd_set_base_address(RDContext* self, RDAddress a);
 RD_API void rd_set_scan_char16(RDContext* self, bool b);
 RD_API void rd_set_min_string(RDContext* self, int l);
 RD_API void rd_set_string_terminators(RDContext* ctx, const u8* terms, usize n);
@@ -188,10 +178,12 @@ RD_API bool rd_has_refs_to(const RDContext* self, RDAddress address);
 RD_API bool rd_get_address(RDContext* self, const char* name, RDAddress* address);
 RD_API bool rd_to_offset(const RDContext* self, RDAddress address, RDOffset* offset);
 RD_API bool rd_to_address(const RDContext* self, RDOffset offset, RDAddress* address);
-RD_API bool rd_map_segment(RDContext* self, const char* name, RDAddress addr, RDAddress endaddr, u32 perm);
-RD_API bool rd_map_segment_n(RDContext* self, const char* name, RDAddress addr, usize n, u32 perm);
-RD_API bool rd_map_input(RDContext* self, RDOffset off, RDAddress addr, RDAddress endaddr);
-RD_API bool rd_map_input_n(RDContext* self, RDOffset off, RDAddress addr, usize n);
+RD_API bool rd_to_absolute(const RDContext* ctx, RDRelAddress r, RDAddress* v);
+RD_API bool rd_to_relative(const RDContext* ctx, RDAddress a, RDRelAddress* v);
+RD_API bool rd_map_segment(RDContext* self, const char* name, RDRelAddress addr, RDRelAddress endaddr, u32 perm);
+RD_API bool rd_map_segment_n(RDContext* self, const char* name, RDRelAddress addr, usize n, u32 perm);
+RD_API bool rd_map_input(RDContext* self, RDOffset off, RDRelAddress addr, RDRelAddress endaddr);
+RD_API bool rd_map_input_n(RDContext* self, RDOffset off, RDRelAddress addr, usize n);
 RD_API bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr, RDXRefType type);
 RD_API RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr, RDXRefType type);
 RD_API RDXRefSlice rd_get_xrefs_to(RDContext* self, RDAddress toaddr, RDXRefType type);

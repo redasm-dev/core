@@ -36,7 +36,7 @@ static void _rd_surface_render_finalize(RDSurface* self) {
     rd_i_renderer_swap(self->renderer);
 }
 
-static bool _rd_surface_step_back(RDSurface* self, const RDSegmentFull** seg,
+static bool _rd_surface_step_back(RDSurface* self, const RDSegment** seg,
                                   usize* seg_idx, usize* idx, usize* sub_line) {
     return rd_i_row_step_back(self->renderer->context, self->renderer->flags,
                               &self->renderer->layout_buf, seg, seg_idx, idx,
@@ -47,14 +47,14 @@ static bool _rd_surface_render(RDSurface* self, usize seg_idx, usize idx,
                                usize sub_line) {
     RDRenderer* r = self->renderer;
     RDContext* ctx = r->context;
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
     if(seg_idx == vect_length(segments)) return false;
 
     while(seg_idx < vect_length(segments)) {
         if(vect_length(&r->rows_back) >= self->max_rows) break;
 
-        const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+        const RDSegment* seg = *vect_at(segments, seg_idx);
 
         // fixup to head
         if(rd_flagsbuffer_has_tail(seg->flags, idx))
@@ -110,9 +110,9 @@ static int _rd_surface_find_row(const RDSurface* self, RDAddress address) {
  * anchor (start + start_sub_line) is ALWAYS the actual current top:
  * render, scroll, jump and history restore cannot drift from it.
  */
-static bool _rd_surface_render_from(RDSurface* self, const RDSegmentFull* seg,
+static bool _rd_surface_render_from(RDSurface* self, const RDSegment* seg,
                                     usize seg_idx, usize idx, usize sub_line) {
-    self->state.start = seg->base.start_address + idx;
+    self->state.start = rd_segment_get_start(seg) + idx;
     self->state.start_sub_line = sub_line;
 
     rd_i_renderer_clear(self->renderer);
@@ -128,8 +128,8 @@ static bool _rd_surface_render_at(RDSurface* self, RDAddress address,
     usize seg_idx;
     if(!rd_i_db_find_segment_index(ctx, address, &seg_idx)) return false;
 
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
-    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegment* seg = *vect_at(segments, seg_idx);
     usize idx = rd_i_address2index(seg, address);
 
     return _rd_surface_render_from(self, seg, seg_idx, idx, sub_line);
@@ -269,8 +269,8 @@ bool rd_surface_scroll(RDSurface* self, int n) {
         if(!rd_i_db_find_segment_index(ctx, top->address, &seg_idx))
             return false;
 
-        const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
-        const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+        const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+        const RDSegment* seg = *vect_at(segments, seg_idx);
         usize idx = rd_i_address2index(seg, top->address);
 
         usize saved = self->max_rows;
@@ -302,8 +302,8 @@ bool rd_surface_scroll(RDSurface* self, int n) {
     usize seg_idx;
     if(!rd_i_db_find_segment_index(ctx, r->address, &seg_idx)) return false;
 
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
-    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegment* seg = *vect_at(segments, seg_idx);
     usize idx = rd_i_address2index(seg, r->address);
     usize sub_line = r->sub_line;
 
@@ -324,14 +324,14 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
     usize seg_idx;
     if(!rd_i_db_find_segment_index(ctx, address, &seg_idx)) return false;
 
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
-    const RDSegmentFull* seg = *vect_at(segments, seg_idx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegment* seg = *vect_at(segments, seg_idx);
 
     usize idx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, idx))
         rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
 
-    RDAddress head = seg->base.start_address + idx;
+    RDAddress head = rd_segment_get_start(seg) + idx;
 
     // a jump is THE history event; repaints and scrolls are not
     rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
@@ -420,13 +420,13 @@ usize rd_surface_get_byte_span(const RDSurface* self) {
     const RDRowVect* rows = &self->renderer->rows_front;
 
     usize span = 0;
-    const RDSegmentFull* run_seg = NULL;
+    const RDSegment* run_seg = NULL;
     RDAddress run_start = 0;
     const RDRow* run_last = NULL;
 
     const RDRow* row;
     vect_each(row, rows) {
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, row->address);
         if(!seg) continue;
 
         if(seg != run_seg) { // crossed into a new segment: close the run

@@ -50,6 +50,18 @@ bool rd_analyzer_enable(RDContext* ctx, const char* id) {
     return true;
 }
 
+const RDAnalyzerPlugin* rd_analyzeritem_get_plugin(const RDAnalyzerItem* self) {
+    return self->plugin;
+}
+
+bool rd_analyzeritem_is_selected(const RDAnalyzerItem* self) {
+    return self->is_selected;
+}
+
+void rd_analyzeritem_select(RDAnalyzerItem* self, bool sel) {
+    self->is_selected = sel;
+}
+
 void rd_i_analyzeritemvect_destroy(RDAnalyzerItemVect* self) {
     RDAnalyzerItem** ai;
     vect_each(ai, self) rd_free(*ai);

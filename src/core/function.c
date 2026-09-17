@@ -28,14 +28,6 @@ static u64 _rd_function_block_weight(const RDGraph* g, RDGraphNode n,
     return c->start;
 }
 
-static int _rd_function_kcmp_pred(const void* key, const void* item) {
-    RDAddress address = *(const RDAddress*)key;
-    const RDFunction* f = *(const RDFunction**)item;
-    if(address < f->address) return -1;
-    if(address > f->address) return 1;
-    return 0;
-}
-
 static int _rd_functionchunk_cmp_pred(const void* arg1, const void* arg2) {
     const RDFunctionChunk* chunk1 = *(const RDFunctionChunk**)arg1;
     const RDFunctionChunk* chunk2 = *(const RDFunctionChunk**)arg2;
@@ -60,8 +52,9 @@ static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
     assert(c);
 
     return rd_i_format(&self->fmt_buf,
-                       "[label=\"0x%" PRIX64 " (%zu)\", noret = %s]", c->start,
-                       c->n_instructions, c->has_noret ? "true" : "false");
+                       "[label=\"0x%" PRIX64 " (%zu)\", noret = %s]",
+                       rd_i_abs(self->context, c->start), c->n_instructions,
+                       c->has_noret ? "true" : "false");
 }
 
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
@@ -70,21 +63,22 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
                                                  RDFunctionWorkVect* w,
                                                  RDFunctionChunkVect* chunks) {
     // don't create phantom blocks to invalid or non-executable segments
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
-    if(!seg || !(seg->base.perm & RD_SP_X)) return 0;
+    const RDSegment* seg = rd_i_db_find_segment(ctx, start);
+    if(!seg || !rd_segment_has_perm(seg, RD_SP_X)) return 0;
 
+    RDRelAddress rel_start = rd_i_rel(ctx, start);
     const RDNodeVect* nodes = rd_i_graph_get_nodes(g);
     const RDGraphNode* it;
 
     vect_each(it, nodes) {
         const RDFunctionChunk* b =
             (const RDFunctionChunk*)rd_graph_get_data(g, *it);
-        if(b->start == start) return *it;
+        if(b->start == rel_start) return *it;
     }
 
     RDFunctionChunk* b = rd_alloc0(1, sizeof(*b));
     b->func = func;
-    b->start = start;
+    b->start = rel_start;
     vect_push(chunks, b);
 
     RDGraphNode n = rd_graph_add_node(g);
@@ -94,7 +88,7 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
     return n;
 }
 
-static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address,
+static RDFunction* _rd_function_create(RDContext* ctx, RDRelAddress address,
                                        const char* type) {
     RDFunction* self = rd_alloc(sizeof(*self));
     const RDTypeDef* tdef = NULL;
@@ -114,7 +108,12 @@ static RDFunction* _rd_function_create(RDContext* ctx, RDAddress address,
 
     if(!tdef) tdef = rd_i_typedef_find(ctx, "function");
 
-    *self = (RDFunction){.context = ctx, .address = address, .type_def = tdef};
+    *self = (RDFunction){
+        .context = ctx,
+        .rel_address = address,
+        .type_def = tdef,
+    };
+
     assert(self->type_def);
     assert(self->type_def->kind == RD_TKIND_FUNC);
 
@@ -147,8 +146,9 @@ void rd_i_function_rebuild_graph(RDFunction* self,
     self->n_norets = 0;
 
     // set function entry
-    RDGraphNode root =
-        _rd_function_get_or_add_block(ctx, g, self->address, self, &w, chunks);
+    RDGraphNode root = _rd_function_get_or_add_block(
+        ctx, g, rd_function_get_address(self), self, &w, chunks);
+
     if(root) rd_graph_set_root(g, root);
 
     while(!vect_is_empty(&w)) {
@@ -157,13 +157,14 @@ void rd_i_function_rebuild_graph(RDFunction* self,
         RDGraphNode src = wi.node;
         RDFunctionChunk* b = (RDFunctionChunk*)rd_graph_get_data(g, src);
 
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, addr);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, addr);
         assert(seg);
-        assert(seg->base.perm & RD_SP_X);
+        assert(rd_segment_has_perm(seg, RD_SP_X));
 
+        RDAddress seg_endaddress = rd_segment_get_end(seg);
         bool has_noret = false;
 
-        while(addr < seg->base.end_address) {
+        while(addr < seg_endaddress) {
             usize idx = rd_i_address2index(seg, addr);
             RDFlags flags = rd_i_flagsbuffer_get(seg->flags, idx);
 
@@ -176,13 +177,13 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             self->n_instructions++;
             b->n_instructions++;
 
-            RDAddress nextaddr = addr + len;
+            RDAddress nextaddr = (RDAddress)(addr + len);
 
             if(rd_flags_has_jump(flags)) {
                 rd_i_get_xrefs_from_ex(ctx, addr, RD_CR_JUMP, &refs);
 
                 // consume all delay slot instructions into current block
-                while(nextaddr < seg->base.end_address) {
+                while(nextaddr < seg_endaddress) {
                     usize nextidx = rd_i_address2index(seg, nextaddr);
                     RDFlags nextflags =
                         rd_i_flagsbuffer_get(seg->flags, nextidx);
@@ -237,7 +238,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
             }
 
             // check next instruction
-            if(nextaddr >= seg->base.end_address) {
+            if(nextaddr >= seg_endaddress) {
                 addr = nextaddr;
                 break; // end of segment, block ends
             }
@@ -268,7 +269,7 @@ void rd_i_function_rebuild_graph(RDFunction* self,
         }
 
         // finalize block end address
-        b->end = addr;
+        b->end = rd_i_rel(ctx, addr);
         b->has_noret = has_noret;
     }
 
@@ -298,46 +299,48 @@ void rd_i_functionchunk_destroy(RDFunctionChunkVect* self) {
     vect_destroy(self);
 }
 
-void rd_i_function_declare_if(RDContext* ctx, const RDSegmentFull* seg,
-                              usize idx, const char* type) {
+int rd_i_function_kcmp_pred(const void* key, const void* item) {
+    RDRelAddress rel_address = *(const RDRelAddress*)key;
+    const RDFunction* f = *(const RDFunction**)item;
+    if(rel_address < f->rel_address) return -1;
+    if(rel_address > f->rel_address) return 1;
+    return 0;
+}
+
+void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
+                              const char* type) {
     if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
-    rd_i_function_declare(ctx, seg->base.start_address + idx, type);
+    rd_i_function_declare(ctx, seg->rel_start + idx, type);
 }
 
-RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address,
+RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,
                                   const char* type) {
     RDFunction* self = _rd_function_create(ctx, address, type);
     self->gen = ++ctx->func_gen;
 
     usize func_idx =
-        vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
+        vect_lower_bound(&ctx->functions, &address, rd_i_function_kcmp_pred);
 
     rd_fire_func_hook(ctx, "redasm.func_adding", self, func_idx);
-
     vect_ins(&ctx->functions, func_idx, self);
-    vect_ins(&ctx->functions.addresses, func_idx, address);
-    assert(vect_length(&ctx->functions) ==
-           vect_length(&ctx->functions.addresses));
-
     rd_fire_func_hook(ctx, "redasm.func_added", self, func_idx);
     return self;
 }
 
-void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
-                             usize idx) {
+void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg, usize idx) {
     if(!rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
-    RDAddress address = seg->base.start_address + idx;
+    RDRelAddress address = rd_segment_get_start(seg) + idx;
 
     usize func_idx =
-        vect_lower_bound(&ctx->functions, &address, _rd_function_kcmp_pred);
+        vect_lower_bound(&ctx->functions, &address, rd_i_function_kcmp_pred);
 
     // FL_FUNC and ctx->functions are set together by rd_i_function_declare:
     // one without the other is a bug, not a tolerable state
     panic_if(func_idx >= vect_length(&ctx->functions) ||
-                 (*vect_at(&ctx->functions, func_idx))->address != address,
+                 (*vect_at(&ctx->functions, func_idx))->rel_address != address,
              "FL_FUNC set with no record @ %" PRIX64, address);
 
     RDFunction* f = *vect_at(&ctx->functions, func_idx);
@@ -353,10 +356,6 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
 
     // remove from the vector FIRST
     vect_del(&ctx->functions, func_idx, 1);
-    vect_del(&ctx->functions.addresses, func_idx, 1);
-    assert(vect_length(&ctx->functions) ==
-           vect_length(&ctx->functions.addresses));
-
     rd_fire_func_hook(ctx, "redasm.func_removed", f, func_idx);
     _rd_function_destroy(f);
 }
@@ -400,7 +399,7 @@ const RDTypeDef* rd_function_get_type(const RDFunction* self) {
 }
 
 RDAddress rd_function_get_address(const RDFunction* self) {
-    return self->address;
+    return rd_i_abs(self->context, self->rel_address);
 }
 
 usize rd_function_get_n_instructions(const RDFunction* self) {
@@ -444,11 +443,12 @@ bool rd_function_contains_address(const RDFunction* self, RDAddress address) {
     if(!self->graph) return false;
 
     const RDNodeVect* nodes = rd_i_graph_get_nodes(self->graph);
+    RDRelAddress rel_address = rd_i_rel(self->context, address);
 
     RDGraphNode* n;
     vect_each(n, nodes) {
         const RDFunctionChunk* chunk = rd_i_function_get_chunk(self, *n);
-        if(chunk && (address >= chunk->start && address < chunk->end))
+        if(chunk && (rel_address >= chunk->start && rel_address < chunk->end))
             return true;
     }
 
@@ -477,7 +477,6 @@ void rd_i_function_rebuild(RDFunction* self) {
 
 void rd_i_functionvect_destroy(RDFunctionVect* self) {
     rd_i_functionchunk_destroy(&self->chunks);
-    vect_destroy(&self->addresses);
 
     RDFunction** f;
     vect_each(f, self) { _rd_function_destroy(*f); }
@@ -485,9 +484,27 @@ void rd_i_functionvect_destroy(RDFunctionVect* self) {
 }
 
 int rd_i_functionchunk_kcmp_pred(const void* key, const void* item) {
-    RDAddress address = *(const RDAddress*)key;
+    RDRelAddress rel_address = *(const RDRelAddress*)key;
     const RDFunctionChunk* c = *(const RDFunctionChunk**)item;
-    if(address < c->start) return -1;
-    if(address >= c->end) return 1;
+    if(rel_address < c->start) return -1;
+    if(rel_address >= c->end) return 1;
     return 0;
+}
+
+RDAddress rd_functionchunk_get_start(const RDFunctionChunk* self) {
+    const RDContext* ctx = self->func->context;
+    return rd_i_abs(ctx, self->start);
+}
+
+RDAddress rd_functionchunk_get_end(const RDFunctionChunk* self) {
+    const RDContext* ctx = self->func->context;
+    return rd_i_abs(ctx, self->end);
+}
+
+usize rd_functionchunk_get_instruction_count(const RDFunctionChunk* self) {
+    return self->n_instructions;
+}
+
+bool rd_functionchunk_has_noret(const RDFunctionChunk* self) {
+    return self->has_noret;
 }

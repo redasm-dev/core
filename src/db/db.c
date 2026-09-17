@@ -1,5 +1,7 @@
 #include "db.h"
 #include "core/context.h"
+#include "core/mapping.h"
+#include "core/segment.h"
 #include "db/schema.h"
 #include "db/types.h"
 #include "support/containers.h"
@@ -8,6 +10,21 @@
 #include <redasm/support/logging.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
+
+static bool _rd_validate_address_bounds(const RDContext* ctx,
+                                        RDAddress address) {
+    if(vect_is_empty(&ctx->db->segments)) return false;
+
+    // check if before the first address
+    if(address < rd_segment_get_start(*vect_first(&ctx->db->segments)))
+        return false;
+
+    // check if after the last address
+    if(address >= rd_segment_get_end(*vect_last(&ctx->db->segments)))
+        return false;
+
+    return true;
+}
 
 bool rd_i_db_is_valid(const char* dbpath) {
     sqlite3* db = NULL;
@@ -68,10 +85,12 @@ void rd_i_db_destroy(RDDB* self) {
     vect_each(v, &self->segment_regs) { vect_destroy(v); }
     vect_destroy(&self->segment_regs);
 
-    RDSegmentFull** s;
+    RDSegment** s;
     vect_each(s, &self->segments) { rd_i_segment_destroy(*s); }
     vect_destroy(&self->segments);
 
+    RDInputMapping** m;
+    vect_each(m, &self->mappings) { rd_i_inputmapping_destroy(*m); }
     vect_destroy(&self->mappings);
 
     for(int i = 0; i < RD_QUERY_COUNT; i++) {
@@ -181,20 +200,21 @@ done:
     return ok;
 }
 
-bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
-    if(seg->base.start_address >= seg->base.end_address) return false;
+bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg) {
+    if(seg->rel_start >= seg->rel_end) return false;
 
     // check for overlaps with existing segments
-    RDSegmentFull** it;
+    RDSegment** it;
     vect_each(it, &ctx->db->segments) {
-        RDAddress s = (*it)->base.start_address;
-        RDAddress e = (*it)->base.end_address;
-        if(seg->base.start_address < e && seg->base.end_address > s) {
+        RDRelAddress s = (*it)->rel_start;
+        RDRelAddress e = (*it)->rel_end;
+
+        if(seg->rel_start < e && seg->rel_end > s) {
             rd_i_add_problem(
-                ctx, seg->base.start_address, seg->base.start_address,
+                ctx, rd_segment_get_start(seg), rd_segment_get_start(seg),
                 "segment '%s' [%llx, %llx) overlaps with '%s' [%llx, %llx)",
-                seg->base.name, seg->base.start_address, seg->base.end_address,
-                (*it)->base.name, s, e);
+                seg->name, rd_segment_get_start(seg), rd_segment_get_end(seg),
+                (*it)->name, s, e);
             return false;
         }
     }
@@ -207,8 +227,12 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg) {
 
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index) {
-    usize seg_idx =
-        vect_bsearch(&ctx->db->segments, &address, _rd_i_db_segment_find_pred);
+    if(!_rd_validate_address_bounds(ctx, address)) return NULL;
+
+    RDRelAddress rel_address = rd_i_rel(ctx, address);
+
+    usize seg_idx = vect_bsearch(&ctx->db->segments, &rel_address,
+                                 _rd_i_db_segment_find_pred);
 
     if(seg_idx < vect_length(&ctx->db->segments)) {
         if(index) *index = seg_idx;
@@ -218,100 +242,96 @@ bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
     return false;
 }
 
-const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
-                                          RDAddress address) {
-    if(vect_is_empty(&ctx->db->segments)) return NULL;
-
-    // check if before the first address
-    if(address < (*vect_first(&ctx->db->segments))->base.start_address)
-        return NULL;
-
-    // check if after the last address
-    if(address >= (*vect_last(&ctx->db->segments))->base.end_address)
-        return NULL;
+const RDSegment* rd_i_db_find_segment(const RDContext* ctx, RDAddress address) {
+    if(!_rd_validate_address_bounds(ctx, address)) return NULL;
 
     if(ctx->db->last_segment &&
        rd_i_segment_contains(ctx->db->last_segment, address))
         return ctx->db->last_segment;
 
-    usize idx =
-        vect_bsearch(&ctx->db->segments, &address, _rd_i_db_segment_find_pred);
+    RDRelAddress rel_address = rd_i_rel(ctx, address);
+
+    usize idx = vect_bsearch(&ctx->db->segments, &rel_address,
+                             _rd_i_db_segment_find_pred);
     if(idx == vect_length(&ctx->db->segments)) return NULL;
 
     ctx->db->last_segment = *vect_at(&ctx->db->segments, idx);
     return ctx->db->last_segment;
 }
 
-const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx) {
+const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx) {
     return &ctx->db->segments;
 }
 
-bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m) {
-    RDAddress endoff = m.end_address - m.start_address + m.offset;
-    if(m.offset >= endoff || m.start_address >= m.end_address) return false;
+bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping* m) {
+    RDOffset endoff = m->rel_end - m->rel_start + m->offset;
+    if(m->offset >= endoff || m->rel_start >= m->rel_end) return false;
 
-    usize n = m.end_address - m.start_address;
-    if(m.offset + n > ctx->input->base.length) {
-        rd_i_add_problem(ctx, m.start_address, m.start_address,
+    usize n = rd_inputmapping_get_size(m);
+
+    if(m->offset + n > ctx->input->base.length) {
+        rd_i_add_problem(ctx, rd_inputmapping_get_start(m),
+                         rd_inputmapping_get_start(m),
                          "trying to map past end of input buffer");
         return false;
     }
 
     // segment must exist and mapping must not cross boundary
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, m.start_address);
+    const RDSegment* seg =
+        rd_i_db_find_segment(ctx, rd_inputmapping_get_start(m));
 
     if(!seg) {
-        rd_i_add_problem(ctx, m.start_address, m.start_address,
-                         "no segment at %llx", m.start_address);
+        rd_i_add_problem(ctx, rd_inputmapping_get_start(m),
+                         rd_inputmapping_get_start(m), "no segment at %llx",
+                         rd_inputmapping_get_start(m));
         return false;
     }
 
-    if(m.end_address > seg->base.end_address) {
+    if(m->rel_end > seg->rel_end) {
         rd_i_add_problem(
-            ctx, m.start_address, m.start_address,
+            ctx, rd_inputmapping_get_start(m), rd_inputmapping_get_start(m),
             "[%llx, %llx) crosses segment boundary '%s' [%llx, %llx)",
-            m.start_address, m.end_address, seg->base.name,
-            seg->base.start_address, seg->base.end_address);
+            rd_inputmapping_get_start(m), rd_inputmapping_get_end(m), seg->name,
+            rd_segment_get_start(seg), rd_segment_get_end(seg));
         return false;
     }
 
     // overlap check against existing mappings
-    RDInputMapping* it;
+    RDInputMapping** it;
     vect_each(it, &ctx->db->mappings) {
-        if(m.start_address < it->end_address &&
-           m.end_address > it->start_address) {
+        if(m->rel_start < (*it)->rel_end && m->rel_end > (*it)->rel_start) {
             rd_i_add_problem(
-                ctx, m.start_address, m.start_address,
+                ctx, rd_inputmapping_get_start(m), rd_inputmapping_get_start(m),
                 "[%llx, %llx) overlaps with existing mapping [%llx, %llx)",
-                m.start_address, m.end_address, it->start_address,
-                it->end_address);
+                rd_inputmapping_get_start(m), rd_inputmapping_get_end(m),
+                rd_inputmapping_get_start(*it), rd_inputmapping_get_end(*it));
             return false;
         }
     }
 
     // write bytes into the segment's flags buffer
-    usize buf_idx = rd_i_address2index(seg, m.start_address);
+    usize buf_idx = rd_i_address2index(seg, rd_inputmapping_get_start(m));
     rd_i_buffer_write((RDBuffer*)seg->flags, buf_idx,
-                      ctx->input->data + m.offset, n);
+                      ctx->input->data + m->offset, n);
 
     vect_push(&ctx->db->mappings, m);
     vect_sort(&ctx->db->mappings, _rd_i_db_mapping_cmp_pred);
-    _rd_i_db_query_add_mapping(ctx, &m);
+    _rd_i_db_query_add_mapping(ctx, m);
     return true;
 }
 
 const RDInputMapping* rd_i_db_find_mapping(const RDContext* ctx,
                                            RDOffset offset) {
-    const RDInputMapping* m;
-    vect_each(m, &ctx->db->mappings) {
-        usize n = m->end_address - m->start_address;
-        if(offset >= m->offset && offset < m->offset + n) return m;
+    RDInputMapping** it;
+    vect_each(it, &ctx->db->mappings) {
+        usize n = rd_inputmapping_get_size(*it);
+        if(offset >= (*it)->offset && offset < (*it)->offset + n) return *it;
     }
 
     return NULL;
 }
 
-const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx) {
+const RDInputMappingVect* rd_i_db_get_mappings(const RDContext* ctx) {
     return &ctx->db->mappings;
 }
 
@@ -460,8 +480,18 @@ bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_has_any_comment(ctx, address);
 }
 
-void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p) {
-    _rd_i_db_query_add_problem(ctx, p);
+void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
+                         const char* msg) {
+    _rd_i_db_query_add_problem(ctx, from, addr, msg);
+}
+
+const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
+                                               RDProblemsVect* v) {
+    return _rd_i_db_query_get_all_problems(ctx, v);
+}
+
+bool rd_i_db_has_problems(RDContext* ctx) {
+    return _rd_i_db_query_has_problems(ctx);
 }
 
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
@@ -471,14 +501,14 @@ bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
         &ctx->db->segment_regs, &ctx->db->segment_reg_names, interned);
 
     RDSegmentReg entry = {
-        .address = address,
+        .address = rd_i_rel(ctx, address),
         .name = interned,
         .value = val,
         .has_value = true,
         .confidence = c,
     };
 
-    RDSegmentReg key = {.address = address};
+    RDSegmentReg key = {.address = rd_i_rel(ctx, address)};
     usize idx = vect_lower_bound(rv, &key, _rd_i_db_segmentreg_cmp);
 
     if(idx < vect_length(rv) && vect_at(rv, idx)->address == address) {
@@ -499,14 +529,14 @@ bool rd_i_db_del_sregval(RDContext* ctx, RDAddress address, const char* regname,
     if(!rv) return false;
 
     RDSegmentReg entry = {
-        .address = address,
+        .address = rd_i_rel(ctx, address),
         .name = interned,
         .value = 0,
         .has_value = false,
         .confidence = c,
     };
 
-    RDSegmentReg key = {.address = address};
+    RDSegmentReg key = {.address = rd_i_rel(ctx, address)};
     usize idx = vect_lower_bound(rv, &key, _rd_i_db_segmentreg_cmp);
 
     if(idx < vect_length(rv) && vect_at(rv, idx)->address == address) {
@@ -527,7 +557,7 @@ bool rd_i_db_get_sregval(RDContext* ctx, RDAddress address, const char* regname,
     if(!rv || vect_is_empty(rv)) return false;
 
     // upper_bound then step back: largest address <= query_address
-    RDSegmentReg key = {.address = address};
+    RDSegmentReg key = {.address = rd_i_rel(ctx, address)};
     usize idx = vect_upper_bound(rv, &key, _rd_i_db_segmentreg_cmp);
     if(!idx) return false;
 

@@ -18,6 +18,7 @@ typedef struct RDProjectManifest {
     const RDProcessorPlugin* processorplugin;
 
     int min_string;
+    RDAddress base_address;
 
     struct {
         RDAddress value;
@@ -55,6 +56,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
     {.key = "format.file_name", .type = TOML_STRING},
 
     {.key = "analysis.min_string", .type = TOML_INT64},
+    {.key = "analysis.base_address", .type = TOML_INT64},
     {.key = "analysis.string_terminators", .type = TOML_ARRAY, .array_type = &(RDTomlSchema){.type = TOML_INT64}},
     {.key = "analysis.loader", .type = TOML_STRING},
     {.key = "analysis.processor", .type = TOML_STRING},
@@ -158,6 +160,9 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     out->min_string =
         (int)toml_seek(out->toml.toptab, "analysis.min_string").u.int64;
 
+    out->base_address =
+        (RDAddress)toml_seek(out->toml.toptab, "analysis.base_address").u.int64;
+
     toml_datum_t string_terminators =
         toml_seek(out->toml.toptab, "analysis.string_terminators");
 
@@ -254,15 +259,16 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
     if(!ctx) return NULL;
 
     ctx->min_string = manifest->min_string;
+    ctx->base_address = manifest->base_address;
     rd_i_set_processor(ctx, manifest->processorplugin);
     rd_i_db_load_segments(ctx);
 
     RDCharVect buf = {0};
 
-    RDSegmentFull** seg;
+    RDSegment** seg;
     vect_each(seg, &ctx->db->segments) {
         const char* flagsname =
-            rd_i_format(&buf, "flags/%" PRIX64, (*seg)->base.start_address);
+            rd_i_format(&buf, "flags/%" PRIX64, (*seg)->rel_start);
 
         size_t n = 0;
         char* flags =
@@ -270,7 +276,7 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
 
         if(!flags ||
            n != rd_flagsbuffer_get_length((*seg)->flags) * sizeof(RDFlags)) {
-            RD_LOG_FAIL("flags mismatch for segment '%s'", (*seg)->base.name);
+            RD_LOG_FAIL("flags mismatch for segment '%s'", (*seg)->name);
             mz_free(flags);
             goto fail;
         }

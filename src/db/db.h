@@ -7,12 +7,12 @@
 #include <sqlite3.h>
 
 typedef struct RDDB {
-    RDSegmentFullVect segments;
-    RDMappingVect mappings;
+    RDSegmentVect segments;
+    RDInputMappingVect mappings;
     RDSegmentRegsVect segment_regs;
     RDSegmentRegNameVect segment_reg_names;
 
-    RDSegmentFull* last_segment;
+    RDSegment* last_segment;
 
     char* filepath;
     sqlite3* handle;
@@ -31,17 +31,16 @@ void rd_i_db_load_segments(RDContext* ctx);
 void rd_i_db_load(RDContext* ctx);
 bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
-bool rd_i_db_add_segment(RDContext* ctx, RDSegmentFull* seg);
+bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg);
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index);
-const RDSegmentFull* rd_i_db_find_segment(const RDContext* ctx,
-                                          RDAddress address);
-const RDSegmentFullVect* rd_i_db_get_segments(const RDContext* ctx);
+const RDSegment* rd_i_db_find_segment(const RDContext* ctx, RDAddress address);
+const RDSegmentVect* rd_i_db_get_segments(const RDContext* ctx);
 
-bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping m);
+bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping* m);
 const RDInputMapping* rd_i_db_find_mapping(const RDContext* ctx,
                                            RDOffset offset);
-const RDMappingVect* rd_i_db_get_mappings(const RDContext* ctx);
+const RDInputMappingVect* rd_i_db_get_mappings(const RDContext* ctx);
 
 void rd_i_db_set_external(RDContext* ctx, const RDExternal* exp);
 bool rd_i_db_get_external(RDContext* ctx, RDAddress address, RDExternal* ext);
@@ -100,7 +99,11 @@ usize rd_i_db_get_comment_count(RDContext* ctx, RDAddress address,
                                 RDCommentPlacement p);
 bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address);
 
-void rd_i_db_add_problem(RDContext* ctx, const RDProblem* p);
+void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
+                         const char* msg);
+const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
+                                               RDProblemsVect* v);
+bool rd_i_db_has_problems(RDContext* ctx);
 
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue val, RDConfidence c);

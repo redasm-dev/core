@@ -8,8 +8,8 @@
 
 typedef enum { RD_UNROLL_ROOT, RD_UNROLL_FIELD, RD_UNROLL_ITEM } RDUnrollKind;
 
-static void _rd_unroll_type(RDContext* ctx, const RDSegmentFull* seg,
-                            usize* idx, const RDType* t, RDUnrollKind kind,
+static void _rd_unroll_type(RDContext* ctx, const RDSegment* seg, usize* idx,
+                            const RDType* t, RDUnrollKind kind,
                             bool coincident) {
     usize sz = rd_type_size(t, ctx);
 
@@ -238,7 +238,7 @@ const char* rd_i_type_to_str(const RDType* t, RDCharVect* buf) {
 }
 
 const char* rd_i_type_path(RDContext* ctx, RDAddress address, RDCharVect* buf) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return NULL;
 
     usize idx = rd_i_address2index(seg, address);
@@ -287,7 +287,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
                    RDTypeModifier mod, RDConfidence c) {
     if(!name || !(*name)) return false;
 
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     RDType t;
@@ -320,7 +320,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
 }
 
 bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -373,7 +373,7 @@ bool rd_type_equals(const RDType* self, const RDType* t) {
 void rd_i_type_unroll(RDContext* ctx, RDAddress address, const RDType* t) {
     assert(t);
 
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     assert(seg);
 
     usize idx = rd_i_address2index(seg, address);

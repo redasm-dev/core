@@ -28,16 +28,6 @@ static void _rd_worker_next_or_emulate(RDContext* ctx) {
         ctx->engine.step++;
 }
 
-static int _rd_worker_problem_cmp(const void* a, const void* b) {
-    const RDProblem* pa = (const RDProblem*)a;
-    const RDProblem* pb = (const RDProblem*)b;
-
-    if(pa->from_address != pb->from_address)
-        return pa->from_address < pb->from_address ? -1 : 1;
-    if(pa->address != pb->address) return pa->address < pb->address ? -1 : 1;
-    return 0;
-}
-
 static void _rd_worker_rebuild_functions(RDContext* ctx) {
     RD_LOG_INFO("generating functions");
 
@@ -90,7 +80,7 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
         RDAddress address;
         if(!rd_get_address(ctx, tdef->name, &address)) continue;
 
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, address);
         if(!seg) continue;
 
         usize idx = rd_i_address2index(seg, address);
@@ -123,7 +113,7 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
     RDFunction** func_it;
     vect_each(func_it, &ctx->functions) {
         if(!rd_function_is_noret(*func_it)) continue;
-        vect_push(&v, (*func_it)->address);
+        vect_push(&v, rd_function_get_address(*func_it));
     }
 
     while(!vect_is_empty(&v)) {
@@ -144,7 +134,8 @@ static void _rd_worker_apply_noret(RDContext* ctx) {
             rd_i_function_rebuild(f);
 
             // if all exit blocks are now NORET, propagate further
-            if(rd_function_is_noret(f)) vect_push(&v, f->address);
+            if(rd_function_is_noret(f))
+                vect_push(&v, rd_function_get_address(f));
         }
     }
 
@@ -185,9 +176,9 @@ static void _rd_worker_dedup_names(RDContext* ctx) {
     vect_clear(&ctx->pending_renames);
 }
 
-static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegmentFull* seg,
+static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegment* seg,
                                       usize start, usize end) {
-    RDAddress curr = seg->base.start_address + start;
+    RDAddress curr = rd_segment_get_start(seg) + start;
 
     for(usize i = start; i < end; i++, curr++) {
         if(!rd_i_flagsbuffer_has_xref_out(seg->flags, i)) continue;
@@ -211,7 +202,7 @@ static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
 
     RDEngineItem* item;
     queue_each(item, &ctx->engine.qdirty) {
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, item->address);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, item->address);
         if(!seg) continue;
 
         usize start_idx = rd_i_address2index(seg, item->address);
@@ -236,7 +227,7 @@ static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
     keep:
         // decode from the ITEM HEAD
         // a mid-item patch must not decode from the patched byte
-        item->address = seg->base.start_address + start_idx;
+        item->address = rd_segment_get_start(seg) + start_idx;
         item->from = item->address;
         item->n = end_idx - start_idx;
     }
@@ -295,13 +286,9 @@ static void _rd_worker_step_finalize(RDContext* ctx) {
     _rd_worker_follow_pointers(ctx);
     _rd_worker_apply_noret(ctx);
     rd_fire_hook(ctx, "redasm.finalized");
-    vect_sort(&ctx->problems, _rd_worker_problem_cmp);
 
     ctx->engine.step++;
-
-    // post-analysis summary
-    RD_LOG_INFO("terminated with functions: %zu, problems: %zu",
-                vect_length(&ctx->functions), vect_length(&ctx->problems));
+    RD_LOG_INFO("analysis completed");
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {
@@ -313,7 +300,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
     if(status) {
         status->is_busy = is_busy;
         status->step = RD_STEP_NAMES[self->engine.step];
-        status->segment = (const RDSegment*)self->engine.segment;
+        status->segment = self->engine.segment;
         status->pending_calls = queue_length(&self->engine.qcall);
         status->pending_jumps = queue_length(&self->engine.qjump);
         optional_unset(&status->address);

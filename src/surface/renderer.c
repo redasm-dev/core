@@ -13,7 +13,7 @@
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
 #define RD_SURFACE_ROW_INITIAL_SIZE 1024
 
-static bool _rd_renderer_can_autoname(const RDSegmentFull* seg, usize idx) {
+static bool _rd_renderer_can_autoname(const RDSegment* seg, usize idx) {
     return rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
            rd_flagsbuffer_has_type(seg->flags, idx) ||
            rd_flagsbuffer_has_func(seg->flags, idx) ||
@@ -138,9 +138,9 @@ static void _rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
     }
 }
 
-const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
-                                                RDAddress address) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(self->context, address);
+const RDSegment* rd_i_renderer_find_segment(RDRenderer* self,
+                                            RDAddress address) {
+    const RDSegment* seg = rd_i_db_find_segment(self->context, address);
     assert(seg);
     return seg;
 }
@@ -305,16 +305,16 @@ void rd_i_renderer_highlight_selection(RDRenderer* self, int startrow,
     }
 }
 
-RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
+RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegment* seg,
                                 usize idx, usize sub_line, usize indent) {
-    RDAddress address = seg->base.start_address + idx;
+    RDAddress address = rd_segment_get_start(seg) + idx;
 
     _rd_renderer_calc_auto_column(self);
     rd_i_rowvect_push(&self->rows_back, sub_line, address);
     rd_i_row_reserve(vect_last(&self->rows_back), RD_SURFACE_ROW_INITIAL_SIZE);
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_ADDRESS)) {
-        rd_renderer_norm(self, seg->base.name);
+        rd_renderer_norm(self, seg->name);
         rd_renderer_norm(self, ":");
 
         const unsigned int PTR_SIZE = rd_get_ptr_size(self->context);
@@ -375,7 +375,7 @@ void rd_i_renderer_flags(RDRenderer* self, RDAddress address) {
     };
 
     const int N_PREDS = sizeof(PREDS) / sizeof(*PREDS);
-    const RDSegmentFull* seg = rd_i_renderer_find_segment(self, address);
+    const RDSegment* seg = rd_i_renderer_find_segment(self, address);
     usize idx = rd_i_address2index(seg, address);
 
     bool first = true;
@@ -390,7 +390,7 @@ void rd_i_renderer_flags(RDRenderer* self, RDAddress address) {
 }
 
 void rd_i_renderer_instr(RDRenderer* self, RDAddress address) {
-    const RDSegmentFull* seg = rd_i_renderer_find_segment(self, address);
+    const RDSegment* seg = rd_i_renderer_find_segment(self, address);
     usize idx = rd_i_address2index(seg, address);
 
     RDInstruction instr = {0};
@@ -494,8 +494,7 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
         bool hasname = rd_i_get_name(self->context, address, false, &n);
 
         if(!hasname) {
-            const RDSegmentFull* seg =
-                rd_i_db_find_segment(self->context, address);
+            const RDSegment* seg = rd_i_db_find_segment(self->context, address);
 
             if(seg) {
                 usize idx = rd_i_address2index(seg, address);

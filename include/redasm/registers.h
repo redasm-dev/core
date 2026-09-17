@@ -15,7 +15,7 @@ typedef struct RDRegMask {
 } RDRegMask;
 
 typedef struct RDSegmentReg {
-    RDAddress address;
+    RDRelAddress address;
     const char* name;
     RDRegValue value;
     bool has_value;

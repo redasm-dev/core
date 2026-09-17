@@ -38,7 +38,7 @@ static inline RDRenderMode rd_i_renderer_get_mode(const RDRenderer* self) {
 
 RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags);
 void rd_i_renderer_destroy(RDRenderer* self);
-const RDSegmentFull* rd_i_renderer_find_segment(RDRenderer* self,
+const RDSegment* rd_i_renderer_find_segment(RDRenderer* self,
                                                 RDAddress address);
 void rd_i_renderer_clear(RDRenderer* self);
 void rd_i_renderer_swap(RDRenderer* self);
@@ -79,5 +79,5 @@ int rd_i_renderer_get_max_column(const RDRenderer* self);
 usize rd_i_renderer_get_row_count(const RDRenderer* self);
 bool rd_i_renderer_select_word(RDRenderer* self, int row, int col,
                                RDSurfacePos* startpos, RDSurfacePos* endpos);
-RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegmentFull* seg,
+RDAddress rd_i_renderer_new_row(RDRenderer* self, const RDSegment* seg,
                                 usize idx, usize sub_line, usize indent);

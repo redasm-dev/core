@@ -59,13 +59,13 @@ static void _rd_surfacegraph_render_range(RDSurfaceGraph* self, RDAddress start,
     RDRenderer* r = self->renderer;
     RDContext* ctx = r->context;
 
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, start);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, start);
     panic_if(!seg, "chunk start outside any segment @ %" PRIX64, start);
 
     // 'endidx' is calculated manually because it can trigger
     // rd_i_address2index's assertion if it is EXACTLY at end
     usize idx = rd_i_address2index(seg, start);
-    usize endidx = end - seg->base.start_address;
+    usize endidx = end - rd_segment_get_start(seg);
     usize len = rd_flagsbuffer_get_length(seg->flags);
     if(endidx > len) endidx = len; // chunks never cross segments
 
@@ -94,7 +94,7 @@ void rd_surfacegraph_render(RDSurfaceGraph* self) {
     const RDFunction* f = rd_surfacegraph_get_function(self);
     if(!f || !f->graph) return;
 
-    const RDNodeVect* nodes = rd_i_graph_get_nodes(f->graph);
+    const RDNodeVect* nodes = rd_i_graph_get_nodes_ordered(f->graph);
 
     RDFunctionChunkVect chunks = {0};
     vect_reserve(&chunks, vect_length(nodes));
@@ -110,7 +110,9 @@ void rd_surfacegraph_render(RDSurfaceGraph* self) {
 
     RDFunctionChunk** chunk;
     vect_each(chunk, &chunks) {
-        _rd_surfacegraph_render_range(self, (*chunk)->start, (*chunk)->end);
+        RDAddress start = rd_i_abs(self->renderer->context, (*chunk)->start);
+        RDAddress end = rd_i_abs(self->renderer->context, (*chunk)->end);
+        _rd_surfacegraph_render_range(self, start, end);
     }
 
     vect_destroy(&chunks);
@@ -122,10 +124,12 @@ bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     const RDFunction* f = rd_i_find_function(ctx, address);
     if(!f) return false;
 
-    if(f->address != self->state.start) {
+    RDAddress addr = rd_function_get_address(f);
+
+    if(addr != self->state.start) {
         rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
         vect_clear(&self->state.fwd_history);
-        self->state.start = f->address; // the anchor IS the entry address
+        self->state.start = addr; // the anchor IS the entry address
     }
 
     // render then set pos: rows_front must be populated first

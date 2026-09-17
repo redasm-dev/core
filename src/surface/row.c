@@ -4,7 +4,7 @@
 #include <inttypes.h>
 
 static void _rd_step_back_to_packed_head(RDContext* ctx,
-                                         const RDSegmentFull* seg, usize* idx) {
+                                         const RDSegment* seg, usize* idx) {
     RDDataHead head;
     rd_i_data_head_get(ctx, seg, *idx, &head);
 
@@ -68,9 +68,9 @@ void rd_i_row_push(RDRow* self, u32 cp, RDThemeKind fg, RDThemeKind bg) {
 }
 
 bool rd_i_row_step_back(RDContext* ctx, RDRenderFlags flags,
-                        RDRowDescVect* scratch, const RDSegmentFull** seg,
+                        RDRowDescVect* scratch, const RDSegment** seg,
                         usize* seg_idx, usize* idx, usize* sub_line) {
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
     // (1) not at the item's first row: just go shallower.
     if(*sub_line > 0) {

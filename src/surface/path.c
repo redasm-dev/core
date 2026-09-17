@@ -27,11 +27,10 @@ static bool _rd_surfacepath_exists(const RDSurfacePath* self, int fromrow,
 }
 
 static bool _rd_row_is_instruction(RDContext* ctx, const RDRow* row,
-                                   const RDSegmentFull** out_seg,
-                                   usize* out_idx) {
+                                   const RDSegment** out_seg, usize* out_idx) {
     if(row->kind != RD_ROWKIND_INSTRUCTION) return false;
 
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, row->address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, row->address);
     if(!seg) return false;
 
     if(out_seg) *out_seg = seg;
@@ -75,7 +74,7 @@ static void _rd_surfacepath_insert(RDSurfacePath* self, RDContext* ctx,
         return;
 
     bool is_dst_cond = false;
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, from_address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, from_address);
 
     if(seg) {
         usize idx = rd_i_address2index(seg, from_address);
@@ -111,7 +110,7 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
     for(usize i = 0; i < vect_length(rows); i++) {
         const RDRow* row = vect_at(rows, i);
 
-        const RDSegmentFull* seg;
+        const RDSegment* seg;
         usize idx;
         if(!_rd_row_is_instruction(ctx, row, &seg, &idx)) continue;
 
@@ -121,9 +120,8 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
             const RDXRef* r;
             vect_each(r, xrefs) {
-                const RDSegmentFull* rseg =
-                    rd_i_db_find_segment(ctx, r->address);
-                if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
+                const RDSegment* rseg = rd_i_db_find_segment(ctx, r->address);
+                if(!rseg || !rd_segment_has_perm(rseg, RD_SP_X)) continue;
 
                 usize ridx = rd_i_address2index(rseg, r->address);
                 if(!rd_flagsbuffer_has_code(rseg->flags, ridx)) continue;
@@ -140,9 +138,8 @@ const RDSurfacePathVect* rd_i_surfacepath_build(RDSurfacePath* self,
 
             const RDXRef* r;
             vect_each(r, xrefs) {
-                const RDSegmentFull* rseg =
-                    rd_i_db_find_segment(ctx, r->address);
-                if(!rseg || !(rseg->base.perm & RD_SP_X)) continue;
+                const RDSegment* rseg = rd_i_db_find_segment(ctx, r->address);
+                if(!rseg || !rd_segment_has_perm(rseg, RD_SP_X)) continue;
 
                 // ignore jumps to tail locations: can happen during plugin
                 // development or simply bugs in Processor plugin

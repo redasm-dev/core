@@ -69,5 +69,5 @@ static inline int rd_i_row_length(const RDRow* self) {
 }
 
 bool rd_i_row_step_back(RDContext* ctx, RDRenderFlags flags,
-                        RDRowDescVect* scratch, const RDSegmentFull** seg,
+                        RDRowDescVect* scratch, const RDSegment** seg,
                         usize* seg_idx, usize* idx, usize* sub_line);

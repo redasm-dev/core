@@ -19,13 +19,13 @@ static inline void _rd_layout_push(RDRowDescVect* out, RDRowKind kind,
 }
 
 static void _rd_layout_comments(RDContext* ctx, RDRenderFlags flags,
-                                const RDSegmentFull* seg, usize idx,
+                                const RDSegment* seg, usize idx,
                                 RDCommentPlacement p, usize length,
                                 usize indent, RDRowDescVect* out) {
     if(flags & RD_RF_NO_COMMENTS) return;
     if(!rd_i_flagsbuffer_has_comment(seg->flags, idx)) return;
 
-    RDAddress address = seg->base.start_address + idx;
+    RDAddress address = rd_segment_get_start(seg) + idx;
     usize n = rd_i_db_get_comment_count(ctx, address, p);
 
     RDRowKind kind = (p == RD_COMMENT_BEFORE) ? RD_ROWKIND_COMMENT_BEFORE
@@ -41,7 +41,7 @@ static void _rd_layout_comments(RDContext* ctx, RDRenderFlags flags,
     }
 }
 
-static usize _rd_layout_hexchunk_len(const RDSegmentFull* seg, usize idx) {
+static usize _rd_layout_hexchunk_len(const RDSegment* seg, usize idx) {
     usize curridx = idx;
 
     while(curridx < rd_flagsbuffer_get_length(seg->flags)) {
@@ -53,7 +53,7 @@ static usize _rd_layout_hexchunk_len(const RDSegmentFull* seg, usize idx) {
     return curridx - idx;
 }
 
-static usize _rd_packed_element_count(const RDSegmentFull* seg, usize idx,
+static usize _rd_packed_element_count(const RDSegment* seg, usize idx,
                                       usize elemsize, usize item_idx) {
     usize len = rd_flagsbuffer_get_length(seg->flags);
     usize n = 1;
@@ -73,7 +73,7 @@ static usize _rd_packed_element_count(const RDSegmentFull* seg, usize idx,
 }
 
 static usize _rd_layout_unknown(RDContext* ctx, RDRenderFlags flags,
-                                const RDSegmentFull* seg, usize idx,
+                                const RDSegment* seg, usize idx,
                                 RDRowDescVect* out) {
     usize len = _rd_layout_hexchunk_len(seg, idx);
 
@@ -91,7 +91,7 @@ static usize _rd_layout_unknown(RDContext* ctx, RDRenderFlags flags,
 }
 
 static usize _rd_layout_code(RDContext* ctx, RDRenderFlags flags,
-                             const RDSegmentFull* seg, usize idx,
+                             const RDSegment* seg, usize idx,
                              RDRowDescVect* out) {
     usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
 
@@ -118,7 +118,7 @@ static usize _rd_layout_code(RDContext* ctx, RDRenderFlags flags,
 }
 
 static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
-                             const RDSegmentFull* seg, usize idx,
+                             const RDSegment* seg, usize idx,
                              RDRowDescVect* out) {
     RDDataHead head;
     rd_i_data_head_get(ctx, seg, idx, &head);
@@ -222,12 +222,12 @@ static usize _rd_layout_data(RDContext* ctx, RDRenderFlags flags,
     return advance;
 }
 
-bool rd_i_is_hexchunk_head(const RDSegmentFull* seg, usize idx) {
+bool rd_i_is_hexchunk_head(const RDSegment* seg, usize idx) {
     if(!rd_flagsbuffer_has_unknown(seg->flags, idx)) return false;
     if(idx == 0) return true;
     if(!rd_flagsbuffer_has_unknown(seg->flags, idx - 1)) return true;
 
-    if(((seg->base.start_address + idx) % RD_SURFACE_HEX_LINE) == 0)
+    if(((rd_segment_get_start(seg) + idx) % RD_SURFACE_HEX_LINE) == 0)
         return true;
 
     return rd_i_flagsbuffer_has_info(seg->flags, idx);
@@ -241,12 +241,12 @@ bool rd_i_link_is_packable(const RDResolveResult* res) {
     return res->field.type.def->kind == RD_TKIND_PRIM;
 }
 
-bool rd_i_is_packed_element_head(const RDSegmentFull* seg, usize idx,
+bool rd_i_is_packed_element_head(const RDSegment* seg, usize idx,
                                  usize elem_size, usize item_idx) {
     if(!item_idx) return true; // the array's first element
     if(rd_i_flagsbuffer_has_info(seg->flags, idx)) return true;
 
-    if(((seg->base.start_address + idx) % RD_SURFACE_HEX_LINE) == 0)
+    if(((rd_segment_get_start(seg) + idx) % RD_SURFACE_HEX_LINE) == 0)
         return true;
 
     // the element right after a broken-out one restarts the run
@@ -254,14 +254,14 @@ bool rd_i_is_packed_element_head(const RDSegmentFull* seg, usize idx,
            rd_i_flagsbuffer_has_info(seg->flags, idx - elem_size);
 }
 
-void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
+void rd_i_data_head_get(RDContext* ctx, const RDSegment* seg, usize idx,
                         RDDataHead* out) {
-    RDAddress address = seg->base.start_address + idx;
+    RDAddress address = rd_segment_get_start(seg) + idx;
 
     if(rd_flagsbuffer_has_type(seg->flags, idx)) {
         RDTypeFull t;
         bool got = rd_i_db_get_type(ctx, address, &t);
-        panic_if(!got, "type not found @ %s:%x", seg->base.name, address);
+        panic_if(!got, "type not found @ %s:%x", seg->name, address);
 
         *out = (RDDataHead){.root = t.base, .offset = 0, .has_banner = true};
         return;
@@ -272,7 +272,7 @@ void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
         RDAddress root_address = address;
         RDType root;
         bool got = rd_i_db_get_root_type(ctx, &root_address, &root);
-        panic_if(!got, "root type not found @ %s:%x", seg->base.name, address);
+        panic_if(!got, "root type not found @ %s:%x", seg->name, address);
 
         *out = (RDDataHead){.root = root, .offset = address - root_address};
         return;
@@ -282,12 +282,11 @@ void rd_i_data_head_get(RDContext* ctx, const RDSegmentFull* seg, usize idx,
 }
 
 usize rd_i_item_layout(RDContext* ctx, RDRenderFlags flags,
-                       const RDSegmentFull* seg, usize idx,
-                       RDRowDescVect* out) {
+                       const RDSegment* seg, usize idx, RDRowDescVect* out) {
     vect_clear(out);
 
     panic_if(rd_flagsbuffer_has_tail(seg->flags, idx),
-             "tail detected @ %" PRIX64, seg->base.start_address + idx);
+             "tail detected @ %" PRIX64, rd_segment_get_start(seg) + idx);
 
     if(!idx && !(flags & RD_RF_NO_SEGMENT))
         _rd_layout_push(out, RD_ROWKIND_SEGMENT, 0, 0);
@@ -304,9 +303,9 @@ usize rd_i_item_layout(RDContext* ctx, RDRenderFlags flags,
         unreachable();
 
     panic_if(vect_is_empty(out), "empty layout @ %" PRIX64,
-             seg->base.start_address + idx);
+             rd_segment_get_start(seg) + idx);
     panic_if(!advance, "zero advance @ %" PRIX64,
-             seg->base.start_address + idx);
+             rd_segment_get_start(seg) + idx);
 
     return advance;
 }

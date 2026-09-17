@@ -1,4 +1,6 @@
 #include "core/context.h"
+#include "core/mapping.h"
+#include "core/segment.h"
 #include "io/flagsbuffer.h"
 #include "plugins/analyzer.h"
 #include "project.h"
@@ -22,6 +24,7 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
 
     str_append(v, "\n[analysis]\n");
     str_append(v, rd_i_format(&buf, "min_string = %d\n", ctx->min_string));
+    str_append(v, rd_i_format(&buf, "base_address = 0x%"PRIX64"\n", ctx->base_address));
 
     str_append(v, "string_terminators = [");
 
@@ -109,7 +112,7 @@ static bool _rd_export_input(RDContext* self, const char* filepath) {
 }
 
 static bool _rd_export_patched_input(RDContext* self, const char* filepath) {
-    const RDMappingVect* mappings = rd_i_db_get_mappings(self);
+    const RDInputMappingVect* mappings = rd_i_db_get_mappings(self);
 
     usize len = rd_i_buffer_get_length((RDBuffer*)self->input);
     u8* input = rd_alloc(sizeof(char) * len);
@@ -117,25 +120,27 @@ static bool _rd_export_patched_input(RDContext* self, const char* filepath) {
     bool ok = true;
 
     // apply patches
-    const RDInputMapping* m;
-    vect_each(m, mappings) { // only mapped portions can be serialized
-        const RDSegmentFull* seg = rd_i_db_find_segment(self, m->start_address);
-        panic_if(!seg, "cannot find segment %" PRIX64, m->start_address);
+    RDInputMapping** it;
+    vect_each(it, mappings) { // only mapped portions can be serialized
+        const RDSegment* seg =
+            rd_i_db_find_segment(self, rd_inputmapping_get_start(*it));
+        panic_if(!seg, "cannot find segment %" PRIX64,
+                 rd_inputmapping_get_start(*it));
 
-        usize map_size = m->end_address - m->start_address;
-        usize idx = rd_i_address2index(seg, m->start_address);
+        usize map_size = rd_inputmapping_get_size(*it);
+        usize idx = rd_i_address2index(seg, rd_inputmapping_get_start(*it));
         usize end_idx = idx + map_size;
 
         for(usize i = idx; i < end_idx; i++) {
             if(!rd_flagsbuffer_has_patch(seg->flags, i)) continue;
 
-            usize dst_offset = m->offset + i;
+            usize dst_offset = (*it)->offset + i;
             panic_if(dst_offset >= len, "destination offset out of range");
 
             u8 v;
             bool has_value = rd_flagsbuffer_get_value(seg->flags, i, &v);
             panic_if(!has_value, "patch @ %" PRIX64 " has not value",
-                     m->start_address + i);
+                     rd_inputmapping_get_start(*it) + i);
 
             input[dst_offset] = v;
         }
@@ -232,12 +237,12 @@ bool rd_project_save(RDContext* self, const char* filepath) {
     _rd_project_add_file(&zip, RD_PROJECT_DATABASE, tmpdbpath, &ok);
     remove(tmpdbpath);
 
-    RDSegmentFull** it;
+    RDSegment** it;
     vect_each(it, &self->db->segments) {
-        RDSegmentFull* seg = *it;
+        RDSegment* seg = *it;
 
         const char* flagsname =
-            rd_i_format(&buf, "flags/%" PRIX64, seg->base.start_address);
+            rd_i_format(&buf, "flags/%" PRIX64, seg->rel_start);
 
         _rd_project_add_file_buf(&zip, flagsname, (const char*)seg->flags->data,
                                  rd_i_buffer_get_length((RDBuffer*)seg->flags) *

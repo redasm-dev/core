@@ -6,7 +6,7 @@
 
 static const char* _rd_symbol_extract_string(const RDSymbol* self,
                                              RDContext* ctx) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, self->address);
     assert(seg && "cannot convert symbol to string, type outside of segments");
 
     usize idx = rd_i_address2index(seg, self->address);
@@ -65,8 +65,8 @@ int rd_i_symbol_sort_pred(const void* a, const void* b) {
 const char* rd_symbol_to_string(const RDSymbol* self, RDContext* ctx) {
     switch(self->kind) {
         case RD_SYMBOL_SEGMENT: {
-            const RDSegmentFull* seg = rd_i_db_find_segment(ctx, self->address);
-            return seg ? seg->base.name : NULL;
+            const RDSegment* seg = rd_i_db_find_segment(ctx, self->address);
+            return seg ? seg->name : NULL;
         }
 
         case RD_SYMBOL_TYPE: {

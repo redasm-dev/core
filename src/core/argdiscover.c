@@ -45,7 +45,7 @@ static usize _rd_discover_arg_depth(const RDCallConv* cc, usize index,
 
 static bool _rd_discover_can_step_back(const RDContext* ctx,
                                        RDAddress address) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
     usize idx = rd_i_address2index(seg, address);
@@ -117,8 +117,8 @@ static void _rd_discover_call_args(RDContext* ctx, const RDTypeDef* tdef,
         // The argument has to point at something executable. A literal
         // sitting in a function-typed slot but landing in data is a null
         // handle or a sentinel, not a callback.
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, fn);
-        if(!seg || !(seg->base.perm & RD_SP_X)) continue;
+        const RDSegment* seg = rd_i_db_find_segment(ctx, fn);
+        if(!seg || !rd_segment_has_perm(seg, RD_SP_X)) continue;
 
         rd_set_typed_function(ctx, fn, p->type.def->name);
         rd_auto_name(ctx, fn, rd_i_format(fmt_buf, "%s_%" PRIX64, p->name, fn));
@@ -135,7 +135,7 @@ static void _rd_discover_collect_targets(RDContext* ctx,
         if(!_rd_discover_is_call_target(ctx, f->type_def, &cc)) continue;
 
         vect_push(targets, ((RDArgTarget){
-                               .address = f->address,
+                               .address = rd_function_get_address(f),
                                .tdef = f->type_def,
                                .cc = cc,
                            }));

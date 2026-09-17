@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/segment.h"
-#include "db/types.h"
 #include "support/utils.h"
 #include "types/def.h"
 #include <redasm/function.h>
@@ -11,12 +10,20 @@ typedef struct RDFunction {
 
     const RDTypeDef* type_def;
     RDContext* context;
-    RDAddress address;
+    RDRelAddress rel_address;
     usize n_instructions;
     usize n_norets;
     RDGraph* graph;
     RDCharVect fmt_buf;
 } RDFunction;
+
+typedef struct RDFunctionChunk {
+    const RDFunction* func;
+    RDRelAddress start;
+    RDRelAddress end;
+    usize n_instructions;
+    bool has_noret;
+} RDFunctionChunk;
 
 typedef struct RDFunctionChunkVect {
     RDFunctionChunk** data;
@@ -26,18 +33,18 @@ typedef struct RDFunctionChunkVect {
 
 typedef struct RDFunctionVect {
     RDFunctionChunkVect chunks;
-    RDAddressVect addresses;
 
     RDFunction** data;
     usize length;
     usize capacity;
 } RDFunctionVect;
 
-void rd_i_function_declare_if(RDContext* ctx, const RDSegmentFull* seg,
+int rd_i_function_kcmp_pred(const void* key, const void* item);
+void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg,
                               usize idx, const char* type);
-RDFunction* rd_i_function_declare(RDContext* ctx, RDAddress address,
+RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,
                                   const char* type);
-void rd_i_function_undeclare(RDContext* ctx, const RDSegmentFull* seg,
+void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg,
                              usize idx);
 
 void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef);

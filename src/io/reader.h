@@ -6,7 +6,7 @@
 #include <redasm/io/reader.h>
 
 typedef struct RDReader {
-    const RDSegmentFull* segment;
+    const RDSegment* segment;
     RDBuffer* buffer;
     usize position;
     bool buffer_owned;

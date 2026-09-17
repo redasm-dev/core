@@ -17,17 +17,17 @@ typedef struct RDAddressVect {
     usize capacity;
 } RDAddressVect;
 
-typedef struct RDSegmentFullVect {
-    RDSegmentFull** data;
+typedef struct RDSegmentVect {
+    RDSegment** data;
     usize length;
     usize capacity;
-} RDSegmentFullVect;
+} RDSegmentVect;
 
-typedef struct RDMappingVect {
-    RDInputMapping* data;
+typedef struct RDInputMappingVect {
+    RDInputMapping** data;
     usize length;
     usize capacity;
-} RDMappingVect;
+} RDInputMappingVect;
 
 typedef struct RDSegmentRegVect {
     RDSegmentReg* data;
@@ -94,6 +94,12 @@ typedef struct RDNameVect {
     usize length;
     usize capacity;
 } RDNameVect;
+
+typedef struct RDProblemsVect {
+    RDProblem* data;
+    usize length;
+    usize capacity;
+} RDProblemsVect;
 
 int _rd_i_db_segment_cmp_pred(const void* a, const void* b);
 int _rd_i_db_segment_find_pred(const void* key, const void* item);

@@ -64,7 +64,7 @@ static bool _rd_strings_check_format(const char* s, int len) {
     return false;
 }
 
-static void _rd_strings_try_classify(RDContext* ctx, const RDSegmentFull* seg,
+static void _rd_strings_try_classify(RDContext* ctx, const RDSegment* seg,
                                      usize idx, const char* type,
                                      const RDCharVect* str,
                                      RDCharVect* fmt_buf) {
@@ -96,11 +96,11 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
         return;
     }
 
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
-    RDSegmentFull** it;
+    RDSegment** it;
     vect_each(it, segments) {
-        RDSegmentFull* seg = *it;
+        RDSegment* seg = *it;
         RDFlagsBuffer* flags = seg->flags;
         usize startidx = 0;
         vect_clear(str);
@@ -140,11 +140,11 @@ static void _rd_find_char_strings(RDContext* ctx, RDCharVect* str,
 
 static void _rd_find_char16_strings(RDContext* ctx, RDCharVect* str,
                                     RDCharVect* fmt_buf) {
-    const RDSegmentFullVect* segments = rd_i_db_get_segments(ctx);
+    const RDSegmentVect* segments = rd_i_db_get_segments(ctx);
 
-    RDSegmentFull** it;
+    RDSegment** it;
     vect_each(it, segments) {
-        RDSegmentFull* seg = *it;
+        RDSegment* seg = *it;
         RDFlagsBuffer* flags = seg->flags;
         usize startidx = 0;
         vect_clear(str);

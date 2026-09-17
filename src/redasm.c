@@ -244,7 +244,7 @@ bool rd_decode_bytes(const char** bytes, usize* n, RDAddress* addr,
 
     if(ok) {
         RDRenderer* r = rd_i_renderer_create(ctx, RD_RF_TEXT | RD_RF_NO_NAMES);
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, *addr);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, *addr);
         assert(seg);
 
         rd_i_renderer_new_row(r, seg, rd_i_address2index(seg, *addr), 0, 0);

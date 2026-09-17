@@ -10,8 +10,8 @@
 #define RD_SURFACE_WS_COMMENT 8
 #define RD_SURFACE_WS_REFS 8
 
-static void _rd_render_modifiers(RDRenderer* r, const RDSegmentFull* seg,
-                                 usize idx, RDThemeKind fg, RDThemeKind bg) {
+static void _rd_render_modifiers(RDRenderer* r, const RDSegment* seg, usize idx,
+                                 RDThemeKind fg, RDThemeKind bg) {
     if(rd_flagsbuffer_has_imported(seg->flags, idx))
         rd_renderer_text(r, "imported ", fg, bg);
     else if(rd_flagsbuffer_has_exported(seg->flags, idx))
@@ -20,7 +20,7 @@ static void _rd_render_modifiers(RDRenderer* r, const RDSegmentFull* seg,
 
 static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                              bool term) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(r->context, address);
+    const RDSegment* seg = rd_i_db_find_segment(r->context, address);
     panic_if(!seg, "_rd_render_value: invalid segment");
 
     const RDBuffer* flags = (const RDBuffer*)seg->flags;
@@ -47,7 +47,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         u64 v;
         if(rd_i_buffer_read_primitive(flags, idx, ptr_type, is_be, &v)) {
             const unsigned int F = calc_ptr_size * 2;
-            rd_renderer_loc(r, v, F, RD_NUM_DEFAULT);
+            rd_renderer_loc(r, (RDAddress)v, F, RD_NUM_DEFAULT);
         }
         else
             rd_renderer_muted(r, "?");
@@ -187,7 +187,7 @@ static void _rd_render_refs(RDRenderer* r, RDAddress address) {
 
     const RDXRef* xref;
     vect_each(xref, &r->xrefs) {
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, xref->address);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
         if(!seg) continue;
 
         RDTypeFull t;
@@ -256,29 +256,30 @@ static void _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
     }
 }
 
-static void _rd_render_segment_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_segment_row(RDRenderer* r, const RDSegment* seg,
                                    usize idx, usize sub_line, usize indent) {
-    const RDProcessorPlugin* p = r->context->processorplugin;
+    const RDContext* ctx = r->context;
+    const RDProcessorPlugin* p = ctx->processorplugin;
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     if(p->render_segment) {
-        p->render_segment(r, (const RDSegment*)seg, r->context->processor);
+        p->render_segment(r, seg, ctx->processor);
         return;
     }
 
-    const unsigned int INT_SIZE = rd_get_ptr_size(r->context);
-    const unsigned int F = INT_SIZE * 2;
+    const unsigned int INT_SIZE = rd_get_ptr_size(ctx);
+    const unsigned int FILL = INT_SIZE * 2;
 
     rd_renderer_text(r, "segment ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, seg->base.name, RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
+    rd_renderer_text(r, seg->name, RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
     rd_renderer_text(r, " (start: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-    rd_renderer_num(r, (i64)seg->base.start_address, 16, F, RD_NUM_NOADDR);
+    rd_renderer_num(r, (i64)rd_segment_get_start(seg), 16, FILL, RD_NUM_NOADDR);
     rd_renderer_text(r, ", end: ", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
-    rd_renderer_num(r, (i64)seg->base.end_address, 16, F, RD_NUM_NOADDR);
+    rd_renderer_num(r, (i64)rd_segment_get_end(seg), 16, FILL, RD_NUM_NOADDR);
     rd_renderer_text(r, ")", RD_THEME_SEGMENT, RD_THEME_BACKGROUND);
 }
 
-static void _rd_render_comment_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_comment_row(RDRenderer* r, const RDSegment* seg,
                                    usize idx, usize sub_line,
                                    const char* comment, usize indent) {
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
@@ -288,8 +289,8 @@ static void _rd_render_comment_row(RDRenderer* r, const RDSegmentFull* seg,
     rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
 }
 
-static void _rd_render_label_row(RDRenderer* r, const RDSegmentFull* seg,
-                                 usize idx, usize sub_line, usize indent) {
+static void _rd_render_label_row(RDRenderer* r, const RDSegment* seg, usize idx,
+                                 usize sub_line, usize indent) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
     RDName n;
@@ -300,7 +301,7 @@ static void _rd_render_label_row(RDRenderer* r, const RDSegmentFull* seg,
     rd_renderer_text(r, ":", RD_THEME_LOCATION, RD_THEME_BACKGROUND);
 }
 
-static void _rd_render_function_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_function_row(RDRenderer* r, const RDSegment* seg,
                                     usize idx, usize sub_line, usize indent) {
     const RDProcessorPlugin* p = r->context->processorplugin;
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
@@ -368,7 +369,7 @@ static void _rd_render_function_row(RDRenderer* r, const RDSegmentFull* seg,
     }
 }
 
-static void _rd_render_elements_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_elements_row(RDRenderer* r, const RDSegment* seg,
                                     usize idx, usize sub_line,
                                     const RDRowDesc* d) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, d->indent);
@@ -385,13 +386,14 @@ static void _rd_render_elements_row(RDRenderer* r, const RDSegmentFull* seg,
 
     for(usize i = 0; i < d->elements.count; i++) {
         if(i) rd_renderer_ws(r, 1);
-        _rd_render_value(r, address + (i * sz), &d->elements.type, false);
+        _rd_render_value(r, (RDAddress)(address + (i * sz)), &d->elements.type,
+                         false);
     }
 
     _rd_render_comment_inline(r, address);
 }
 
-static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_instruction_row(RDRenderer* r, const RDSegment* seg,
                                        usize idx, usize sub_line,
                                        usize indent) {
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
@@ -408,12 +410,12 @@ static void _rd_render_instruction_row(RDRenderer* r, const RDSegmentFull* seg,
     }
 }
 
-static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
+static void _rd_render_hexdump_row(RDRenderer* r, const RDSegment* seg,
                                    usize idx, usize sub_line, usize len,
                                    usize indent) {
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
 
-    usize lead = (seg->base.start_address + idx) % RD_SURFACE_HEX_LINE;
+    usize lead = (rd_segment_get_start(seg) + idx) % RD_SURFACE_HEX_LINE;
     if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
 
     for(usize i = 0; i < len; i++) {
@@ -445,8 +447,8 @@ static void _rd_render_hexdump_row(RDRenderer* r, const RDSegmentFull* seg,
         rd_renderer_ws(r, RD_SURFACE_HEX_LINE - lead - len);
 }
 
-static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
-                                usize idx, usize sub_line, const RDRowDesc* d) {
+static void _rd_render_data_row(RDRenderer* r, const RDSegment* seg, usize idx,
+                                usize sub_line, const RDRowDesc* d) {
     bool is_banner = d->kind == RD_ROWKIND_DATA_BANNER;
     RDAddress address = rd_i_renderer_new_row(r, seg, idx, sub_line, d->indent);
 
@@ -545,7 +547,7 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegmentFull* seg,
     _rd_render_comment_inline(r, address);
 }
 
-void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
+void rd_i_render_row(RDRenderer* r, const RDSegment* seg, usize idx,
                      usize sub_line, const RDRowDesc* d) {
     usize before = vect_length(&r->rows_back);
 
@@ -556,7 +558,7 @@ void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
 
         case RD_ROWKIND_COMMENT_BEFORE:
         case RD_ROWKIND_COMMENT_AFTER: {
-            RDAddress address = seg->base.start_address + idx;
+            RDAddress address = rd_segment_get_start(seg) + idx;
 
             RDCommentPlacement p = (d->kind == RD_ROWKIND_COMMENT_BEFORE)
                                        ? RD_COMMENT_BEFORE
@@ -611,7 +613,7 @@ void rd_i_render_row(RDRenderer* r, const RDSegmentFull* seg, usize idx,
     vect_last(&r->rows_back)->kind = d->kind;
 }
 
-void rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg, usize idx,
+void rd_i_render_item(RDRenderer* r, const RDSegment* seg, usize idx,
                       usize sub_line) {
     rd_i_item_layout(r->context, r->flags, seg, idx, &r->layout_buf);
     if(sub_line >= vect_length(&r->layout_buf)) return;
@@ -619,7 +621,7 @@ void rd_i_render_item(RDRenderer* r, const RDSegmentFull* seg, usize idx,
     rd_i_render_row(r, seg, idx, sub_line, vect_at(&r->layout_buf, sub_line));
 }
 
-void rd_i_render_item_any(RDRenderer* r, const RDSegmentFull* seg, usize idx) {
+void rd_i_render_item_any(RDRenderer* r, const RDSegment* seg, usize idx) {
     rd_i_item_layout(r->context, r->flags, seg, idx, &r->layout_buf);
 
     usize sub_line = rd_i_item_layout_content(&r->layout_buf);

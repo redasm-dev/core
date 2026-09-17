@@ -61,7 +61,8 @@ typedef uintptr_t uptr;
 typedef intptr_t iptr;
 // NOLINTEND
 
-typedef u64 RDAddress;
+typedef u64 RDRelAddress;
+typedef RDRelAddress RDAddress;
 typedef u64 RDOffset;
 
 typedef struct RDSLeb128 {

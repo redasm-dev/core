@@ -62,7 +62,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
         RDFunction* f = *it;
 
         RDName n;
-        if(rd_i_get_name(ctx, f->address, false, &n) &&
+        if(rd_i_get_name(ctx, rd_function_get_address(f), false, &n) &&
            n.confidence > RD_CONFIDENCE_AUTO)
             continue;
 
@@ -77,7 +77,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
         if(tdef && tdef->kind == RD_TKIND_FUNC)
             rd_i_function_set_type_def(f, tdef);
 
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, resolved);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, resolved);
         assert(seg);
 
         usize idx = rd_i_address2index(seg, resolved);
@@ -91,7 +91,7 @@ static void _rd_autorename_functions(RDContext* ctx) {
             auto_name = rd_i_format(&namebuf, "j_%s", resolved_name);
 
         assert(auto_name);
-        rd_i_set_name(ctx, f->address, auto_name, c);
+        rd_i_set_name(ctx, rd_function_get_address(f), auto_name, c);
     }
 
     rd_il_destroy(rdil);
@@ -115,7 +115,7 @@ static void _rd_autorename_types(RDContext* ctx) {
         RDAddress dst;
         if(!rd_follow_ptr(ctx, address, &dst)) continue;
 
-        const RDSegmentFull* seg = rd_i_db_find_segment(ctx, dst);
+        const RDSegment* seg = rd_i_db_find_segment(ctx, dst);
         if(!seg) continue;
 
         const RDFlagsBuffer* flags = seg->flags;

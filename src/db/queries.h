@@ -77,19 +77,21 @@ enum {
     RD_QUERY_GET_ALL_OVR_OPERAND,
 
     RD_QUERY_ADD_PROBLEM,
+    RD_QUERY_GET_ALL_PROBLEMS,
+    RD_QUERY_HAS_PROBLEMS,
 
     RD_QUERY_GET_UNDEFINE_CONFIDENCE,
 
     RD_QUERY_COUNT,
 };
 
-void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegmentFull* s);
-RDSegmentFullVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
-                                                   RDSegmentFullVect* v);
+void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegment* s);
+RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
+                                               RDSegmentVect* v);
 
 void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m);
-RDMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
-                                               RDMappingVect* v);
+RDInputMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
+                                                    RDInputMappingVect* v);
 
 void _rd_i_db_query_set_external(RDContext* ctx, const RDExternal* ext);
 bool _rd_i_db_query_get_external(RDContext* ctx, RDAddress address,
@@ -163,7 +165,11 @@ usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
                                        RDCommentPlacement p);
 bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address);
 
-void _rd_i_db_query_add_problem(RDContext* ctx, const RDProblem* p);
+void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
+                                const char* msg);
+const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
+                                                      RDProblemsVect* v);
+bool _rd_i_db_query_has_problems(RDContext* ctx);
 
 bool _rd_i_db_query_get_userdata(RDContext* ctx, const char* key, uptr* ud);
 void _rd_i_db_query_set_userdata(RDContext* ctx, const char* key, uptr ud);

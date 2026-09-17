@@ -68,7 +68,7 @@ typedef struct RDOperand {
         u64 cnst;
         i64 s_cnst;
         RDReg reg;
-        u64 addr;
+        RDAddress addr;
         u64 imm;
         i64 s_imm;
         RDAddress mem;

@@ -291,7 +291,8 @@ void rd_il_destroy(RDIL* self) {
 void rd_il_flush(RDIL* self) {
     hmap_clear(&self->registers);
     vect_clear(&self->lifted);
-    self->current_address = self->function ? self->function->address : 0;
+    self->current_address =
+        self->function ? rd_function_get_address(self->function) : 0;
     self->done = false;
 }
 
@@ -309,7 +310,7 @@ void rd_il_assign(RDIL* self, const RDFunction* f) {
     vect_each(it, sreg_names) {
         RDRegValue val;
 
-        if(rd_get_sregval(self->context, f->address, *it, &val))
+        if(rd_get_sregval(self->context, rd_function_get_address(f), *it, &val))
             rd_il_set_regval(self, *it, val);
     }
 }

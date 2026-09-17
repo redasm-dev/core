@@ -19,10 +19,10 @@ static u64 _rd_reader_get_pos(const RDReader* self) { return self->position; }
 
 static void _rd_flagsreader_seek(RDReader* self, u64 pos) {
     RDFlagsReader* fr = (RDFlagsReader*)self;
-    self->segment = rd_i_db_find_segment(fr->context, pos);
+    self->segment = rd_i_db_find_segment(fr->context, (RDAddress)pos);
 
     if(self->segment) {
-        fr->base.position = rd_i_address2index(self->segment, pos);
+        fr->base.position = rd_i_address2index(self->segment, (RDAddress)pos);
         fr->base.buffer = (RDBuffer*)self->segment->flags;
         fr->base.error = false;
     }
@@ -33,7 +33,7 @@ static void _rd_flagsreader_seek(RDReader* self, u64 pos) {
 }
 
 static u64 _rd_flagsreader_get_pos(const RDReader* self) {
-    return self->segment->base.start_address + self->position;
+    return rd_segment_get_start(self->segment) + self->position;
 }
 
 RDReader* rd_i_reader_create(RDBuffer* buf) {

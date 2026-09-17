@@ -14,7 +14,7 @@ static inline bool _rd_engine_is_dirty_kind(RDEngineItemKind k) {
 
 static inline void _rd_engine_enqueue_dirty(RDContext* ctx, RDAddress address,
                                             usize n, RDEngineItemKind kind) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(ctx, address);
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return;
 
     RDEngineItem item = {
@@ -50,9 +50,9 @@ static const char* _rd_engine_queue_name(RDEngineItemKind k) {
     return NULL;
 }
 
-static const RDSegmentFull* _rd_engine_find_segment(const RDContext* ctx,
-                                                    RDAddress address) {
-    const RDSegmentFull* seg = ctx->engine.segment;
+static const RDSegment* _rd_engine_find_segment(const RDContext* ctx,
+                                                RDAddress address) {
+    const RDSegment* seg = ctx->engine.segment;
 
     if(!seg || !rd_i_segment_contains(seg, address))
         return rd_i_db_find_segment(ctx, address);
@@ -67,8 +67,8 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
         return false;
 
     // non-existing or non-executable segment
-    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
-    if(!seg || !(seg->base.perm & RD_SP_X)) return false;
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg || !rd_segment_has_perm(seg, RD_SP_X)) return false;
 
     usize idx = rd_i_address2index(seg, address);
 
@@ -99,7 +99,7 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
     //   visible to branch emulate
     RDAddress saved_address = ctx->engine.current.address;
     RDEngineItemKind saved_kind = ctx->engine.current.kind;
-    const RDSegmentFull* saved_seg = ctx->engine.segment;
+    const RDSegment* saved_seg = ctx->engine.segment;
 
     ctx->engine.dslot_info.instr = *instr;
     ctx->engine.dslot_info.n = 0;
@@ -136,9 +136,8 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
     return ctx->engine.flow;
 }
 
-bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
-                        const RDSegmentFull* seg, usize index,
-                        RDInstruction* instr) {
+bool rd_i_engine_decode(RDContext* ctx, RDAddress address, const RDSegment* seg,
+                        usize index, RDInstruction* instr) {
     assert(!rd_flagsbuffer_has_tail(seg->flags, index));
 
     instr->address = address;
@@ -157,7 +156,7 @@ bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
 
                 if(op->kind == RD_OP_IMM) {
                     op->kind = RD_OP_ADDR;
-                    op->addr = op->imm;
+                    op->addr = (RDAddress)op->imm; // ?!?
                 }
                 else {
                     panic("instruction @ %x operand %d, invalid override",
@@ -187,13 +186,13 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
 
     // may be already code (backward jump / loop). Promote FL_JMPDST if so.
     // tail and non-executable cases are already handled inside accept_address.
-    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
     if(!seg) return false;
 
     usize dstidx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
 
-    if((seg->base.perm & RD_SP_X) &&
+    if(rd_segment_has_perm(seg, RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
         rd_i_flagsbuffer_set_jmpdst(seg->flags, dstidx);
     }
@@ -219,13 +218,13 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
         return true;
     }
 
-    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
     if(!seg) return false;
 
     usize dstidx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
 
-    if((seg->base.perm & RD_SP_X) &&
+    if(rd_segment_has_perm(seg, RD_SP_X) &&
        rd_flagsbuffer_has_code(seg->flags, dstidx)) {
         rd_i_function_declare_if(ctx, seg, dstidx, type);
     }
@@ -300,7 +299,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
             goto done;
         }
 
-        if(!(ctx->engine.segment->base.perm & RD_SP_X)) goto done;
+        if(!rd_segment_has_perm(ctx->engine.segment, RD_SP_X)) goto done;
     }
 
     assert(ctx->engine.current.registers.hash &&
@@ -405,7 +404,7 @@ void rd_flow(RDContext* ctx, RDAddress address) {
     // unset and do checks
     optional_unset(&ctx->engine.flow);
 
-    const RDSegmentFull* seg = ctx->engine.segment;
+    const RDSegment* seg = ctx->engine.segment;
 
     // don't falltrough NORET locations
     usize curr_idx = rd_i_address2index(seg, ctx->engine.current.address);
@@ -463,8 +462,8 @@ bool rd_encode(RDContext* ctx, RDAddress address, const char* s,
 bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr) {
     if(!ctx) return false;
 
-    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
-    if(!seg || !(seg->base.perm & RD_SP_X)) return false;
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg || !rd_segment_has_perm(seg, RD_SP_X)) return false;
 
     usize idx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
@@ -485,8 +484,8 @@ bool rd_decode_n(RDContext* ctx, RDAddress address, RDInstruction* instrs,
 }
 
 bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
-    const RDSegmentFull* seg = _rd_engine_find_segment(ctx, address);
-    if(!seg || !(seg->base.perm & RD_SP_X)) return false;
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg || !rd_segment_has_perm(seg, RD_SP_X)) return false;
 
     usize idx = rd_i_address2index(seg, address);
     if(!idx) return false;

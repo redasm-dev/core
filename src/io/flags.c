@@ -360,7 +360,7 @@ void rd_i_flags_clear_op_over(RDFlags* self) {
 }
 
 bool rd_get_flags(const RDContext* self, RDAddress address, RDFlags* f) {
-    const RDSegmentFull* seg = rd_i_db_find_segment(self, address);
+    const RDSegment* seg = rd_i_db_find_segment(self, address);
     if(!seg) return false;
 
     if(f) {
