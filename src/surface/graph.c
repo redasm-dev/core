@@ -124,12 +124,11 @@ bool rd_surfacegraph_jump_to(RDSurfaceGraph* self, RDAddress address) {
     const RDFunction* f = rd_i_find_function(ctx, address);
     if(!f) return false;
 
-    RDAddress addr = rd_function_get_address(f);
-
-    if(addr != self->state.start) {
-        rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
+    if(f->rel_address != self->state.start) {
+        rd_i_surfacestate_push_history(&self->state, &self->state.back_history,
+                                       ctx);
         vect_clear(&self->state.fwd_history);
-        self->state.start = addr; // the anchor IS the entry address
+        self->state.start = f->rel_address; // the anchor IS the entry address
     }
 
     // render then set pos: rows_front must be populated first
@@ -160,13 +159,15 @@ bool rd_surfacegraph_select_word(RDSurfaceGraph* self, int row, int col) {
 }
 
 bool rd_surfacegraph_go_back(RDSurfaceGraph* self) {
-    if(!rd_i_surfacestate_go_back(&self->state)) return false;
+    if(!rd_i_surfacestate_go_back(&self->state, self->renderer->context))
+        return false;
     rd_surfacegraph_render(self);
     return true;
 }
 
 bool rd_surfacegraph_go_forward(RDSurfaceGraph* self) {
-    if(!rd_i_surfacestate_go_forward(&self->state)) return false;
+    if(!rd_i_surfacestate_go_forward(&self->state, self->renderer->context))
+        return false;
     rd_surfacegraph_render(self);
     return true;
 }
@@ -297,7 +298,8 @@ void rd_surfacegraph_set_highlight_word(RDSurfaceGraph* self,
 }
 
 const RDFunction* rd_surfacegraph_get_function(const RDSurfaceGraph* self) {
-    return rd_i_find_function(self->renderer->context, self->state.start);
+    const RDContext* ctx = self->renderer->context;
+    return rd_i_find_function(ctx, rd_i_abs(ctx, self->state.start));
 }
 
 RDGraph* rd_surfacegraph_get_graph(const RDSurfaceGraph* self) {

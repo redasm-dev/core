@@ -3,7 +3,7 @@
 #include <redasm/surface/common.h>
 
 typedef struct RDHistoryItem {
-    RDAddress start;
+    RDRelAddress start;
     usize start_sub_line;
     RDSurfacePos pos;
 } RDHistoryItem;
@@ -16,7 +16,7 @@ typedef struct RDHistoryVect {
 
 typedef struct RDSurfaceState {
     RDSurfacePos pos, sel_pos;
-    RDAddress start;
+    RDRelAddress start;
     usize start_sub_line;
     RDHistoryVect back_history, fwd_history;
     bool lock_history;
@@ -30,11 +30,12 @@ typedef struct RDSurfaceState {
     } while(0)
 
 void rd_i_surfacestate_push_history(RDSurfaceState* self,
-                                    RDHistoryVect* history);
+                                    RDHistoryVect* history,
+                                    const RDContext* ctx);
 bool rd_i_surfacestate_can_go_back(const RDSurfaceState* self);
 bool rd_i_surfacestate_can_go_forward(const RDSurfaceState* self);
-bool rd_i_surfacestate_go_back(RDSurfaceState* self);
-bool rd_i_surfacestate_go_forward(RDSurfaceState* self);
+bool rd_i_surfacestate_go_back(RDSurfaceState* self, const RDContext* ctx);
+bool rd_i_surfacestate_go_forward(RDSurfaceState* self, const RDContext* ctx);
 bool rd_i_surfacestate_has_selection(const RDSurfaceState* self);
 bool rd_i_surfacestate_set_pos(RDSurfaceState* self, int row, int col);
 bool rd_i_surfacestate_select(RDSurfaceState* self, int row, int col);

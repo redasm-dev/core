@@ -112,7 +112,7 @@ static int _rd_surface_find_row(const RDSurface* self, RDAddress address) {
  */
 static bool _rd_surface_render_from(RDSurface* self, const RDSegment* seg,
                                     usize seg_idx, usize idx, usize sub_line) {
-    self->state.start = rd_segment_get_start(seg) + idx;
+    self->state.start = seg->rel_start + idx;
     self->state.start_sub_line = sub_line;
 
     rd_i_renderer_clear(self->renderer);
@@ -195,16 +195,22 @@ bool rd_surface_can_go_forward(const RDSurface* self) {
 }
 
 bool rd_surface_go_back(RDSurface* self) {
-    if(!rd_i_surfacestate_go_back(&self->state)) return false;
+    if(!rd_i_surfacestate_go_back(&self->state, self->renderer->context))
+        return false;
 
-    return _rd_surface_render_at(self, self->state.start,
+    const RDContext* ctx = self->renderer->context;
+
+    return _rd_surface_render_at(self, rd_i_abs(ctx, self->state.start),
                                  self->state.start_sub_line);
 }
 
 bool rd_surface_go_forward(RDSurface* self) {
-    if(!rd_i_surfacestate_go_forward(&self->state)) return false;
+    if(!rd_i_surfacestate_go_forward(&self->state, self->renderer->context))
+        return false;
 
-    return _rd_surface_render_at(self, self->state.start,
+    const RDContext* ctx = self->renderer->context;
+
+    return _rd_surface_render_at(self, rd_i_abs(ctx, self->state.start),
                                  self->state.start_sub_line);
 }
 
@@ -252,8 +258,9 @@ bool rd_surface_render(RDSurface* self, RDAddress address) {
 }
 
 bool rd_surface_repaint(RDSurface* self) {
-    return _rd_surface_render_at(self, self->state.start,
-                                 self->state.start_sub_line);
+    return _rd_surface_render_at(
+        self, rd_i_abs(self->renderer->context, self->state.start),
+        self->state.start_sub_line);
 }
 
 bool rd_surface_scroll(RDSurface* self, int n) {
@@ -334,7 +341,8 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
     RDAddress head = rd_segment_get_start(seg) + idx;
 
     // a jump is THE history event; repaints and scrolls are not
-    rd_i_surfacestate_push_history(&self->state, &self->state.back_history);
+    rd_i_surfacestate_push_history(&self->state, &self->state.back_history,
+                                   ctx);
     vect_clear(&self->state.fwd_history);
 
     int row = _rd_surface_find_row(self, head);
@@ -343,7 +351,7 @@ bool rd_surface_jump_to(RDSurface* self, RDAddress address) {
         // destination already visible: keep the top unchanged, move the
         // cursor, repeat a render cycle so highlights follow it
         rd_surface_set_pos(self, row, 0);
-        return _rd_surface_render_at(self, self->state.start,
+        return _rd_surface_render_at(self, rd_i_abs(ctx, self->state.start),
                                      self->state.start_sub_line);
     }
 

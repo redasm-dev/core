@@ -1,5 +1,6 @@
 #include "state.h"
 #include "support/containers.h"
+#include <core/context.h>
 
 static inline bool _rd_history_item_equals(const RDHistoryItem* a,
                                            const RDHistoryItem* b) {
@@ -8,8 +9,10 @@ static inline bool _rd_history_item_equals(const RDHistoryItem* a,
 }
 
 void rd_i_surfacestate_push_history(RDSurfaceState* self,
-                                    RDHistoryVect* history) {
+                                    RDHistoryVect* history,
+                                    const RDContext* ctx) {
     if(self->lock_history) return;
+    if(!rd_is_address(ctx, rd_i_abs(ctx, self->start))) return;
 
     RDHistoryItem item = {
         .start = self->start,
@@ -36,11 +39,11 @@ bool rd_i_surfacestate_has_selection(const RDSurfaceState* self) {
            (self->pos.col != self->sel_pos.col);
 }
 
-bool rd_i_surfacestate_go_back(RDSurfaceState* self) {
+bool rd_i_surfacestate_go_back(RDSurfaceState* self, const RDContext* ctx) {
     if(vect_is_empty(&self->back_history)) return false;
 
     RDHistoryItem item = vect_pop_last(&self->back_history);
-    rd_i_surfacestate_push_history(self, &self->fwd_history);
+    rd_i_surfacestate_push_history(self, &self->fwd_history, ctx);
 
     rd_i_surfacestate_with_locked_history(self, {
         self->start = item.start;
@@ -51,11 +54,11 @@ bool rd_i_surfacestate_go_back(RDSurfaceState* self) {
     return true;
 }
 
-bool rd_i_surfacestate_go_forward(RDSurfaceState* self) {
+bool rd_i_surfacestate_go_forward(RDSurfaceState* self, const RDContext* ctx) {
     if(vect_is_empty(&self->fwd_history)) return false;
 
     RDHistoryItem item = vect_pop_last(&self->fwd_history);
-    rd_i_surfacestate_push_history(self, &self->back_history);
+    rd_i_surfacestate_push_history(self, &self->back_history, ctx);
 
     rd_i_surfacestate_with_locked_history(self, {
         self->start = item.start;
