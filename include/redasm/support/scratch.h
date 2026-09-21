@@ -8,6 +8,8 @@ typedef struct RDScratchBuffer RDScratchBuffer;
 RD_API RDScratchBuffer* rd_scratch_create(void);
 RD_API void rd_scratch_destroy(RDScratchBuffer* self);
 RD_API void rd_scratch_reserve(RDScratchBuffer* self, usize n);
+RD_API void rd_scratch_concat(RDScratchBuffer* dst, const RDScratchBuffer* src);
+RD_API void rd_scratch_concat_n(RDScratchBuffer* dst, const RDScratchBuffer* src, usize n);
 RD_API void rd_scratch_append(RDScratchBuffer* self, const void* data, usize n);
 RD_API void rd_scratch_push(RDScratchBuffer* self, char c);
 RD_API bool rd_scratch_write(RDScratchBuffer* self, usize idx, const void* data, usize n);

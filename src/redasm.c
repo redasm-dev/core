@@ -11,30 +11,25 @@ static char* _rd_derive_path(const RDTestResult* tr,
     if(!strcmp(tr->filepath, ":memory:")) return rd_strdup(tr->filepath);
 
     const char* dir;
-    char* owned_dir = NULL;
+    const char* owned_dir = NULL;
 
     if(params->working_dir) {
         dir = params->working_dir;
     }
     else {
-        owned_dir = rd_i_get_file_path(tr->filepath);
+        owned_dir = rd_path_dirname(tr->filepath);
         if(!owned_dir) return NULL;
         dir = owned_dir;
     }
 
-    char* stem = rd_i_get_file_stem(tr->filepath);
-    if(!stem) {
-        rd_free(owned_dir);
-        return NULL;
-    }
+    const char* stem = rd_path_stem(tr->filepath);
+    if(!stem) return NULL;
 
     RDCharVect buf = {0};
     char* result =
         rd_strdup(rd_i_format(&buf, "%s%c%s.%s", dir, RD_PATH_SEP, stem, ext));
     vect_destroy(&buf);
 
-    rd_free(stem);
-    rd_free(owned_dir);
     return result;
 }
 
@@ -49,13 +44,13 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
-    char* workingdir = rd_i_get_file_path(tr->filepath);
+    const char* workingdir = rd_path_dirname(tr->filepath);
     if(!workingdir) {
         RD_LOG_FAIL("cannot extract filepath from '%s'", tr->filepath);
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
     }
 
-    const char* filename = rd_i_get_file_name(tr->filepath);
+    const char* filename = rd_path_filename(tr->filepath);
     if(!filename) {
         RD_LOG_FAIL("cannot extract filename from '%s'", tr->filepath);
         return (RDAcceptResult){.status = RD_ACCEPT_FAIL};
@@ -77,7 +72,7 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     if(params->mode == RD_AM_PROJECT) {
         char* rdxpath = _rd_derive_path(tr, params, "rdx");
 
-        if(rdxpath && rd_i_file_exists(rdxpath)) {
+        if(rdxpath && rd_path_exists(rdxpath)) {
             res = rd_project_load(rdxpath, workingdir);
 
             if(res.status == RD_ACCEPT_OK) // project loads input from .rdx
@@ -98,7 +93,7 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
         goto cleanup;
     }
 
-    if(rd_i_file_exists(dbpath)) remove(dbpath);
+    if(rd_path_exists(dbpath)) remove(dbpath);
 
     res.context = rd_i_context_create(tr->loaderplugin, tr->input_buffer,
                                       workingdir, filename, dbpath);
@@ -142,7 +137,6 @@ cleanup:
     }
 
     rd_free(dbpath);
-    rd_free(workingdir);
     return res;
 }
 

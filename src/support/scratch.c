@@ -48,8 +48,24 @@ bool rd_scratch_write(RDScratchBuffer* self, usize idx, const void* data,
     return true;
 }
 
+void rd_scratch_concat(RDScratchBuffer* dst, const RDScratchBuffer* src) {
+    rd_scratch_append(dst, rd_scratch_data(src), rd_scratch_length(src));
+}
+
+void rd_scratch_concat_n(RDScratchBuffer* dst, const RDScratchBuffer* src,
+                         usize n) {
+    usize avail = rd_scratch_length(src);
+
+    if(n > avail) {
+        RD_LOG_WARN("n (%zu) exceeds source length (%zu), clamping", n, avail);
+        n = avail;
+    }
+
+    rd_scratch_append(dst, rd_scratch_data(src), n);
+}
+
 void rd_scratch_append(RDScratchBuffer* self, const void* data, usize n) {
-    if(!n) return;
+    if(!data || !n) return;
     rd_scratch_reserve(self, self->impl.length + n);
     rd_scratch_write(self, self->impl.length, data, n);
 }

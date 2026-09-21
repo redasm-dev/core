@@ -12,6 +12,7 @@
 #include <redasm/io/reader.h>
 #include <redasm/kb.h>
 #include <redasm/mapping.h>
+#include <redasm/net/net.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader/loader.h>
@@ -23,6 +24,7 @@
 #include <redasm/support/hash.h>
 #include <redasm/support/lexer.h>
 #include <redasm/support/logging.h>
+#include <redasm/support/path.h>
 #include <redasm/support/scratch.h>
 #include <redasm/support/utils.h>
 #include <redasm/surface/graph.h>
@@ -60,6 +62,7 @@ typedef struct RDAcceptParams {
 
 typedef struct RDInitParams {
     const char** kb_paths;
+    bool network_enabled;
 } RDInitParams;
 
 typedef struct RDTestResultSlice {

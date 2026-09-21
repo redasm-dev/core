@@ -5,13 +5,6 @@
 
 typedef struct RDByteBuffer RDByteBuffer;
 
-#ifdef _WIN32
-#include <windows.h>
-#define RD_PATH_SEP '\\'
-#else
-#define RD_PATH_SEP '/'
-#endif
-
 typedef struct RDCharVect {
     char* data;
     usize length;
@@ -23,12 +16,6 @@ typedef struct RDStringVect {
     usize length;
     usize capacity;
 } RDStringVect;
-
-typedef struct RDPathVect {
-    char** data;
-    usize length;
-    usize capacity;
-} RDPathVect;
 
 typedef struct RDBaseParams {
     unsigned int base;
@@ -53,16 +40,7 @@ RDByteBuffer* rd_i_fromdata(const void* data, usize n);
 RDByteBuffer* rd_i_readfile(const char* filepath);
 RDWriteFileResult rd_i_writefile(const char* filepath, const char* data,
                                  usize n);
-bool rd_i_file_exists(const char* filepath);
-bool rd_i_path_is_writable(const char* path);
-const char* rd_i_strip_prefix(const char* s);
 const char* rd_i_tolower(char* s);
-const char* rd_i_get_file_name(const char* filepath);
-const char* rd_i_get_file_ext(const char* filepath);
-char* rd_i_get_file_path(const char* filepath);
-char* rd_i_get_file_stem(const char* filepath);
-char* rd_i_get_temp_path(const char* suffix);
-char* rd_i_get_unique_temp_path(const char* suffix);
 const char* rd_i_escape_char(char c, bool isstr);
 const char* rd_i_escape_char16(u16 c, bool isstr);
 int rd_i_utf8_decode(const char* s, u32* cp);

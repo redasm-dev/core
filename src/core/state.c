@@ -62,9 +62,29 @@ void rd_i_testresult_destroy(RDTestResult* self) {
 }
 
 void rd_i_state_init(const RDInitParams* params) {
+#if defined(RD_HAS_NETWORK)
+    rd_i_state.is_network_enabled = false;
+#endif
+
     if(params) {
         rd_i_kb_paths_init(params->kb_paths);
+
+#if defined(RD_HAS_NETWORK)
+        rd_i_state.is_network_enabled = params->network_enabled;
+
+        if(rd_i_state.is_network_enabled) {
+            _rd_net_socket_init();
+            _rd_net_http_init();
+        }
+#endif
     }
+
+#if defined(RD_HAS_NETWORK)
+    RD_LOG_INFO("Network support: %s",
+                rd_i_state.is_network_enabled ? "ENABLED" : "DISABLED");
+#else
+    RD_LOG_INFO("Network support: UNAVAILABLE");
+#endif
 
     rd_i_theme_init(&rd_i_state.theme);
     rd_i_builtin_binary();
@@ -94,8 +114,17 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.instr_text_buf);
     vect_destroy(&rd_i_state.instr_dump_buf);
     vect_destroy(&rd_i_state.mnem_buf);
+    vect_destroy(&rd_i_state.path_dirname_buf);
+    vect_destroy(&rd_i_state.path_stem_buf);
+    vect_destroy(&rd_i_state.path_join_buf);
     _rd_i_state_unload_modules();
     rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
+
+#if defined(RD_HAS_NETWORK)
+    rd_i_state.is_network_enabled = false;
+    _rd_net_http_deinit();
+    _rd_net_socket_deinit();
+#endif
 }
 
 void rd_set_log_callback(RDLogCallback cb, void* userdata) {

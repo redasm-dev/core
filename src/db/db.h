@@ -3,7 +3,6 @@
 #include "core/segment.h"
 #include "db/queries.h"
 #include "db/types.h"
-#include <redasm/redasm.h>
 #include <sqlite3.h>
 
 typedef struct RDDB {

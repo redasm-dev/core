@@ -33,7 +33,7 @@ typedef struct RDProjectManifest {
 } RDProjectManifest;
 
 typedef struct RDProjectPaths {
-    char* working_dir;
+    const char* working_dir;
     char* db_path;
 } RDProjectPaths;
 
@@ -76,7 +76,6 @@ static void _rd_project_manifest_destroy(RDProjectManifest* m) {
 
 static void _rd_project_paths_destroy(RDProjectPaths* p) {
     rd_free(p->db_path);
-    rd_free(p->working_dir);
 }
 
 static bool _rd_project_resolve_paths(const char* filepath,
@@ -85,7 +84,7 @@ static bool _rd_project_resolve_paths(const char* filepath,
                                       RDProjectPaths* out,
                                       RDAcceptResult* res) {
     if(!workingdir) {
-        out->working_dir = rd_i_get_file_path(filepath);
+        out->working_dir = rd_path_dirname(filepath);
 
         if(!out->working_dir) {
             RD_LOG_FAIL("cannot get file path for '%s'", filepath);
@@ -95,7 +94,7 @@ static bool _rd_project_resolve_paths(const char* filepath,
     else
         out->working_dir = rd_strdup(workingdir);
 
-    char* stem = rd_i_get_file_stem(manifest->file_name);
+    const char* stem = rd_path_stem(manifest->file_name);
 
     if(!stem) {
         RD_LOG_FAIL("cannot get file stem for '%s'", manifest->file_name);
@@ -108,7 +107,6 @@ static bool _rd_project_resolve_paths(const char* filepath,
         rd_i_format(&buf, "%s%c%s.db", out->working_dir, RD_PATH_SEP, stem));
 
     vect_destroy(&buf);
-    rd_free(stem);
 
     if(!rd_i_path_is_writable(out->db_path)) {
         res->status = RD_ACCEPT_FAIL_WRITE;

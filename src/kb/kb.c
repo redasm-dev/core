@@ -58,7 +58,7 @@ static const char* _rd_kb_find_path(const char* name) {
         str_append(p, name);
         str_append(p, RD_KB_EXT);
 
-        if(rd_i_file_exists(p->data)) return p->data;
+        if(rd_path_exists(p->data)) return p->data;
     }
 
     return NULL;

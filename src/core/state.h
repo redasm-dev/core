@@ -1,8 +1,10 @@
 #pragma once
 
+#include "net/http/http.h"
+#include "net/socket/socket.h"
 #include "plugins/loader/option.h"
+#include "support/path.h"
 #include "support/scratch.h"
-#include "support/utils.h"
 #include "theme.h"
 #include <redasm/redasm.h>
 
@@ -26,6 +28,12 @@ typedef struct RDGlobalState {
     RDPluginVect analyzers;
     RDPluginVect commands;
 
+#if defined(RD_HAS_NETWORK)
+    bool is_network_enabled;
+    RDNetHttp* net_http;
+    RDNetSocket* net_socket;
+#endif
+
     RDTheme theme;
 
     RDLogCallback log_callback;
@@ -41,6 +49,9 @@ typedef struct RDGlobalState {
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;
     RDCharVect mnem_buf;
+    RDCharVect path_dirname_buf;
+    RDCharVect path_stem_buf;
+    RDCharVect path_join_buf;
 
     RDLoaderOptionVect optgroup_buf;
     RDScratchBuffer encode_buf;

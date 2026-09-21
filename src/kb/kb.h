@@ -1,6 +1,6 @@
 #pragma once
 
-#include "support/utils.h"
+#include "support/path.h"
 #include <redasm/kb.h>
 #include <tomlc17.h>
 

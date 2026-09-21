@@ -2,7 +2,7 @@
 
 #include "core/registers.h"
 #include "core/segment.h"
-#include <redasm/redasm.h>
+#include <redasm/plugins/processor/instruction.h>
 
 typedef enum {
     RD_EI_NONE = 0,
@@ -42,9 +42,8 @@ void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n);
 void rd_i_engine_enqueue_code(RDContext* ctx, RDAddress address, usize n);
 bool rd_i_engine_mark_dirty(RDContext* ctx);
 bool rd_i_engine_has_pending_code(const RDContext* ctx);
-bool rd_i_engine_decode(RDContext* ctx, RDAddress address,
-                        const RDSegment* seg, usize index,
-                        RDInstruction* instr);
+bool rd_i_engine_decode(RDContext* ctx, RDAddress address, const RDSegment* seg,
+                        usize index, RDInstruction* instr);
 u16 rd_i_engine_tick(RDContext* ctx);
 void rd_i_engine_init(RDContext* ctx);
 void rd_i_engine_destroy(RDContext* ctx);

@@ -69,8 +69,8 @@ RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
     RDLoaderRequest req = {
         .filepath = filepath,
         .input = rd_i_reader_create((RDBuffer*)inputbuf),
-        .name = rd_i_get_file_name(filepath),
-        .ext = rd_i_get_file_ext(filepath),
+        .name = rd_path_filename(filepath),
+        .ext = rd_path_ext(filepath),
     };
 
     RDParseResult pr = {.loader = rd_i_loader_create(plugin)};

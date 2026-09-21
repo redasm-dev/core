@@ -6,7 +6,7 @@
 #include "project.h"
 #include "support/containers.h"
 #include "support/error.h"
-#include "support/utils.h"
+#include "support/path.h"
 #include <inttypes.h>
 #include <miniz.h>
 #include <redasm/support/logging.h>
@@ -196,7 +196,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
     RDCharVect name_buf = {0};
 
     if(!filepath) {
-        char* stem = rd_i_get_file_stem(self->file_name);
+        const char* stem = rd_path_stem(self->file_name);
 
         str_append(&name_buf, self->working_dir);
         str_push(&name_buf, RD_PATH_SEP);
@@ -204,7 +204,6 @@ bool rd_project_save(RDContext* self, const char* filepath) {
         str_append(&name_buf, ".rdx");
 
         filepath = name_buf.data;
-        rd_free(stem);
     }
 
     char* tmpdbpath = NULL;
@@ -226,7 +225,7 @@ bool rd_project_save(RDContext* self, const char* filepath) {
         &zip, self->file_name, (const char*)self->input->data,
         rd_i_buffer_get_length((RDBuffer*)self->input), &ok);
 
-    tmpdbpath = rd_i_get_unique_temp_path(RD_PROJECT_DATABASE);
+    tmpdbpath = rd_i_path_unique_tmppath(RD_PROJECT_DATABASE);
 
     if(!tmpdbpath) {
         RD_LOG_FAIL("temporary path creation failed");

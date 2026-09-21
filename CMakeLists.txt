@@ -7,6 +7,10 @@ include(GNUInstallDirs)
 include(cmake/Dependencies.cmake)
 setup_dependencies()
 
+include(cmake/Network.cmake)
+include(cmake/Version.cmake)
+redasm_generate_version()
+
 add_library(${PROJECT_NAME} SHARED)
 add_library(redasm::redasm ALIAS ${PROJECT_NAME})
 
@@ -65,6 +69,7 @@ target_sources(${PROJECT_NAME}
         src/support/hash/sha1.c
         src/support/lexer.c
         src/support/logging.c
+        src/support/path.c
         src/support/scratch.c
         src/support/utils.c
         src/support/stringpool.c
@@ -84,6 +89,12 @@ target_sources(${PROJECT_NAME}
         src/redasm.c
         src/theme.c
         src/version.c
+
+    PRIVATE # networking
+        src/net/http/http.c
+        src/net/socket/socket.c
+        src/net/net.c
+        $<$<BOOL:${REDASM_HAS_NETWORK}>:${REDASM_NETWORK_SOURCES}>
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -101,10 +112,13 @@ target_link_libraries(${PROJECT_NAME}
         SQLite3::SQLite3
         tomlc17
         miniz::miniz
+        $<$<BOOL:${REDASM_HAS_NETWORK}>:${REDASM_NETWORK_LIBS}>
 )
 
-include(cmake/Version.cmake)
-redasm_generate_version()
+target_compile_definitions(${PROJECT_NAME}
+    PRIVATE
+        $<$<BOOL:${REDASM_HAS_NETWORK}>:RD_HAS_NETWORK>
+)
 
 install(
     TARGETS ${PROJECT_NAME}

@@ -171,7 +171,7 @@ bool rd_i_db_export(RDContext* ctx, const char* filepath) {
         return false;
     }
 
-    if(rd_i_file_exists(filepath))
+    if(rd_path_exists(filepath))
         remove(filepath); // clean db, don't merge an existing one
 
     sqlite3_backup* backup = NULL;

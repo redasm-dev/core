@@ -7,16 +7,6 @@
 #include <ctype.h>
 #include <redasm/allocator.h>
 #include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-
-#if defined(_WIN32)
-#include <io.h> // _access
-#define access _access
-#define W_OK 2
-#else
-#include <unistd.h> // access
-#endif
 
 #define _rd_rol_impl(val, n, bits)                                             \
     (((val) << ((n) & ((bits) - 1))) |                                         \
@@ -25,33 +15,6 @@
 #define _rd_ror_impl(val, n, bits)                                             \
     (((val) >> ((n) & ((bits) - 1))) |                                         \
      ((val) << (((bits) - (n)) & ((bits) - 1))))
-
-static const char* _rd_get_temp_path(void) {
-#if defined(_WIN32)
-    static char tmp[MAX_PATH];
-    DWORD len = GetTempPath(MAX_PATH, tmp);
-    if(len == 0 || len > MAX_PATH) return NULL;
-    return tmp;
-#elif defined(__unix__) || defined(__APPLE__) || defined(__HAIKU__)
-    const char* const CANDIDATES[] = {
-        getenv("TMPDIR"), getenv("TEMP"), getenv("TMP"), P_tmpdir, "/tmp",
-    };
-
-    const int N_CANDIDATES = sizeof(CANDIDATES) / sizeof(*CANDIDATES);
-
-    for(int i = 0; i < N_CANDIDATES; i++) {
-        const char* path = CANDIDATES[i];
-        if(path == NULL || path[0] == '\0') continue;
-
-        struct stat st;
-        if(stat(path, &st) == 0 && S_ISDIR(st.st_mode)) return path;
-    }
-
-    return NULL;
-#else
-#error "Unsupported temp path implementation"
-#endif
-}
 
 static const RDBaseParams RD_BASE_DEFAULTS = {
     .base = 10,
@@ -130,58 +93,6 @@ RDWriteFileResult rd_i_writefile(const char* filepath, const char* data,
     return RD_WRITEFILE_TRUNC;
 }
 
-bool rd_i_file_exists(const char* filepath) {
-    assert(filepath);
-
-    struct stat st;
-    return stat(filepath, &st) == 0;
-}
-
-bool rd_i_path_is_writable(const char* path) {
-    assert(path);
-
-    if(rd_i_file_exists(path)) return access(path, W_OK) == 0;
-
-    char* dir = rd_i_get_file_path(path);
-    if(!dir) return false;
-
-    bool ok = access(dir, W_OK) == 0;
-    rd_free(dir);
-    return ok;
-}
-
-const char* rd_i_strip_prefix(const char* s) {
-    if(!s) return s;
-
-    const char* res = NULL;
-
-    if(strstr(s, "loc_") == s)
-        res = s + sizeof("loc_") - 1;
-    else if(strstr(s, "sub_") == s)
-        res = s + sizeof("sub_") - 1;
-
-    if(res) {
-        if(*res) return res;
-        return s;
-    }
-
-    const char* split = strrchr(s, '_');
-    if(!split) return s; // no underscores found
-
-    const char* p = s;
-
-    // left part: only characters numbers and underscores allowed
-    while(p < split) {
-        if(*p != '_' && !islower((int)*p) && !isdigit((int)*p)) return s;
-        p++;
-    }
-
-    p = split + 1;
-    if(*p == 0) return s; // prefix only string
-
-    return p;
-}
-
 const char* rd_i_tolower(char* s) {
     for(char* p = s; *p; p++)
         *p = (char)tolower((int)*p);
@@ -241,137 +152,6 @@ int rd_strnicmp(const char* a, const char* b, int n) {
         b++;
     }
     return n <= 0 ? 0 : tolower((unsigned char)*a) - tolower((unsigned char)*b);
-}
-
-const char* rd_i_get_file_name(const char* filepath) {
-    if(!filepath) return NULL;
-
-    const char* lsep = strrchr(filepath, '/');
-
-#if defined(_WIN32)
-    const char* lsep_win = strrchr(filepath, '\\');
-    if(lsep_win > lsep) lsep = lsep_win;
-#endif
-
-    return lsep ? lsep + 1 : filepath;
-}
-
-const char* rd_i_get_file_ext(const char* filepath) {
-    const char* fname = rd_i_get_file_name(filepath);
-    if(!fname) return NULL;
-
-    const char* ldot =
-        strrchr(fname, '.'); // search filename only, not full path
-
-    // Has extension if dot exists and isn't at the start (avoid
-    // ".gitignore")
-    if(ldot && ldot != fname) return ldot + 1;
-
-    return filepath + strlen(filepath); // no extension
-}
-
-char* rd_i_get_file_path(const char* filepath) {
-    if(!filepath) return NULL;
-
-    const char* lsep = strrchr(filepath, '/');
-
-#if defined(_WIN32)
-    const char* lsep_win = strrchr(filepath, '\\');
-    if(lsep_win > lsep) lsep = lsep_win;
-#endif
-
-    if(!lsep) {
-        char* dot = rd_alloc(2);
-        dot[0] = '.';
-        dot[1] = '\0';
-        return dot;
-    }
-
-    usize len = (usize)(lsep - filepath);
-    char* out = rd_alloc(len + 1);
-    memcpy(out, filepath, len);
-    out[len] = '\0';
-    return out;
-}
-
-char* rd_i_get_file_stem(const char* filepath) {
-    const char* filename = rd_i_get_file_name(filepath);
-    const char* fileext = rd_i_get_file_ext(filepath);
-
-    // handle names without extension
-    if(!fileext || !(*fileext)) return rd_strdup(filename);
-
-    // handle names like ".gitignore"
-    if(filename == fileext) return rd_strdup(fileext);
-
-    ptrdiff_t n = (fileext - filename - 1);
-    char* stem = rd_alloc((usize)n + 1);
-    memcpy(stem, filename, (usize)n);
-    stem[n] = 0;
-    return stem;
-}
-
-char* rd_i_get_temp_path(const char* suffix) {
-    if(!suffix) return NULL;
-
-    const char* tmpdir = _rd_get_temp_path();
-    assert(tmpdir && "cannot get temporary path");
-
-    size_t tmpdir_len = strlen(tmpdir);
-    size_t suffix_len = strlen(suffix);
-
-    if(tmpdir[tmpdir_len - 1] == RD_PATH_SEP) tmpdir_len--;
-
-    if(*suffix == RD_PATH_SEP) {
-        suffix++;
-        suffix_len--;
-    }
-
-    char* p = rd_alloc(tmpdir_len + suffix_len + 2);
-    if(!p) return NULL;
-
-    memcpy(p, tmpdir, tmpdir_len);
-
-    if(suffix_len > 0) {
-        p[tmpdir_len] = RD_PATH_SEP;
-        memcpy(p + tmpdir_len + 1, suffix, suffix_len);
-        p[tmpdir_len + suffix_len + 1] = 0;
-    }
-    else
-        p[tmpdir_len + suffix_len] = 0;
-
-    return p;
-}
-
-char* rd_i_get_unique_temp_path(const char* suffix) {
-    char* tmppath = rd_i_get_temp_path(suffix);
-    if(!tmppath) return NULL;
-    if(!rd_i_file_exists(tmppath)) return tmppath;
-
-    const char* ext = rd_i_get_file_ext(tmppath);
-    size_t baselen, extlen;
-
-    if(ext) {
-        baselen = (usize)(ext - tmppath - 1);
-        extlen = strlen(ext);
-    }
-    else {
-        ext = "";
-        baselen = strlen(tmppath);
-        extlen = 0;
-    }
-
-    // +32 covers " (n)" with generous room for the integer digits
-    size_t buflen = baselen + extlen + 32;
-    char* p = rd_alloc(buflen);
-
-    for(unsigned int i = 1;; i++) {
-        snprintf(p, buflen, "%.*s_%d.%s", (int)baselen, tmppath, i, ext);
-        if(!rd_i_file_exists(p)) break;
-    }
-
-    rd_free(tmppath);
-    return p;
 }
 
 const char* rd_i_escape_char(char c, bool isstr) {
