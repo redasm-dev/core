@@ -46,7 +46,7 @@ static const char* _rd_path_get_tmppath(void) {
 #endif
 }
 
-static bool _rd_path_kind_is(const char* path, mode_t mask) {
+static bool _rd_path_kind_is(const char* path, unsigned int mask) {
     if(!path) return false;
 
     struct stat st;
