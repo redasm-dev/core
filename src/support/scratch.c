@@ -1,8 +1,10 @@
 #include "scratch.h"
+#include "core/state.h"
 #include "support/containers.h"
 #include <redasm/allocator.h>
 #include <redasm/support/logging.h>
 #include <redasm/support/scratch.h>
+#include <stdarg.h>
 
 RDScratchBuffer* rd_scratch_create(void) {
     return (RDScratchBuffer*)rd_alloc0(1, sizeof(RDScratchBuffer));
@@ -93,6 +95,15 @@ bool rd_scratch_set(RDScratchBuffer* self, usize idx, char c) {
 }
 
 void rd_scratch_clear(RDScratchBuffer* self) { str_clear(&self->impl); }
+
+void rd_scratch_putf(RDScratchBuffer* self, const char* fmt, ...) {
+    va_list args; // format in a temporary buffer, then append
+    va_start(args, fmt);
+    const char* result = rd_i_vformat(&rd_i_state.scratch_buf, fmt, args);
+    va_end(args);
+
+    rd_scratch_puts(self, result);
+}
 
 void rd_scratch_puts(RDScratchBuffer* self, const char* s) {
     if(s) str_append(&self->impl, s);

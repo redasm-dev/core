@@ -17,6 +17,7 @@ RD_API bool rd_scratch_is_empty(const RDScratchBuffer* self);
 RD_API bool rd_scratch_get(const RDScratchBuffer* self, usize idx, char* c);
 RD_API bool rd_scratch_set(RDScratchBuffer* self, usize idx, char c);
 RD_API void rd_scratch_clear(RDScratchBuffer* self);
+RD_API void rd_scratch_putf(RDScratchBuffer* self, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(2, 3);
 RD_API void rd_scratch_puts(RDScratchBuffer* self, const char* s);
 RD_API void rd_scratch_puts_n(RDScratchBuffer* self, const char* s, usize n);
 RD_API void rd_scratch_putchar(RDScratchBuffer* self, char c);
