@@ -47,7 +47,6 @@ static void _curl_apply_request(CURL* curl, const RDNetRequest* req, // NOLINT
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, req->method);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, reply);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, (long)timeout_ms);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)timeout_ms);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, req->user_agent ? req->user_agent : RD_NET_USERAGENT);
     // clang-format on
 
