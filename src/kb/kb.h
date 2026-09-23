@@ -7,7 +7,7 @@
 typedef struct RDKBFile {
     char* name;
     toml_result_t toml;
-    const RDKBObject* root;
+    const RDDatum* root;
 } RDKBFile;
 
 typedef struct RDKBFileVect {

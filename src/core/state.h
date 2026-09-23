@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/settings.h"
 #include "net/http/http.h"
 #include "net/socket/socket.h"
 #include "plugins/loader/option.h"
@@ -36,17 +37,20 @@ typedef struct RDGlobalState {
 
     RDTheme theme;
 
+    char* settings_filepath;
+    RDSettings* settings;
+
     RDLogCallback log_callback;
     void* log_userdata;
 
     RDPathVect kb_paths;
     RDCharVect kb_path_buf;
     RDCharVect kb_schema_buf;
-    RDCharVect kb_key_buf;
 
     RDCharVect fmt_buf;
     RDCharVect log_buf;
     RDCharVect scratch_buf;
+    RDCharVect toml_key_buf;
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;
     RDCharVect mnem_buf;

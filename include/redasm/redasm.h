@@ -20,6 +20,7 @@
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>
 #include <redasm/segment.h>
+#include <redasm/settings.h>
 #include <redasm/support/byteorder.h>
 #include <redasm/support/hash.h>
 #include <redasm/support/lexer.h>
@@ -62,6 +63,7 @@ typedef struct RDAcceptParams {
 
 typedef struct RDInitParams {
     const char** kb_paths;
+    const char* settings_filepath;
     bool network_enabled;
 } RDInitParams;
 

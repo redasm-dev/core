@@ -1,9 +1,9 @@
 #include "kb.h"
 #include "core/context.h"
 #include "core/state.h"
-#include "kb/object.h"
 #include "kb/schema.h"
 #include "support/containers.h"
+#include "support/datum.h"
 #include "support/error.h"
 #include "support/tomlschema.h"
 #include <errno.h>
@@ -97,21 +97,21 @@ static RDKBOrdinalModule* _rd_kb_check_ordinal_module(RDContext* ctx,
     return vect_at(&ctx->kb->ordinal_modules, idx);
 }
 
-static bool _rd_kb_get_type(const RDKBObject* obj, RDType* t,
+static bool _rd_kb_get_type(const RDDatum* obj, RDType* t,
                             const RDContext* ctx) {
     *t = (RDType){.mod = RD_TYPE_NONE};
 
     i64 count = 0;
-    const char* tname = rd_kbobject_get_str(obj, "type");
+    const char* tname = rd_datum_get_str(obj, "type");
     assert(tname);
 
     bool is_type_cptr = !strcmp(tname, "cptr");
     bool is_type_ptr = !strcmp(tname, "ptr");
 
-    rd_kbobject_get_int(obj, "count", &count);
+    rd_datum_get_int(obj, "count", &count);
     t->count = (usize)count;
 
-    const char* mod_str = rd_kbobject_get_str(obj, "mod");
+    const char* mod_str = rd_datum_get_str(obj, "mod");
     bool is_mod_str_cptr = mod_str && !strcmp(mod_str, "cptr");
     bool is_mod_str_ptr = mod_str && !strcmp(mod_str, "ptr");
 
@@ -153,25 +153,24 @@ static bool _rd_kb_get_type(const RDKBObject* obj, RDType* t,
 
 // push the current manifest (if any):
 // - NULL 'callconv' is valid and it means "no specified"
-static bool _rd_kb_push_manifest(const RDKBObject* root, RDContext* ctx) {
-    const RDKBObject* manifest = rd_kbobject_get_table(root, "manifest");
+static bool _rd_kb_push_manifest(const RDDatum* root, RDContext* ctx) {
+    const RDDatum* manifest = rd_datum_get_table(root, "manifest");
     if(manifest && !rd_i_kb_validate_manifest(manifest)) return false;
 
     // Resolve and push first: dependencies are includes and inherit this.
-    const char* callconv = rd_kbobject_get_str(manifest, "callconv");
+    const char* callconv = rd_datum_get_str(manifest, "callconv");
 
     if(!callconv && !vect_is_empty(&ctx->kb->curr_callconv))
         callconv = *vect_last(&ctx->kb->curr_callconv);
 
     vect_push(&ctx->kb->curr_callconv, callconv);
 
-    const RDKBObject* dependencies =
-        rd_kbobject_get_array(manifest, "dependencies");
+    const RDDatum* dependencies = rd_datum_get_array(manifest, "dependencies");
 
     if(dependencies) {
-        const RDKBObject* dep;
-        rd_kbobject_each(dep, dependencies) {
-            const char* dep_path = rd_kbobject_to_str(dep);
+        const RDDatum* dep;
+        rd_datum_each(dep, dependencies) {
+            const char* dep_path = rd_datum_to_str(dep);
             if(dep_path) rd_kb_load(ctx, dep_path);
         }
     }
@@ -183,11 +182,11 @@ static void _rd_kb_pop_manifest(RDContext* ctx) {
     vect_pop_last(&ctx->kb->curr_callconv);
 }
 
-static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
+static void _rd_kb_load_compounds(const RDDatum* types, RDContext* ctx,
                                   RDTypeKind kind) {
     const char* name;
-    const RDKBObject* def;
-    rd_kbobject_each_pair(name, def, types) {
+    const RDDatum* def;
+    rd_datum_each_pair(name, def, types) {
         if(!rd_i_kb_validate_compound(def)) continue;
 
         /*
@@ -208,18 +207,18 @@ static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
         else
             unreachable();
 
-        const RDKBObject* members = rd_kbobject_get_array(def, "members");
+        const RDDatum* members = rd_datum_get_array(def, "members");
         assert(members);
 
-        const RDKBObject* m;
-        rd_kbobject_each(m, members) {
+        const RDDatum* m;
+        rd_datum_each(m, members) {
             RDType t;
             if(!_rd_kb_get_type(m, &t, ctx)) {
                 rd_typedef_destroy(tdef);
                 return;
             }
 
-            const char* param_name = rd_kbobject_get_str(m, "name");
+            const char* param_name = rd_datum_get_str(m, "name");
             if(!param_name) {
                 rd_typedef_destroy(tdef);
                 return;
@@ -236,33 +235,33 @@ static void _rd_kb_load_compounds(const RDKBObject* types, RDContext* ctx,
     }
 }
 
-static void _rd_kb_load_structs(const RDKBObject* types, RDContext* ctx) {
+static void _rd_kb_load_structs(const RDDatum* types, RDContext* ctx) {
     _rd_kb_load_compounds(types, ctx, RD_TKIND_STRUCT);
 }
 
-static void _rd_kb_load_unions(const RDKBObject* types, RDContext* ctx) {
+static void _rd_kb_load_unions(const RDDatum* types, RDContext* ctx) {
     _rd_kb_load_compounds(types, ctx, RD_TKIND_UNION);
 }
 
-static void _rd_kb_load_enums(const RDKBObject* enums, RDContext* ctx) {
+static void _rd_kb_load_enums(const RDDatum* enums, RDContext* ctx) {
     const char* name;
-    const RDKBObject* e;
-    rd_kbobject_each_pair(name, e, enums) {
+    const RDDatum* e;
+    rd_datum_each_pair(name, e, enums) {
         if(!rd_i_kb_validate_enum(e)) continue;
 
-        const char* base_type = rd_kbobject_get_str(e, "base_type");
+        const char* base_type = rd_datum_get_str(e, "base_type");
         assert(base_type);
 
         RDTypeDef* tdef = rd_typedef_create_enum(name, base_type, ctx);
 
-        const RDKBObject* members = rd_kbobject_get_array(e, "members");
+        const RDDatum* members = rd_datum_get_array(e, "members");
         assert(members);
 
-        const RDKBObject* m;
-        rd_kbobject_each(m, members) {
-            const char* m_name = rd_kbobject_get_str(m, "name");
+        const RDDatum* m;
+        rd_datum_each(m, members) {
+            const char* m_name = rd_datum_get_str(m, "name");
             i64 m_value;
-            bool value_ok = rd_kbobject_get_int(m, "value", &m_value);
+            bool value_ok = rd_datum_get_int(m, "value", &m_value);
 
             if(!m_name || !value_ok) {
                 rd_typedef_destroy(tdef);
@@ -279,26 +278,26 @@ static void _rd_kb_load_enums(const RDKBObject* enums, RDContext* ctx) {
     }
 }
 
-static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
+static void _rd_kb_load_funcs(const RDDatum* functions, RDContext* ctx,
                               RDTypeFlags flags) {
     const char* name;
-    const RDKBObject* f;
-    rd_kbobject_each_pair(name, f, functions) {
+    const RDDatum* f;
+    rd_datum_each_pair(name, f, functions) {
         if(!rd_i_kb_validate_function(f)) continue;
 
         RDTypeDef* tdef = rd_typedef_create_func(name, ctx);
         rd_typedef_set_proto(tdef, flags & RD_TFLAGS_PROTOTYPE);
 
         bool is_noret = false;
-        rd_kbobject_get_bool(f, "noret", &is_noret);
+        rd_datum_get_bool(f, "noret", &is_noret);
         rd_typedef_set_noret(tdef, is_noret);
 
         // try explicit 'callconv' or manifest provided one (if any)
-        const char* callconv = rd_kbobject_get_str(f, "callconv");
+        const char* callconv = rd_datum_get_str(f, "callconv");
         if(!callconv) callconv = *vect_last(&ctx->kb->curr_callconv);
         rd_typedef_set_callconv(tdef, callconv);
 
-        const RDKBObject* ret = rd_kbobject_get(f, "ret");
+        const RDDatum* ret = rd_datum_get(f, "ret");
         assert(ret);
 
         RDType ret_type;
@@ -315,18 +314,18 @@ static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
                                ret_type.mod, ctx);
         }
 
-        const RDKBObject* args = rd_kbobject_get_array(f, "args");
+        const RDDatum* args = rd_datum_get_array(f, "args");
         assert(args);
 
-        const RDKBObject* a;
-        rd_kbobject_each(a, args) {
+        const RDDatum* a;
+        rd_datum_each(a, args) {
             RDType t;
             if(!_rd_kb_get_type(a, &t, ctx)) {
                 rd_typedef_destroy(tdef);
                 return;
             }
 
-            const char* arg_name = rd_kbobject_get_str(a, "name");
+            const char* arg_name = rd_datum_get_str(a, "name");
             if(!arg_name) {
                 rd_typedef_destroy(tdef);
                 return;
@@ -343,31 +342,30 @@ static void _rd_kb_load_funcs(const RDKBObject* functions, RDContext* ctx,
     }
 }
 
-static void _rd_kb_load_functions(const RDKBObject* functions, RDContext* ctx) {
+static void _rd_kb_load_functions(const RDDatum* functions, RDContext* ctx) {
     _rd_kb_load_funcs(functions, ctx, RD_TFLAGS_NONE);
 }
 
-static void _rd_kb_load_prototypes(const RDKBObject* functions,
-                                   RDContext* ctx) {
+static void _rd_kb_load_prototypes(const RDDatum* functions, RDContext* ctx) {
     _rd_kb_load_funcs(functions, ctx, RD_TFLAGS_PROTOTYPE);
 }
 
-static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
+static void _rd_kb_load_symbols(const RDDatum* symbols, RDContext* ctx) {
     const char* name;
-    const RDKBObject* sym;
-    rd_kbobject_each_pair(name, sym, symbols) {
+    const RDDatum* sym;
+    rd_datum_each_pair(name, sym, symbols) {
         if(!rd_i_kb_validate_symbol(sym)) continue;
 
         i64 addr_v;
-        rd_kbobject_get_int(sym, "address", &addr_v);
+        rd_datum_get_int(sym, "address", &addr_v);
 
         RDAddress address = (RDAddress)addr_v;
 
         bool is_func;
-        bool has_func = rd_kbobject_get_bool(sym, "function", &is_func);
-        const RDKBObject* type = rd_kbobject_get_table(sym, "type");
-        const char* module = rd_kbobject_get_str(sym, "module");
-        const char* external = rd_kbobject_get_str(sym, "external");
+        bool has_func = rd_datum_get_bool(sym, "function", &is_func);
+        const RDDatum* type = rd_datum_get_table(sym, "type");
+        const char* module = rd_datum_get_str(sym, "module");
+        const char* external = rd_datum_get_str(sym, "external");
 
         if(has_func && type) {
             RD_LOG_FAIL("symbol '%s' @ %" PRIX64
@@ -390,8 +388,8 @@ static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
             if(is_func) rd_set_function(ctx, address);
         }
         else if(type) {
-            const char* type_name = rd_kbobject_get_str(type, "name");
-            const char* type_mod = rd_kbobject_get_str(type, "mod");
+            const char* type_name = rd_datum_get_str(type, "name");
+            const char* type_mod = rd_datum_get_str(type, "mod");
 
             RDTypeModifier mod = RD_TYPE_NONE;
 
@@ -403,7 +401,7 @@ static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
             }
 
             i64 type_count;
-            bool has_count = rd_kbobject_get_int(type, "count", &type_count);
+            bool has_count = rd_datum_get_int(type, "count", &type_count);
 
             rd_library_type(ctx, address, type_name,
                             has_count ? (usize)type_count : 0, mod);
@@ -411,15 +409,15 @@ static void _rd_kb_load_symbols(const RDKBObject* symbols, RDContext* ctx) {
     }
 }
 
-static void _rd_kb_load_ordinals(const RDKBObject* ordinals, RDContext* ctx) {
+static void _rd_kb_load_ordinals(const RDDatum* ordinals, RDContext* ctx) {
     const char* modname;
-    const RDKBObject* ord_list;
-    rd_kbobject_each_pair(modname, ord_list, ordinals) {
+    const RDDatum* ord_list;
+    rd_datum_each_pair(modname, ord_list, ordinals) {
         RDKBOrdinalModule* mod = _rd_kb_check_ordinal_module(ctx, modname);
 
         const char* ord_str;
-        const RDKBObject* ord;
-        rd_kbobject_each_pair(ord_str, ord, ord_list) {
+        const RDDatum* ord;
+        rd_datum_each_pair(ord_str, ord, ord_list) {
             errno = 0;
             u32 ord_val = (u32)strtoul(ord_str, NULL, 10);
 
@@ -429,14 +427,14 @@ static void _rd_kb_load_ordinals(const RDKBObject* ordinals, RDContext* ctx) {
                 continue;
             }
 
-            const char* func_name = rd_kbobject_to_str(ord);
+            const char* func_name = rd_datum_to_str(ord);
 
             if(!func_name) {
                 RD_LOG_WARN(
                     "ordinal-name must be '%s', got '%s' for module '%s', "
                     "skipping...",
                     rd_i_toml_type_str(TOML_STRING),
-                    rd_i_toml_type_str(rd_i_kbobject_toml_type(ord)), modname);
+                    rd_i_toml_type_str(rd_i_datum_handle_type(ord)), modname);
                 continue;
             }
 
@@ -460,10 +458,10 @@ static void _rd_kb_load_ordinals(const RDKBObject* ordinals, RDContext* ctx) {
     }
 }
 
-static void _rd_kb_load_callconvs(const RDKBObject* callconvs, RDContext* ctx) {
+static void _rd_kb_load_callconvs(const RDDatum* callconvs, RDContext* ctx) {
     const char* cc_kb_name;
-    const RDKBObject* cc_kb;
-    rd_kbobject_each_pair(cc_kb_name, cc_kb, callconvs) {
+    const RDDatum* cc_kb;
+    rd_datum_each_pair(cc_kb_name, cc_kb, callconvs) {
         if(!rd_i_kb_validate_callconv(cc_kb)) continue;
 
         if(rd_i_callconv_find(ctx, cc_kb_name)) {
@@ -473,12 +471,12 @@ static void _rd_kb_load_callconvs(const RDKBObject* callconvs, RDContext* ctx) {
         }
 
         RDCallConv* cc = rd_i_callconv_create(cc_kb_name, ctx);
-        const RDKBObject* arg_regs = rd_kbobject_get_array(cc_kb, "arg_regs");
+        const RDDatum* arg_regs = rd_datum_get_array(cc_kb, "arg_regs");
 
         if(arg_regs) {
-            const RDKBObject* arg_reg;
-            rd_kbobject_each(arg_reg, arg_regs) {
-                const char* regname = rd_kbobject_to_str(arg_reg);
+            const RDDatum* arg_reg;
+            rd_datum_each(arg_reg, arg_regs) {
+                const char* regname = rd_datum_to_str(arg_reg);
                 RDQueryReg q = {.kind = RD_QUERY_REG_BY_NAME, .name = regname};
 
                 if(!rd_query_reg(ctx, &q)) {
@@ -493,17 +491,17 @@ static void _rd_kb_load_callconvs(const RDKBObject* callconvs, RDContext* ctx) {
             }
         }
 
-        const char* arg_order = rd_kbobject_get_str(cc_kb, "arg_order");
+        const char* arg_order = rd_datum_get_str(cc_kb, "arg_order");
         cc->arg_order =
             !strcmp(arg_order, "ltr") ? RD_ARGORDER_LTR : RD_ARGORDER_RTL;
 
-        const char* stack_cleanup = rd_kbobject_get_str(cc_kb, "stack_cleanup");
+        const char* stack_cleanup = rd_datum_get_str(cc_kb, "stack_cleanup");
         cc->stack_cleanup = !strcmp(stack_cleanup, "caller")
                                 ? RD_STACK_CLEANUP_CALLER
                                 : RD_STACK_CLEANUP_CALLEE;
 
         i64 shadow_space;
-        if(rd_kbobject_get_int(cc_kb, "shadow_space", &shadow_space))
+        if(rd_datum_get_int(cc_kb, "shadow_space", &shadow_space))
             cc->shadow_space = (usize)shadow_space;
 
         vect_push(&ctx->callconvs, cc);
@@ -516,7 +514,7 @@ static void _rd_kb_load_callconvs(const RDKBObject* callconvs, RDContext* ctx) {
 
 typedef struct RDKBCategory {
     const char* name;
-    void (*load)(const RDKBObject*, RDContext*);
+    void (*load)(const RDDatum*, RDContext*);
 } RDKBCategory;
 
 static const RDKBCategory KB_CATEGORIES[] = {
@@ -578,7 +576,7 @@ const char* rd_i_kb_find_ordinal_name(RDContext* ctx, const char* module,
     return NULL;
 }
 
-const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
+const RDDatum* rd_kb_load(RDContext* ctx, const char* kb) {
     if(!kb) return NULL;
 
     RDKBFile* kbfile = _rd_kb_find_file(ctx, kb);
@@ -601,15 +599,15 @@ const RDKBObject* rd_kb_load(RDContext* ctx, const char* kb) {
     kbfile = _rd_kbfile_create();
     kbfile->name = rd_strdup(kb);
     kbfile->toml = toml;
-    kbfile->root = rd_i_kb_from_datum(&kbfile->toml.toptab);
+    kbfile->root = rd_i_datum_from_handle(&kbfile->toml.toptab);
 
     vect_push(&ctx->kb->files, kbfile); // avoid recursion
     RD_LOG_INFO("loading KB '%s'", kb);
 
     if(_rd_kb_push_manifest(kbfile->root, ctx)) {
         const char* cat;
-        const RDKBObject* table;
-        rd_kbobject_each_pair(cat, table, kbfile->root) {
+        const RDDatum* table;
+        rd_datum_each_pair(cat, table, kbfile->root) {
             const RDKBCategory* c = KB_CATEGORIES;
 
             while(c->name) {

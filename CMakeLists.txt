@@ -28,6 +28,7 @@ target_sources(${PROJECT_NAME}
         src/core/mapping.c
         src/core/registers.c
         src/core/segment.c
+        src/core/settings.c
         src/core/state.c
         src/core/stringfinder.c
         src/core/symbol.c
@@ -44,7 +45,6 @@ target_sources(${PROJECT_NAME}
         src/io/flagsbuffer.c
         src/io/reader.c
         src/kb/kb.c
-        src/kb/object.c
         src/kb/schema.c
         src/plugins/builtin/loaders.c
         src/plugins/builtin/processors.c
@@ -62,6 +62,7 @@ target_sources(${PROJECT_NAME}
         src/rdil/rdil.c
         src/rdil/renderer.c
         src/support/containers.c
+        src/support/datum.c
         src/support/error.c
         src/support/hash/adler32.c
         src/support/hash/hash.c

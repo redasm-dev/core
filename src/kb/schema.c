@@ -1,5 +1,5 @@
 #include "schema.h"
-#include "kb/object.h"
+#include "support/datum.h"
 #include "support/tomlschema.h"
 
 static const char* rd_kb_mod_values[] = {
@@ -99,38 +99,38 @@ static const RDTomlSchema RD_KB_SCHEMA_CALLCONV[] = {
 };
 // clang-format off
 
-bool rd_i_kb_validate_manifest(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_manifest(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_MANIFEST);
 }
 
-bool rd_i_kb_validate_function(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_function(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_FUNCTION);
 }
 
-bool rd_i_kb_validate_compound(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_compound(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_COMPOUND);
 }
 
-bool rd_i_kb_validate_enum(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_enum(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_ENUM);
 }
 
-bool rd_i_kb_validate_symbol(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_symbol(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_SYMBOL);
 }
 
-bool rd_i_kb_validate_callconv(const RDKBObject* obj) {
-    const toml_datum_t* d = rd_i_kb_to_datum(obj);
+bool rd_i_kb_validate_callconv(const RDDatum* obj) {
+    const toml_datum_t* d = rd_i_datum_to_handle(obj);
     assert(d);
     return rd_i_toml_validate_schema(*d, RD_KB_SCHEMA_CALLCONV);
 }
