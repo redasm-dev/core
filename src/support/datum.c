@@ -1,5 +1,6 @@
 #include "datum.h"
 #include "core/state.h"
+#include "support/tomlschema.h"
 #include <string.h>
 
 // we need pointers, do not use toml_get
@@ -52,6 +53,9 @@ usize rd_datum_get_length(const RDDatum* self) {
     if(datum) {
         if(datum->type == TOML_ARRAY) return (usize)datum->u.arr.size;
         if(datum->type == TOML_TABLE) return (usize)datum->u.tab.size;
+
+        RD_LOG_WARN("trying to get the length of type '%s'",
+                    rd_i_toml_type_str(rd_i_datum_handle_type(self)));
     }
 
     return 0;
@@ -91,6 +95,10 @@ const char* rd_datum_get_str(const RDDatum* self, const char* key) {
 
     const RDDatum* v = _rd_datum_seek(self, key);
     return rd_datum_to_str(v);
+}
+
+bool rd_datum_is_empty(const RDDatum* self) {
+    return rd_datum_get_length(self) == 0;
 }
 
 bool rd_datum_get_bool(const RDDatum* self, const char* key, bool* val) {

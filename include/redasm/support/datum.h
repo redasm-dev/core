@@ -36,6 +36,7 @@ RD_API usize rd_datum_get_length(const RDDatum* self);
 RD_API RDDatumKind rd_datum_get_kind(const RDDatum* self);
 RD_API const RDDatum* rd_datum_get(const RDDatum* self, const char* key);
 RD_API const char* rd_datum_get_str(const RDDatum* self, const char* key);
+RD_API bool rd_datum_is_empty(const RDDatum* self);
 RD_API bool rd_datum_get_bool(const RDDatum* self, const char* key, bool* val);
 RD_API bool rd_datum_get_int(const RDDatum* self, const char* key, i64* val);
 RD_API bool rd_datum_get_float(const RDDatum* self, const char* key,
