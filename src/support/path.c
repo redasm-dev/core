@@ -52,7 +52,7 @@ static bool _rd_path_kind_is(const char* path, int mask) {
     struct stat st;
     if(stat(path, &st) != 0) return false;
 
-    return (st.st_mode & S_IFMT) == mask;
+    return ((int)st.st_mode & S_IFMT) == mask;
 }
 
 bool rd_i_path_is_writable(const char* path) {
