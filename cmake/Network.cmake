@@ -17,10 +17,10 @@ if(NOT REDASM_ENABLE_NETWORK)
 elseif(WIN32)
     set(REDASM_NETWORK_SOURCES 
         src/net/http/backend/winhttp.c
-        src/net/socket/backend/stub.c
+        src/net/socket/backend/winsock.c
     )
 
-    set(REDASM_NETWORK_LIBS winhttp)
+    set(REDASM_NETWORK_LIBS winhttp ws2_32)
     set(REDASM_HAS_NETWORK TRUE)
 
     message(STATUS "Network: WinHTTP")
