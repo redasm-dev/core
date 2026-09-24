@@ -15,12 +15,15 @@ option(REDASM_ENABLE_NETWORK "Enable network support" ON)
 if(NOT REDASM_ENABLE_NETWORK)
     rd_no_network("REDASM_ENABLE_NETWORK=OFF")
 elseif(WIN32)
-    rd_no_network("Windows not supported (yet)")
-    # set(REDASM_NETWORK_SOURCES src/net/http/backend/winhttp.c)
-    # set(REDASM_NETWORK_LIBS winhttp)
-    # set(REDASM_HAS_NETWORK TRUE)
+    set(REDASM_NETWORK_SOURCES 
+        src/net/http/backend/winhttp.c
+        src/net/socket/backend/stub.c
+    )
 
-    # message(STATUS "Network: WinHTTP")
+    set(REDASM_NETWORK_LIBS winhttp)
+    set(REDASM_HAS_NETWORK TRUE)
+
+    message(STATUS "Network: WinHTTP")
 else()
     find_package(CURL)
 
