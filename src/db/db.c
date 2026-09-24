@@ -227,7 +227,7 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg) {
 
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index) {
-    if(!_rd_validate_address_bounds(ctx, address)) return NULL;
+    if(!_rd_validate_address_bounds(ctx, address)) return false;
 
     RDRelAddress rel_address = rd_i_rel(ctx, address);
 
