@@ -105,6 +105,10 @@ typedef bool (*VectPredicate)(const void*);
     _vect_reserve((void**)(&(self)->data), &(self)->capacity, n,               \
                   sizeof(*(self)->data))
 
+#define vect_resize(self, n)                                                   \
+    _vect_resize((void**)(&(self)->data), &(self)->capacity, &(self)->length,  \
+                 (n), sizeof(*(self)->data))
+
 #define vect_dup(dst, src)                                                     \
     do {                                                                       \
         (dst)->length = (src)->length;                                         \
@@ -346,6 +350,8 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
 void _vect_grow(void** data, size_t* cap, size_t len, size_t elem_size);
 void _vect_reserve(void** data, size_t* currcap, size_t newcap,
                    size_t elem_size);
+void _vect_resize(void** data, size_t* cap, size_t* len, size_t newlen,
+                  size_t elem_size);
 void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
                  size_t elem_size);
 void _queue_reserve(void** data, size_t* currcap, size_t newcap,

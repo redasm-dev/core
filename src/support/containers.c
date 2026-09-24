@@ -63,6 +63,21 @@ void _vect_reserve(void** data, size_t* currcap, size_t newcap,
     *data = realloc(*data, elem_size * newcap);
 }
 
+void _vect_resize(void** data, size_t* cap, size_t* len, size_t newlen,
+                  size_t elem_size) {
+    if(newlen > *cap) {
+        *cap = newlen;
+        *data = realloc(*data, elem_size * *cap);
+    }
+
+    if(newlen > *len) {
+        memset((char*)*data + (*len * elem_size), 0,
+               (newlen - *len) * elem_size);
+    }
+
+    *len = newlen;
+}
+
 void _queue_grow(void** data, size_t* cap, size_t* head, size_t len,
                  size_t elem_size) {
     if(*head + len < *cap) return;

@@ -17,6 +17,10 @@ void rd_scratch_destroy(RDScratchBuffer* self) {
     rd_free(self);
 }
 
+void rd_scratch_resize(RDScratchBuffer* self, usize n) {
+    vect_resize(&self->impl, n);
+}
+
 void rd_scratch_reserve(RDScratchBuffer* self, usize n) {
     usize oldcap = vect_capacity(&self->impl);
     if(n <= oldcap) return;
