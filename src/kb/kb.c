@@ -463,12 +463,7 @@ static void _rd_kb_load_callconvs(const RDDatum* callconvs, RDContext* ctx) {
     const RDDatum* cc_kb;
     rd_datum_each_pair(cc_kb_name, cc_kb, callconvs) {
         if(!rd_i_kb_validate_callconv(cc_kb)) continue;
-
-        if(rd_i_callconv_find(ctx, cc_kb_name)) {
-            RD_LOG_WARN("calling convention '%s' already registered",
-                        cc_kb_name);
-            continue;
-        }
+        if(rd_i_callconv_find(ctx, cc_kb_name)) continue;
 
         RDCallConv* cc = rd_i_callconv_create(cc_kb_name, ctx);
         const RDDatum* arg_regs = rd_datum_get_array(cc_kb, "arg_regs");
