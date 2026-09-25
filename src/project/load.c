@@ -33,7 +33,7 @@ typedef struct RDProjectManifest {
 } RDProjectManifest;
 
 typedef struct RDProjectPaths {
-    const char* working_dir;
+    char* working_dir;
     char* db_path;
 } RDProjectPaths;
 
@@ -75,6 +75,7 @@ static void _rd_project_manifest_destroy(RDProjectManifest* m) {
 }
 
 static void _rd_project_paths_destroy(RDProjectPaths* p) {
+    rd_free(p->working_dir);
     rd_free(p->db_path);
 }
 
@@ -84,7 +85,7 @@ static bool _rd_project_resolve_paths(const char* filepath,
                                       RDProjectPaths* out,
                                       RDAcceptResult* res) {
     if(!workingdir) {
-        out->working_dir = rd_path_dirname(filepath);
+        out->working_dir = rd_strdup(rd_path_dirname(filepath));
 
         if(!out->working_dir) {
             RD_LOG_FAIL("cannot get file path for '%s'", filepath);
