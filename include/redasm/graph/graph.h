@@ -31,12 +31,15 @@ typedef struct RDGraphPointSlice {
     usize length;
 } RDGraphPointSlice;
 
+typedef void (*RDGraphDestroy)(RDGraph* self);
+
 typedef const char* (*RDGraphPropCallback)(const RDGraph* self, RDGraphNode n,
                                            void* userdata);
 typedef u64 (*RDGraphOrderCallback)(const RDGraph* self, RDGraphNode n,
                                     void* userdata);
 
 RD_API RDGraph* rd_graph_create(void);
+RD_API RDGraph* rd_graph_create_ex(usize n, RDGraphDestroy d);
 RD_API void rd_graph_destroy(RDGraph* self);
 RD_API bool rd_graph_is_same(const RDGraph* self, const RDGraph* g);
 RD_API u32 rd_graph_get_hash(const RDGraph* self, RDGraphPropCallback cb,
@@ -114,3 +117,5 @@ RD_API void rd_graph_set_edge_routes(RDGraph* self, const RDGraphEdge* e,
 
 RD_API void rd_graph_set_edge_arrow(RDGraph* self, const RDGraphEdge* e,
                                     const RDGraphPoint* poly, usize n);
+
+#define rd_graph_create_as(T, d) ((T*)rd_graph_create_ex(sizeof(T), d))

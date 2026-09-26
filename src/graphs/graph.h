@@ -37,6 +37,8 @@ typedef struct RDEdgeAttributes {
 
 typedef struct RDGraph {
     u32 gen;
+    RDGraphDestroy destroy;
+
     bool is_ordered;
     RDCharVect dot_buf;
     RDCharVect hash_dot_buf;

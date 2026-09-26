@@ -1,5 +1,6 @@
 #include "graph.h"
 #include "support/containers.h"
+#include "support/error.h"
 #include "support/hash/murmur3.h"
 #include "support/scratch.h"
 #include <redasm/allocator.h>
@@ -188,10 +189,24 @@ void rd_i_graph_remove_edges(RDGraph* self, RDGraphNode n) {
     }
 }
 
-RDGraph* rd_graph_create(void) { return rd_alloc0(1, sizeof(RDGraph)); }
+RDGraph* rd_graph_create(void) {
+    return rd_graph_create_ex(sizeof(RDGraph), NULL);
+}
+
+RDGraph* rd_graph_create_ex(usize n, RDGraphDestroy d) {
+    panic_if(n < sizeof(RDGraph),
+             "graph size %zu is smaller than RDGraph (%zu)", n,
+             sizeof(RDGraph));
+
+    RDGraph* self = rd_alloc0(1, n);
+    self->destroy = d;
+    return self;
+}
 
 void rd_graph_destroy(RDGraph* self) {
     if(!self) return;
+
+    if(self->destroy) self->destroy(self);
 
     _rd_graph_destroy_edge_attributes(self);
     vect_destroy(&self->edge_attributes);
