@@ -20,7 +20,7 @@ typedef struct RDFunction {
 typedef struct RDFunctionChunk {
     const RDFunction* func;
     RDRelAddress start;
-    RDRelAddress end;
+    RDRelAddress end; // exclusive
     usize n_instructions;
     bool has_noret;
 } RDFunctionChunk;
@@ -40,12 +40,11 @@ typedef struct RDFunctionVect {
 } RDFunctionVect;
 
 int rd_i_function_kcmp_pred(const void* key, const void* item);
-void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg,
-                              usize idx, const char* type);
+void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
+                              const char* type);
 RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,
                                   const char* type);
-void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg,
-                             usize idx);
+void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg, usize idx);
 
 void rd_i_function_set_type_def(RDFunction* self, const RDTypeDef* tdef);
 void rd_i_function_rebuild(RDFunction* self);

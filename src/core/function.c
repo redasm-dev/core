@@ -68,8 +68,8 @@ static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
 
     RDRelAddress rel_start = rd_i_rel(ctx, start);
     const RDNodeVect* nodes = rd_i_graph_get_nodes(g);
-    const RDGraphNode* it;
 
+    const RDGraphNode* it;
     vect_each(it, nodes) {
         const RDFunctionChunk* b =
             (const RDFunctionChunk*)rd_graph_get_data(g, *it);
