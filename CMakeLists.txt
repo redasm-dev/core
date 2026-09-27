@@ -21,6 +21,7 @@ target_sources(${PROJECT_NAME}
     PRIVATE
         src/core/argdiscover.c
         src/core/autorename.c
+        src/core/callgraph.c
         src/core/callconv.c
         src/core/context.c
         src/core/engine.c
@@ -38,8 +39,10 @@ target_sources(${PROJECT_NAME}
         src/db/schema.c
         src/db/types.c
         src/db/schema.c
+        src/graphs/ego.c
         src/graphs/graph.c
         src/graphs/layered.c
+        src/graphs/radial.c
         src/io/buffer.c
         src/io/flags.c
         src/io/flagsbuffer.c
