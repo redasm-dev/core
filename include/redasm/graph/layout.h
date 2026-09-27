@@ -18,3 +18,4 @@ typedef enum {
 
 RD_API bool rd_graph_compute_layered(RDGraph* self, RDLayeredLayoutKind kind);
 RD_API bool rd_graph_compute_ego(RDGraph* self, RDEgoLayoutKind kind);
+RD_API bool rd_graph_compute_radial(RDGraph* self);
