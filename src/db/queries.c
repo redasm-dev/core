@@ -1090,10 +1090,17 @@ void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
         VALUES (:fromaddr, :address, :message) \
     ");
 
+    const RDSegment* from_seg = rd_i_db_find_segment(ctx, from);
+    const RDSegment* addr_seg = rd_i_db_find_segment(ctx, addr);
+
+    // if address not valid, just write what the problem passed
+
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
-                          (sqlite3_int64)rd_i_rel(ctx, from));
+                          from_seg ? (sqlite3_int64)rd_i_rel(ctx, from)
+                                   : (sqlite3_int64)from);
     _rd_db_bind_param_int(ctx, stmt, ":address",
-                          (sqlite3_int64)rd_i_rel(ctx, addr));
+                          addr_seg ? (sqlite3_int64)rd_i_rel(ctx, addr)
+                                   : (sqlite3_int64)addr);
     _rd_db_bind_param_str(ctx, stmt, ":message", msg);
     _rd_db_step(ctx, stmt);
 }
