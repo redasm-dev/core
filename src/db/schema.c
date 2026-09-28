@@ -118,9 +118,11 @@ CREATE TABLE IF NOT EXISTS OperandOverrides ( \
 ); \
 \
 CREATE TABLE IF NOT EXISTS Problems ( \
-    from_address INTEGER NOT NULL, \
-    address      INTEGER NOT NULL, \
-    message      TEXT NOT NULL \
+    from_value        INTEGER NOT NULL, \
+    from_is_address   INTEGER NOT NULL, \
+    target_value      INTEGER NOT NULL, \
+    target_is_address INTEGER NOT NULL, \
+    message           TEXT NOT NULL \
 ); \
 \
 CREATE INDEX IF NOT EXISTS Names_NameIdx ON Names(name); \

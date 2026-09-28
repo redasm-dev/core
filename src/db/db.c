@@ -480,9 +480,9 @@ bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_has_any_comment(ctx, address);
 }
 
-void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
+void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
                          const char* msg) {
-    _rd_i_db_query_add_problem(ctx, from, addr, msg);
+    _rd_i_db_query_add_problem(ctx, from, target, msg);
 }
 
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,

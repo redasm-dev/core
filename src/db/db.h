@@ -98,7 +98,7 @@ usize rd_i_db_get_comment_count(RDContext* ctx, RDAddress address,
                                 RDCommentPlacement p);
 bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address);
 
-void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
+void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
                          const char* msg);
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
                                                RDProblemsVect* v);

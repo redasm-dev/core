@@ -165,8 +165,8 @@ usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
                                        RDCommentPlacement p);
 bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address);
 
-void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from, RDAddress addr,
-                                const char* msg);
+void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
+                                RDAddress target, const char* msg);
 const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
                                                       RDProblemsVect* v);
 bool _rd_i_db_query_has_problems(RDContext* ctx);

@@ -34,8 +34,16 @@ typedef enum {
 } RDExportFormat;
 
 typedef struct RDProblem {
-    RDRelAddress from_address;
-    RDRelAddress address;
+    struct {
+        RDAddress value;
+        bool is_address;
+    } from;
+
+    struct {
+        RDAddress value;
+        bool is_address;
+    } target;
+
     const char* message;
 } RDProblem;
 
