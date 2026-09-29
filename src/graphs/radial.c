@@ -5,7 +5,7 @@
 #include <redasm/allocator.h>
 #include <redasm/graph/layout.h>
 
-#define RD_RADIAL_PADDING 24
+#define RD_RADIAL_PADDING 64
 #define RD_RADIAL_TAU 6.283185307179586 // avoids relying on M_PI's availability
 
 typedef struct RDRadialBlock {
