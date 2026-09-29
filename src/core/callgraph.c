@@ -6,6 +6,7 @@
 
 typedef struct RDCallGraphNode {
     RDRelAddress func_rel_address;
+    bool up_queued, down_queued;
 } RDCallGraphNode;
 
 static void _rd_callgraph_destroy(RDGraph* base) {
@@ -25,9 +26,8 @@ static void _rd_callgraph_destroy(RDGraph* base) {
     vect_destroy(&self->wl);
 }
 
-static bool _rd_callgraph_get_or_add_block(RDCallGraph* self,
-                                           RDRelAddress address,
-                                           RDGraphNode* out_n) {
+static RDGraphNode _rd_callgraph_get_or_add_block(RDCallGraph* self,
+                                                  RDRelAddress address) {
     const RDNodeVect* nodes = rd_i_graph_get_nodes(&self->base);
 
     const RDGraphNode* it;
@@ -35,18 +35,29 @@ static bool _rd_callgraph_get_or_add_block(RDCallGraph* self,
         const RDCallGraphNode* d =
             (const RDCallGraphNode*)rd_graph_get_data(&self->base, *it);
 
-        if(d->func_rel_address == address) {
-            *out_n = *it;
-            return false;
-        }
+        if(d->func_rel_address == address) return *it;
     }
 
     RDCallGraphNode* d = rd_alloc(sizeof(*d));
     d->func_rel_address = address;
+    d->up_queued = false;
+    d->down_queued = false;
 
-    *out_n = rd_graph_add_node(&self->base);
-    rd_graph_set_data(&self->base, *out_n, (RDNodeData)d);
-    return true;
+    RDGraphNode n = rd_graph_add_node(&self->base);
+    rd_graph_set_data(&self->base, n, (RDNodeData)d);
+    return n;
+}
+
+// A node is explored at most once per direction:
+// - only direct calls uses this.
+// - indirect ones create/annotate a node but never queue it.
+static void _rd_callgraph_enqueue(RDCallGraph* self, RDGraphNode n, bool up) {
+    RDCallGraphNode* d = (RDCallGraphNode*)rd_graph_get_data(&self->base, n);
+    bool* queued = up ? &d->up_queued : &d->down_queued;
+    if(*queued) return;
+
+    *queued = true;
+    vect_push(&self->wl, n);
 }
 
 static void _rd_callgraph_explore_up(RDCallGraph* self, RDGraphNode child_node,
@@ -54,23 +65,36 @@ static void _rd_callgraph_explore_up(RDCallGraph* self, RDGraphNode child_node,
     RDContext* ctx = self->context;
 
     const RDXRefVect* xrefs = rd_i_db_get_xrefs_to(
-        ctx, rd_i_abs(ctx, f->rel_address), RD_CR_CALL, &self->xrefs_buf);
+        ctx, rd_i_abs(ctx, f->rel_address), RD_XR_NONE, &self->xrefs_buf);
 
     const RDXRef* xref;
     vect_each(xref, xrefs) {
-        const RDFunction* caller = rd_i_find_function(ctx, xref->address);
-        if(!caller) continue; // call site not (yet) claimed by any function
+        bool direct = xref->type == RD_CR_CALL;
 
-        RDGraphNode n;
-        bool added =
-            _rd_callgraph_get_or_add_block(self, caller->rel_address, &n);
+        // xref->address is the referencing address: a call site, or a data
+        // cell for indirect references.
+        // Key by the containing function so several calls from one caller
+        // collapse into a single node.
+        const RDFunction* src = rd_i_find_function(ctx, xref->address);
+        if(!src && direct)
+            continue; // call site not (yet) claimed by a function
+
+        RDRelAddress key =
+            src ? src->rel_address : rd_i_rel(ctx, xref->address);
+
+        // a jump back to our own entry (a loop) isn't a reference to us
+        if(!direct && key == f->rel_address) continue;
+
+        RDGraphNode n = _rd_callgraph_get_or_add_block(self, key);
 
         // caller -> callee, same orientation as down edges
         RDGraphEdge e = rd_graph_add_edge(&self->base, n, child_node);
-        rd_graph_set_edge_color(&self->base, &e,
-                                rd_get_theme_color(RD_THEME_FAIL));
 
-        if(added) vect_push(&self->wl, n);
+        rd_graph_set_edge_color(
+            &self->base, &e,
+            rd_get_theme_color(direct ? RD_THEME_FAIL : RD_THEME_MUTED));
+
+        if(direct) _rd_callgraph_enqueue(self, n, true);
     }
 }
 
@@ -96,21 +120,24 @@ static void _rd_callgraph_explore_down(RDCallGraph* self,
             if(rd_flagsbuffer_has_call(seg->flags, idx)) {
                 RDAddress addr = rd_i_index2address(seg, idx);
                 const RDXRefVect* xrefs = rd_i_db_get_xrefs_from(
-                    ctx, addr, RD_CR_CALL, &self->xrefs_buf);
+                    ctx, addr, RD_XR_NONE, &self->xrefs_buf);
 
                 const RDXRef* xref;
                 vect_each(xref, xrefs) {
-                    RDGraphNode n;
+                    bool direct = xref->type == RD_CR_CALL;
 
-                    bool added = _rd_callgraph_get_or_add_block(
-                        self, rd_i_rel(ctx, xref->address), &n);
+                    RDGraphNode n = _rd_callgraph_get_or_add_block(
+                        self, rd_i_rel(ctx, xref->address));
 
                     RDGraphEdge e =
                         rd_graph_add_edge(&self->base, parent_node, n);
-                    rd_graph_set_edge_color(
-                        &self->base, &e, rd_get_theme_color(RD_THEME_SUCCESS));
 
-                    if(added) vect_push(&self->wl, n);
+                    rd_graph_set_edge_color(
+                        &self->base, &e,
+                        rd_get_theme_color(direct ? RD_THEME_SUCCESS
+                                                  : RD_THEME_WARNING));
+
+                    if(direct) _rd_callgraph_enqueue(self, n, false);
                 }
             }
 
@@ -160,8 +187,7 @@ RDCallGraph* rd_callgraph_create(RDContext* ctx, RDAddress address) {
     RDCallGraph* self = rd_graph_create_as(RDCallGraph, _rd_callgraph_destroy);
     self->context = ctx;
 
-    RDGraphNode root;
-    _rd_callgraph_get_or_add_block(self, f->rel_address, &root);
+    RDGraphNode root = _rd_callgraph_get_or_add_block(self, f->rel_address);
     rd_graph_set_root(&self->base, root);
     _rd_callgraph_walk_down(self, root);
     _rd_callgraph_walk_up(self, root);
