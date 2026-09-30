@@ -56,14 +56,6 @@ static void _rd_worker_rebuild_functions(RDContext* ctx) {
     }
 
     rd_i_functionchunk_sort(&chunks);
-
-#if !defined(NDEBUG)
-    for(usize i = 1; i < vect_length(&chunks); i++) {
-        _rd_worker_check_chunk_pair((*vect_at(&chunks, i - 1)),
-                                    *vect_at(&chunks, i));
-    }
-#endif
-
     mem_swap(RDFunctionChunkVect, &ctx->functions.chunks, &chunks);
     rd_i_functionchunk_destroy(&chunks);
 }
@@ -309,6 +301,14 @@ static void _rd_worker_step_finalize(RDContext* ctx) {
     _rd_worker_rebuild_functions(ctx);
     _rd_worker_follow_pointers(ctx);
     _rd_worker_apply_noret(ctx);
+
+#if !defined(NDEBUG)
+    for(usize i = 1; i < vect_length(&ctx->functions.chunks); i++) {
+        _rd_worker_check_chunk_pair((*vect_at(&ctx->functions.chunks, i - 1)),
+                                    *vect_at(&ctx->functions.chunks, i));
+    }
+#endif
+
     rd_fire_hook(ctx, "redasm.finalized");
 
     ctx->engine.step++;
