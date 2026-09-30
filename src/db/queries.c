@@ -1149,6 +1149,16 @@ const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
     return v;
 }
 
+usize _rd_i_db_query_get_problem_count(RDContext* ctx) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_PROBLEM_COUNT,
+                                              "SELECT COUNT(*) FROM Problems");
+
+    if(_rd_db_step(ctx, stmt) == SQLITE_ROW)
+        return (usize)sqlite3_column_int64(stmt, 0);
+
+    return 0;
+}
+
 bool _rd_i_db_query_has_problems(RDContext* ctx) {
     sqlite3_stmt* stmt =
         _rd_db_prepare_query(ctx, RD_QUERY_HAS_PROBLEMS,

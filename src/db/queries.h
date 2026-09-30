@@ -78,6 +78,7 @@ enum {
 
     RD_QUERY_ADD_PROBLEM,
     RD_QUERY_GET_ALL_PROBLEMS,
+    RD_QUERY_GET_PROBLEM_COUNT,
     RD_QUERY_HAS_PROBLEMS,
 
     RD_QUERY_GET_UNDEFINE_CONFIDENCE,
@@ -169,6 +170,7 @@ void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
                                 RDAddress target, const char* msg);
 const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
                                                       RDProblemsVect* v);
+usize _rd_i_db_query_get_problem_count(RDContext* ctx);
 bool _rd_i_db_query_has_problems(RDContext* ctx);
 
 bool _rd_i_db_query_get_userdata(RDContext* ctx, const char* key, uptr* ud);

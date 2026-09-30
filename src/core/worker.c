@@ -21,6 +21,22 @@ static const char* const RD_STEP_NAMES[] = {
 
 static_assert(rd_count_of(RD_STEP_NAMES) == RD_WS_COUNT, "step names mismatch");
 
+#if !defined(NDEBUG)
+static void _rd_worker_check_chunk_pair(const RDFunctionChunk* p,
+                                        const RDFunctionChunk* c) {
+    if(p->end <= c->start) return;
+
+    RD_LOG_FAIL("chunk overlap: func %llx [%llx,%llx) vs func %llx [%llx,%llx)",
+                (unsigned long long)rd_function_get_address(p->func),
+                (unsigned long long)rd_functionchunk_get_start(p),
+                (unsigned long long)rd_functionchunk_get_end(p),
+                (unsigned long long)rd_function_get_address(c->func),
+                (unsigned long long)rd_functionchunk_get_start(c),
+                (unsigned long long)rd_functionchunk_get_end(c));
+    assert(false && "overlapping function chunks");
+}
+#endif
+
 static void _rd_worker_next_or_emulate(RDContext* ctx) {
     if(rd_i_engine_has_pending_code(ctx))
         ctx->engine.step = RD_WS_EMULATE;
@@ -40,6 +56,14 @@ static void _rd_worker_rebuild_functions(RDContext* ctx) {
     }
 
     rd_i_functionchunk_sort(&chunks);
+
+#if !defined(NDEBUG)
+    for(usize i = 1; i < vect_length(&chunks); i++) {
+        _rd_worker_check_chunk_pair((*vect_at(&chunks, i - 1)),
+                                    *vect_at(&chunks, i));
+    }
+#endif
+
     mem_swap(RDFunctionChunkVect, &ctx->functions.chunks, &chunks);
     rd_i_functionchunk_destroy(&chunks);
 }
@@ -288,7 +312,9 @@ static void _rd_worker_step_finalize(RDContext* ctx) {
     rd_fire_hook(ctx, "redasm.finalized");
 
     ctx->engine.step++;
-    RD_LOG_INFO("analysis completed");
+
+    RD_LOG_INFO("terminated with functions: %zu, problems: %zu",
+                vect_length(&ctx->functions), rd_i_db_get_problem_count(ctx));
 }
 
 bool rd_step(RDContext* self, RDWorkerStatus* status) {

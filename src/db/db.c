@@ -494,6 +494,10 @@ bool rd_i_db_has_problems(RDContext* ctx) {
     return _rd_i_db_query_has_problems(ctx);
 }
 
+usize rd_i_db_get_problem_count(RDContext* ctx) {
+    return _rd_i_db_query_get_problem_count(ctx);
+}
+
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue val, RDConfidence c) {
     const char* interned = rd_i_strpool_intern(&ctx->strings, regname);

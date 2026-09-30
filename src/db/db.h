@@ -103,6 +103,7 @@ void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
                                                RDProblemsVect* v);
 bool rd_i_db_has_problems(RDContext* ctx);
+usize rd_i_db_get_problem_count(RDContext* ctx);
 
 bool rd_i_db_set_sregval(RDContext* ctx, RDAddress address, const char* regname,
                          RDRegValue val, RDConfidence c);
