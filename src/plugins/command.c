@@ -92,6 +92,7 @@ RDCommandValue rd_command_run(RDContext* ctx, const char* name,
     if(!_rd_command_validate_args(commandplugin, commandplugin->params, args))
         return (RDCommandValue){0};
 
+    RD_LOG_INFO("executing command '%s'", name);
     return commandplugin->execute(ctx, args);
 }
 
