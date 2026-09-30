@@ -129,8 +129,7 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
 
         if(!len) {
             rd_i_add_problem(ctx, instr->address, address,
-                             "cannot decode delay slot #%u",
-                             ctx->engine.dslot_info.n);
+                             "cannot decode delay slot #%u", nslot);
             break;
         }
 
@@ -148,6 +147,152 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
 
     // reinstate the correct continuation, suppressing what emulate set
     return ctx->engine.flow;
+}
+//
+static RDEngineQueue* _rd_engine_pick_queue(RDContext* ctx) {
+    while(!queue_is_empty(&ctx->engine.qdirty)) {
+        if(queue_peek_first(&ctx->engine.qdirty).kind != RD_EI_NONE)
+            return &ctx->engine.qdirty;
+
+        queue_discard(&ctx->engine.qdirty);
+    }
+
+    if(!queue_is_empty(&ctx->engine.qcall)) return &ctx->engine.qcall;
+    if(!queue_is_empty(&ctx->engine.qjump)) return &ctx->engine.qjump;
+    return NULL;
+}
+
+// Makes the next item ctx->engine.current and sets ctx->engine.segment.
+// false: nothing to run this tick (empty queues, pc outside any segment,
+// non-executable segment).
+static bool _rd_engine_next_item(RDContext* ctx) {
+    if(ctx->engine.flow.has_value) {
+        ctx->engine.current.address = optional_take(&ctx->engine.flow);
+        ctx->engine.current.kind = RD_EI_FLOW;
+        assert(ctx->engine.segment && "flow tick with no current segment");
+        return true;
+    }
+
+    RDEngineQueue* q = _rd_engine_pick_queue(ctx);
+    if(!q) return false;
+
+    hmap_destroy(&ctx->engine.current.registers);
+    queue_pop(q, &ctx->engine.current);
+
+    ctx->engine.segment =
+        _rd_engine_find_segment(ctx, ctx->engine.current.address);
+
+    if(!ctx->engine.segment) {
+        rd_i_add_problem(ctx, ctx->engine.current.address,
+                         ctx->engine.current.address,
+                         "program counter outside any segment");
+        return false;
+    }
+
+    return rd_segment_has_perm(ctx->engine.segment, RD_SP_X);
+}
+
+// Is there anything to decode at current.address?
+// false: the tick ends here and instr->length is what it returns (the existing
+// length when the address was already decoded, 0 otherwise).
+static bool _rd_engine_should_decode(RDContext* ctx, usize idx,
+                                     RDInstruction* instr) {
+    const RDEngineItem* cur = &ctx->engine.current;
+    const RDSegment* seg = ctx->engine.segment;
+
+    // something already re-decoded this range (eg. flow from a neighbour,
+    // or a duplicate mark) there is nothing left to do
+    if(_rd_engine_is_dirty_kind(cur->kind) &&
+       !rd_flagsbuffer_has_unknown(seg->flags, idx))
+        return false;
+
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
+        const char* queue_kind = _rd_engine_queue_name(cur->kind);
+        assert(queue_kind && "invalid queue kind");
+
+        rd_i_add_problem(ctx, cur->from, cur->address,
+                         "%s target points into middle of existing instruction",
+                         queue_kind);
+        return false;
+    }
+
+    if(rd_flagsbuffer_has_code(seg->flags, idx)) {
+        // queued as a call/jump target but flow decoded it first
+        rd_i_engine_promote_target(ctx, seg, idx, cur->kind, cur->func_type);
+        instr->length = (u16)rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+        return false;
+    }
+
+    return true;
+}
+
+// Decodes at current.address and classifies the bytes as code.
+// false: nothing was classified (instr->length is 0).
+static bool _rd_engine_do_decode(RDContext* ctx, usize idx,
+                                 RDInstruction* instr) {
+    const RDEngineItem* cur = &ctx->engine.current;
+    const RDSegment* seg = ctx->engine.segment;
+
+    if(!rd_i_engine_decode(ctx, cur->address, seg, idx, instr)) return false;
+    assert(instr->length && "decode succeeded without a length");
+
+    if(!rd_i_flagsbuffer_has_unknown_n(seg->flags, idx, instr->length)) {
+        rd_i_add_problem(ctx, cur->address, cur->address,
+                         "instruction overlaps existing item (length: %u)",
+                         instr->length);
+        instr->length = 0;
+        return false;
+    }
+
+    if(!rd_i_flagsbuffer_set_code(seg->flags, idx, instr->length)) {
+        rd_i_add_problem(ctx, cur->address, cur->address,
+                         "failed to classify as code (length: %u)",
+                         instr->length);
+        instr->length = 0;
+        return false;
+    }
+
+    return true;
+}
+
+static void _rd_engine_emulate(RDContext* ctx, RDInstruction* instr) {
+    if(instr->delay_slots && !rd_instr_is_delay_slot(instr)) {
+        RDEngineFlow dslot_flow = _rd_engine_execute_delay_slots(ctx, instr);
+
+        ctx->processorplugin->emulate(ctx, instr, ctx->processor);
+
+        // always override: branch's rd_flow points at first delay slot,
+        // which is architecturally wrong. real PC after execution is
+        // determined by the last delay slot's flow.
+        ctx->engine.flow = dslot_flow;
+    }
+    else
+        ctx->processorplugin->emulate(ctx, instr, ctx->processor);
+}
+
+static void _rd_engine_apply_flags(const RDSegment* seg, usize idx,
+                                   const RDInstruction* instr) {
+    if(rd_instr_is_jump(instr))
+        rd_i_flagsbuffer_set_jump(seg->flags, idx);
+    else if(rd_instr_is_call(instr))
+        rd_i_flagsbuffer_set_call(seg->flags, idx);
+
+    if(rd_instr_is_cond(instr)) rd_i_flagsbuffer_set_cond(seg->flags, idx);
+
+    if(rd_instr_is_delay_slot(instr))
+        rd_i_flagsbuffer_set_dslot(seg->flags, idx);
+
+    if(instr->no_ret) rd_i_flagsbuffer_set_noret(seg->flags, idx);
+}
+
+static void _rd_engine_apply_arrival(RDContext* ctx, const RDSegment* seg,
+                                     usize idx) {
+    const RDEngineItem* cur = &ctx->engine.current;
+
+    if(cur->kind == RD_EI_FLOW)
+        rd_i_flagsbuffer_set_flow(seg->flags, idx);
+    else
+        rd_i_engine_promote_target(ctx, seg, idx, cur->kind, cur->func_type);
 }
 
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address, const RDSegment* seg,
@@ -268,144 +413,24 @@ u16 rd_i_engine_tick(RDContext* ctx) {
         .delay_slots = ctx->engine.dslot_info.n ? RD_IS_DSLOT : 0,
     };
 
-    usize idx = 0;
-
-    if(ctx->engine.flow.has_value) {
-        ctx->engine.current.address = optional_take(&ctx->engine.flow);
-        ctx->engine.current.kind = RD_EI_FLOW;
-        assert(ctx->engine.segment && "flow tick with no current segment");
-    }
-    else {
-        RDEngineQueue* q = NULL;
-
-        while(!queue_is_empty(&ctx->engine.qdirty)) {
-            if(queue_peek_first(&ctx->engine.qdirty).kind != RD_EI_NONE) {
-                q = &ctx->engine.qdirty;
-                break;
-            }
-
-            queue_discard(&ctx->engine.qdirty);
-        }
-
-        if(!q && !queue_is_empty(&ctx->engine.qcall)) q = &ctx->engine.qcall;
-        if(!q && !queue_is_empty(&ctx->engine.qjump)) q = &ctx->engine.qjump;
-        if(!q) goto done;
-
-        hmap_destroy(&ctx->engine.current.registers);
-        queue_pop(q, &ctx->engine.current);
-
-        ctx->engine.segment =
-            _rd_engine_find_segment(ctx, ctx->engine.current.address);
-
-        if(!ctx->engine.segment) {
-            rd_i_add_problem(ctx, ctx->engine.current.address,
-                             ctx->engine.current.address,
-                             "program counter outside any segment");
-            goto done;
-        }
-
-        if(!rd_segment_has_perm(ctx->engine.segment, RD_SP_X)) goto done;
-    }
+    if(!_rd_engine_next_item(ctx)) return 0;
 
     assert(ctx->engine.current.registers.hash &&
            "invalid registers hash function");
     assert(ctx->engine.current.registers.equal &&
            "invalid registers equal function");
 
-    idx = rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
+    usize idx =
+        rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
     rd_i_segment_clear_queued(ctx->engine.segment, idx);
 
-    // something already re-decoded this range (eg. flow from a neighbour,
-    // or a duplicate mark) there is nothing left to do
-    if(_rd_engine_is_dirty_kind(ctx->engine.current.kind) &&
-       !rd_flagsbuffer_has_unknown(ctx->engine.segment->flags, idx))
-        goto done;
+    if(!_rd_engine_should_decode(ctx, idx, &instr)) return instr.length;
+    if(!_rd_engine_do_decode(ctx, idx, &instr)) return instr.length;
 
-    if(rd_flagsbuffer_has_tail(ctx->engine.segment->flags, idx)) {
-        const char* queue_kind =
-            _rd_engine_queue_name(ctx->engine.current.kind);
-        assert(queue_kind && "invalid queue kind");
+    _rd_engine_emulate(ctx, &instr);
+    _rd_engine_apply_flags(ctx->engine.segment, idx, &instr);
+    _rd_engine_apply_arrival(ctx, ctx->engine.segment, idx);
 
-        rd_i_add_problem(
-            ctx, ctx->engine.current.from, ctx->engine.current.address,
-            "%s target points into middle of existing instruction", queue_kind);
-
-        goto done;
-    }
-
-    if(rd_flagsbuffer_has_code(ctx->engine.segment->flags, idx)) {
-        // queued as a call/jump target but flow decoded it first
-        rd_i_engine_promote_target(ctx, ctx->engine.segment, idx,
-                                   ctx->engine.current.kind,
-                                   ctx->engine.current.func_type);
-
-        instr.length = (u16)rd_i_flagsbuffer_get_range_length(
-            ctx->engine.segment->flags, idx);
-        goto done;
-    }
-
-    if(!rd_i_engine_decode(ctx, ctx->engine.current.address,
-                           ctx->engine.segment, idx, &instr))
-        goto done;
-
-    if(instr.length) {
-        if(!rd_i_flagsbuffer_has_unknown_n(ctx->engine.segment->flags, idx,
-                                           instr.length)) {
-            rd_i_add_problem(ctx, ctx->engine.current.address,
-                             ctx->engine.current.address,
-                             "instruction overlaps existing item (length: %u)",
-                             instr.length);
-            instr.length = 0;
-            goto done;
-        }
-
-        if(!rd_i_flagsbuffer_set_code(ctx->engine.segment->flags, idx,
-                                      instr.length)) {
-            rd_i_add_problem(
-                ctx, ctx->engine.current.address, ctx->engine.current.address,
-                "failed to classify as code (length: %u)", instr.length);
-            instr.length = 0;
-            goto done;
-        }
-
-        if(instr.delay_slots && !rd_instr_is_delay_slot(&instr)) {
-            RDEngineFlow dslot_flow =
-                _rd_engine_execute_delay_slots(ctx, &instr);
-
-            ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
-
-            // always override: branch's rd_flow points at first delay slot,
-            // which is architecturally wrong. real PC after execution is
-            // determined by the last delay slot's flow.
-            ctx->engine.flow = dslot_flow;
-        }
-        else
-            ctx->processorplugin->emulate(ctx, &instr, ctx->processor);
-
-        if(rd_instr_is_jump(&instr))
-            rd_i_flagsbuffer_set_jump(ctx->engine.segment->flags, idx);
-        else if(rd_instr_is_call(&instr))
-            rd_i_flagsbuffer_set_call(ctx->engine.segment->flags, idx);
-
-        if(rd_instr_is_cond(&instr))
-            rd_i_flagsbuffer_set_cond(ctx->engine.segment->flags, idx);
-
-        if(rd_instr_is_delay_slot(&instr))
-            rd_i_flagsbuffer_set_dslot(ctx->engine.segment->flags, idx);
-
-        if(instr.no_ret)
-            rd_i_flagsbuffer_set_noret(ctx->engine.segment->flags, idx);
-
-        if(ctx->engine.current.kind == RD_EI_FLOW)
-            rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
-        else {
-            rd_i_engine_promote_target(ctx, ctx->engine.segment, idx,
-                                       ctx->engine.current.kind,
-                                       ctx->engine.current.func_type);
-        }
-    }
-
-done:
     return instr.length;
 }
 
