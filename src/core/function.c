@@ -57,6 +57,21 @@ static const char* _rd_function_dot_props(const RDGraph* g, RDGraphNode n,
                        c->has_noret ? "true" : "false");
 }
 
+// A jump to another function's entry is a tail call: that function owns its
+// own CFG.
+// Absorbing it gives two functions the same chunks and makes address lookups
+// (rd_i_find_function) ambiguous.
+static bool _rd_function_is_tail_call(const RDFunction* self,
+                                      RDAddress target) {
+    if(target == rd_function_get_address(self))
+        return false; // loop to own entry
+
+    const RDSegment* seg = rd_i_db_find_segment(self->context, target);
+    if(!seg) return false;
+
+    return rd_flagsbuffer_has_func(seg->flags, rd_i_address2index(seg, target));
+}
+
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
                                                  RDAddress start,
                                                  const RDFunction* func,
@@ -202,6 +217,9 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     // true edge(s): jump targets from refs
                     const RDXRef* r;
                     vect_each(r, &refs) {
+                        if(_rd_function_is_tail_call(self, r->address))
+                            continue;
+
                         RDGraphNode dst = _rd_function_get_or_add_block(
                             ctx, g, r->address, self, &w, chunks);
 
@@ -226,6 +244,9 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                 else { // unconditional: single jump edge per target
                     const RDXRef* r;
                     vect_each(r, &refs) {
+                        if(_rd_function_is_tail_call(self, r->address))
+                            continue;
+
                         RDGraphNode dst = _rd_function_get_or_add_block(
                             ctx, g, r->address, self, &w, chunks);
 
@@ -307,12 +328,13 @@ int rd_i_function_kcmp_pred(const void* key, const void* item) {
     return 0;
 }
 
-void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
+bool rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
                               const char* type) {
-    if(rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
+    if(rd_flagsbuffer_has_func(seg->flags, idx)) return false; // idempotent
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
     rd_i_function_declare(ctx, seg->rel_start + idx, type);
+    return true;
 }
 
 RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,

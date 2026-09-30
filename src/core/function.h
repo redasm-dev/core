@@ -40,7 +40,7 @@ typedef struct RDFunctionVect {
 } RDFunctionVect;
 
 int rd_i_function_kcmp_pred(const void* key, const void* item);
-void rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
+bool rd_i_function_declare_if(RDContext* ctx, const RDSegment* seg, usize idx,
                               const char* type);
 RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,
                                   const char* type);
