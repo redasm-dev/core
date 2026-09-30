@@ -102,8 +102,10 @@ static usize _rd_layout_code(RDContext* ctx, RDRenderFlags flags,
         if(!(flags & RD_RF_NO_FUNCTION))
             _rd_layout_push(out, RD_ROWKIND_FUNCTION, len, RD_INDENT_FUNCTION);
     }
-    else if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
+    else if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) ||
+            rd_flagsbuffer_has_name(seg->flags, idx)) {
         _rd_layout_push(out, RD_ROWKIND_LABEL, len, RD_INDENT_LABEL);
+    }
 
     _rd_layout_push(out, RD_ROWKIND_INSTRUCTION, len, RD_INDENT_CONTENT);
 
