@@ -11,6 +11,15 @@ typedef struct RDILValue {
     bool known;
 } RDILValue;
 
+static bool _rd_il_can_flow(const RDContext* ctx, RDAddress from,
+                            RDAddress to) {
+    const RDSegment* seg = rd_i_db_find_segment(ctx, from);
+    if(!seg || !rd_i_segment_contains(seg, to)) return false;
+
+    usize idx = rd_i_address2index(seg, to);
+    return rd_flagsbuffer_has_flow(seg->flags, idx);
+}
+
 static inline bool _rd_il_is_storable(RDOperandKind k) {
     return k == RD_OP_REG || k == RD_OP_SYM || k == RD_OP_MEM ||
            k == RD_OP_DISPL;
@@ -345,6 +354,14 @@ bool rd_il_step(RDIL* self) {
     if(v->real_instr.delay_slots > 0 &&
        v->real_instr.delay_slots != RD_IS_DSLOT) {
 
+        const RDSegment* seg =
+            rd_i_db_find_segment(self->context, v->real_instr.address);
+
+        if(!seg || !rd_i_segment_contains(seg, next_address)) {
+            self->done = true;
+            return false;
+        }
+
         // keep lifted instruction with delay slot and restore it later
         RDInstructionVect keep = *v;
         bool done_keep = self->done;
@@ -368,9 +385,9 @@ bool rd_il_step(RDIL* self) {
 
     self->current_address = next_address;
 
-    // check if we've left the function
-    if(!rd_function_contains_address(self->function, self->current_address) ||
-       !rd_instr_can_flow(&self->lifted.real_instr))
+    if(!rd_instr_can_flow(&self->lifted.real_instr) ||
+       !_rd_il_can_flow(self->context, self->lifted.real_instr.address,
+                        self->current_address))
         self->done = true;
 
     return true;
