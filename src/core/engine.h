@@ -40,6 +40,8 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
                               const char* type);
 void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n);
 void rd_i_engine_enqueue_code(RDContext* ctx, RDAddress address, usize n);
+bool rd_i_engine_promote_target(RDContext* ctx, const RDSegment* seg, usize idx,
+                                RDEngineItemKind kind, const char* type);
 bool rd_i_engine_mark_dirty(RDContext* ctx);
 bool rd_i_engine_has_pending_code(const RDContext* ctx);
 bool rd_i_engine_decode(RDContext* ctx, RDAddress address, const RDSegment* seg,

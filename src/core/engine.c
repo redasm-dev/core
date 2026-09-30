@@ -60,6 +60,20 @@ static const RDSegment* _rd_engine_find_segment(const RDContext* ctx,
     return seg;
 }
 
+static void _rd_engine_check_promote(RDContext* ctx, RDAddress address,
+                                     RDEngineItemKind kind, const char* type) {
+    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
+    if(!seg) return;
+
+    usize dstidx = rd_i_address2index(seg, address);
+    if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return;
+
+    rd_i_engine_promote_target(ctx, seg, dstidx, kind, type);
+
+    if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
+        rd_i_set_noret(ctx, ctx->engine.current.address);
+}
+
 static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
                                       RDEngineQueue* q) {
     // consecutive duplicate fast reject
@@ -184,22 +198,7 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
         return true;
     }
 
-    // may be already code (backward jump / loop). Promote FL_JMPDST if so.
-    // tail and non-executable cases are already handled inside accept_address.
-    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
-    if(!seg) return false;
-
-    usize dstidx = rd_i_address2index(seg, address);
-    if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
-
-    if(rd_segment_has_perm(seg, RD_SP_X) &&
-       rd_flagsbuffer_has_code(seg->flags, dstidx)) {
-        rd_i_flagsbuffer_set_jmpdst(seg->flags, dstidx);
-    }
-
-    if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
-        rd_i_set_noret(ctx, ctx->engine.current.address);
-
+    _rd_engine_check_promote(ctx, address, RD_EI_JUMP, NULL);
     return false;
 }
 
@@ -218,20 +217,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
         return true;
     }
 
-    const RDSegment* seg = _rd_engine_find_segment(ctx, address);
-    if(!seg) return false;
-
-    usize dstidx = rd_i_address2index(seg, address);
-    if(rd_flagsbuffer_has_tail(seg->flags, dstidx)) return false;
-
-    if(rd_segment_has_perm(seg, RD_SP_X) &&
-       rd_flagsbuffer_has_code(seg->flags, dstidx)) {
-        rd_i_function_declare_if(ctx, seg, dstidx, type);
-    }
-
-    if(rd_flagsbuffer_has_noret(seg->flags, dstidx))
-        rd_i_set_noret(ctx, ctx->engine.current.address);
-
+    _rd_engine_check_promote(ctx, address, RD_EI_CALL, type);
     return false;
 }
 
@@ -241,6 +227,25 @@ void rd_i_engine_enqueue_dirty(RDContext* ctx, RDAddress address, usize n) {
 
 void rd_i_engine_enqueue_code(RDContext* ctx, RDAddress address, usize n) {
     _rd_engine_enqueue_dirty(ctx, address, n, RD_EI_CODE);
+}
+
+bool rd_i_engine_promote_target(RDContext* ctx, const RDSegment* seg, usize idx,
+                                RDEngineItemKind kind, const char* type) {
+    if(!rd_segment_has_perm(seg, RD_SP_X) ||
+       !rd_flagsbuffer_has_code(seg->flags, idx))
+        return false;
+
+    switch(kind) {
+        case RD_EI_CALL: return rd_i_function_declare_if(ctx, seg, idx, type);
+
+        case RD_EI_JUMP:
+            rd_i_flagsbuffer_set_jmpdst(seg->flags, idx);
+            return false;
+
+        default: break; // FLOW, CODE, DIRTY: nothing to promote
+    }
+
+    return false;
 }
 
 bool rd_i_engine_mark_dirty(RDContext* ctx) {
@@ -329,6 +334,11 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     }
 
     if(rd_flagsbuffer_has_code(ctx->engine.segment->flags, idx)) {
+        // queued as a call/jump target but flow decoded it first
+        rd_i_engine_promote_target(ctx, ctx->engine.segment, idx,
+                                   ctx->engine.current.kind,
+                                   ctx->engine.current.func_type);
+
         instr.length = (u16)rd_i_flagsbuffer_get_range_length(
             ctx->engine.segment->flags, idx);
         goto done;
@@ -388,12 +398,11 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
         if(ctx->engine.current.kind == RD_EI_FLOW)
             rd_i_flagsbuffer_set_flow(ctx->engine.segment->flags, idx);
-        else if(ctx->engine.current.kind == RD_EI_CALL) {
-            rd_i_function_declare_if(ctx, ctx->engine.segment, idx,
-                                     ctx->engine.current.func_type);
+        else {
+            rd_i_engine_promote_target(ctx, ctx->engine.segment, idx,
+                                       ctx->engine.current.kind,
+                                       ctx->engine.current.func_type);
         }
-        else if(ctx->engine.current.kind == RD_EI_JUMP)
-            rd_i_flagsbuffer_set_jmpdst(ctx->engine.segment->flags, idx);
     }
 
 done:

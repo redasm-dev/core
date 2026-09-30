@@ -777,11 +777,19 @@ bool rd_set_typed_function(RDContext* self, RDAddress address,
         return false;
     }
 
-    usize index = rd_i_address2index(seg, address);
+    usize idx = rd_i_address2index(seg, address);
 
     // conflict checks
-    if(rd_flagsbuffer_has_tail(seg->flags, index)) return false;
-    if(rd_flagsbuffer_has_data(seg->flags, index)) return false;
+    if(rd_flagsbuffer_has_tail(seg->flags, idx)) return false;
+    if(rd_flagsbuffer_has_data(seg->flags, idx)) return false;
+
+    // already decoded: nothing to enqueue, promote in place
+    if(rd_flagsbuffer_has_code(seg->flags, idx)) {
+        if(rd_i_engine_promote_target(self, seg, idx, RD_EI_CALL, type))
+            rd_i_engine_mark_dirty(self);
+
+        return true;
+    }
 
     return rd_i_engine_enqueue_call(self, address, type);
 }
