@@ -68,4 +68,5 @@ bool rd_i_flagsbuffer_clear_comment(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_clear_xref_out(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_clear_xref_in(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_clear_flow(RDFlagsBuffer* self, usize idx);
+bool rd_i_flagsbuffer_clear_jmpdst(RDFlagsBuffer* self, usize idx);
 bool rd_i_flagsbuffer_clear_op_over(RDFlagsBuffer* self, usize idx);

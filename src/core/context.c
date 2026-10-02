@@ -1393,21 +1393,34 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     const RDSegment* toseg = rd_i_db_find_segment(self, toaddr);
     if(!fromseg || !toseg) return false;
 
-    usize fromidx = rd_i_address2index(fromseg, fromaddr);
-    usize toidx = rd_i_address2index(toseg, toaddr);
+    usize from_idx = rd_i_address2index(fromseg, fromaddr);
+    usize to_idx = rd_i_address2index(toseg, toaddr);
+    RDXRefType type;
 
-    if(!rd_i_flagsbuffer_has_xref_out(fromseg->flags, fromidx)) return false;
-    if(!rd_i_flagsbuffer_has_xref_in(toseg->flags, toidx)) return false;
-    if(!rd_i_db_del_xref(self, fromaddr, toaddr, c)) return false;
+    if(!rd_i_flagsbuffer_has_xref_out(fromseg->flags, from_idx)) return false;
+    if(!rd_i_flagsbuffer_has_xref_in(toseg->flags, to_idx)) return false;
+    if(!rd_i_db_del_xref(self, fromaddr, toaddr, c, &type)) return false;
 
-    if(!rd_i_db_has_xrefs_from(self, fromaddr))
-        rd_i_flagsbuffer_clear_xref_out(fromseg->flags, fromidx);
+    // flags are head-only: a tail has nothing to keep in step
+    if(!rd_flagsbuffer_has_tail(fromseg->flags, from_idx) &&
+       !rd_i_db_has_xrefs_from(self, fromaddr, RD_XR_NONE))
+        rd_i_flagsbuffer_clear_xref_out(fromseg->flags, from_idx);
 
-    if(!rd_i_db_has_xrefs_to(self, toaddr))
-        rd_i_flagsbuffer_clear_xref_in(toseg->flags, toidx);
+    if(!rd_flagsbuffer_has_tail(toseg->flags, to_idx)) {
+        if(!rd_i_db_has_xrefs_to(self, toaddr, RD_XR_NONE)) {
+            // the last xref of any kind: nothing points here any more
+            rd_i_flagsbuffer_clear_xref_in(toseg->flags, to_idx);
+            rd_i_flagsbuffer_clear_jmpdst(toseg->flags, to_idx);
+        }
+        else if(type == RD_CR_JUMP &&
+                rd_i_flagsbuffer_has_jmpdst(toseg->flags, to_idx) &&
+                !rd_i_db_has_xrefs_to(self, toaddr, RD_CR_JUMP)) {
+            // other xrefs remain (calls, data), but no jump justifies the bit
+            rd_i_flagsbuffer_clear_jmpdst(toseg->flags, to_idx);
+        }
+    }
 
-    rd_fire_xref_hook(self, "redasm.xref_removed", fromaddr, toaddr,
-                      RD_XR_NONE);
+    rd_fire_xref_hook(self, "redasm.xref_removed", fromaddr, toaddr, type);
     return true;
 }
 

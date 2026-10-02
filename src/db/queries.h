@@ -107,7 +107,7 @@ RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
 void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefType type, RDConfidence c);
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                             RDConfidence c);
+                             RDConfidence c, RDXRefType* type);
 void _rd_i_db_query_del_xref_from(RDContext* ctx, RDAddress from, RDAddress to,
                                   RDXRefType type, RDConfidence c);
 bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -119,8 +119,10 @@ RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
 bool _rd_i_db_query_del_xrefs_from(RDContext* ctx, RDAddress from,
                                    RDConfidence c);
 bool _rd_i_db_query_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c);
-bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address);
-bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address);
+bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address,
+                                   RDXRefType type);
+bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address,
+                                 RDXRefType type);
 
 bool _rd_i_db_query_get_address(RDContext* ctx, const char* name,
                                 RDAddress* address);

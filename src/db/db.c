@@ -359,8 +359,8 @@ void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
 }
 
 bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                      RDConfidence c) {
-    return _rd_i_db_query_del_xref(ctx, from, to, c);
+                      RDConfidence c, RDXRefType* type) {
+    return _rd_i_db_query_del_xref(ctx, from, to, c, type);
 }
 
 bool rd_i_db_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -386,12 +386,13 @@ bool rd_i_db_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c) {
     return _rd_i_db_query_del_xrefs_to(ctx, to, c);
 }
 
-bool rd_i_db_has_xrefs_from(RDContext* ctx, RDAddress address) {
-    return _rd_i_db_query_has_xrefs_from(ctx, address);
+bool rd_i_db_has_xrefs_from(RDContext* ctx, RDAddress address,
+                            RDXRefType type) {
+    return _rd_i_db_query_has_xrefs_from(ctx, address, type);
 }
 
-bool rd_i_db_has_xrefs_to(RDContext* ctx, RDAddress address) {
-    return _rd_i_db_query_has_xrefs_to(ctx, address);
+bool rd_i_db_has_xrefs_to(RDContext* ctx, RDAddress address, RDXRefType type) {
+    return _rd_i_db_query_has_xrefs_to(ctx, address, type);
 }
 
 bool rd_i_db_get_address(RDContext* ctx, const char* name, RDAddress* address) {

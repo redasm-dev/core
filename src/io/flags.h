@@ -41,4 +41,5 @@ void rd_i_flags_clear_comment(RDFlags* self);
 void rd_i_flags_clear_xref_out(RDFlags* self);
 void rd_i_flags_clear_xref_in(RDFlags* self);
 void rd_i_flags_clear_flow(RDFlags* self);
+void rd_i_flags_clear_jmpdst(RDFlags* self);
 void rd_i_flags_clear_op_over(RDFlags* self);

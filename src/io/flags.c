@@ -354,6 +354,11 @@ void rd_i_flags_clear_flow(RDFlags* self) {
     *self &= ~FL_FLOW;
 }
 
+void rd_i_flags_clear_jmpdst(RDFlags* self) {
+    assert(rd_flags_has_code(*self));
+    *self &= ~FL_JMPDST;
+}
+
 void rd_i_flags_clear_op_over(RDFlags* self) {
     assert(rd_flags_has_code(*self));
     *self &= ~FL_OPOVER;

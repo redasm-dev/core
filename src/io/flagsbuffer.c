@@ -514,6 +514,15 @@ bool rd_i_flagsbuffer_clear_flow(RDFlagsBuffer* self, usize idx) {
     return false;
 }
 
+bool rd_i_flagsbuffer_clear_jmpdst(RDFlagsBuffer* self, usize idx) {
+    if(idx < self->base.length) {
+        rd_i_flags_clear_jmpdst(&self->data[idx]);
+        return true;
+    }
+
+    return false;
+}
+
 bool rd_i_flagsbuffer_clear_op_over(RDFlagsBuffer* self, usize idx) {
     if(idx < self->base.length) {
         rd_i_flags_clear_op_over(&self->data[idx]);

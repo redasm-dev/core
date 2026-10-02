@@ -388,12 +388,13 @@ void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
 }
 
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                             RDConfidence c) {
+                             RDConfidence c, RDXRefType* type) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_XREF, "\
             DELETE FROM XRefs \
             WHERE from_address = :fromaddr \
             AND to_address = :toaddr \
             AND confidence <= :confidence \
+            RETURNING type\
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
@@ -403,7 +404,15 @@ bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
     _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
     _rd_db_step(ctx, stmt);
 
-    return sqlite3_changes(ctx->db->handle) > 0;
+    bool deleted = false;
+
+    if(sqlite3_step(stmt) == SQLITE_ROW) {
+        if(type) *type = (RDXRefType)sqlite3_column_int(stmt, 0);
+        deleted = true;
+    }
+
+    sqlite3_reset(stmt); // RETURNING keeps the statement active until reset
+    return deleted;
 }
 
 bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -516,32 +525,41 @@ bool _rd_i_db_query_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c) {
     return sqlite3_changes(ctx->db->handle) > 0;
 }
 
-bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(
-        ctx, RD_QUERY_HAS_XREFS_FROM, "SELECT EXISTS(SELECT 1 FROM XRefs \
-                                WHERE from_address = :address)");
+bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address,
+                                   RDXRefType type) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_HAS_XREFS_FROM, "\
+            SELECT EXISTS( \
+                SELECT 1 FROM XRefs \
+                WHERE from_address = :from_address \
+                AND (:type = :none OR type = :type) \
+            ) \
+    ");
 
-    if(!stmt) return false;
-    _rd_db_bind_param_int(ctx, stmt, ":address",
+    _rd_db_bind_param_int(ctx, stmt, ":from_address",
                           (sqlite3_int64)rd_i_rel(ctx, address));
+    _rd_db_bind_param_int(ctx, stmt, ":type", type);
+    _rd_db_bind_param_int(ctx, stmt, ":none", RD_XR_NONE);
 
-    bool r = false;
-    if(sqlite3_step(stmt) == SQLITE_ROW) r = sqlite3_column_int(stmt, 0);
-    return r;
+    return sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) != 0;
 }
 
-bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address) {
-    sqlite3_stmt* stmt = _rd_db_prepare_query(
-        ctx, RD_QUERY_HAS_XREFS_TO,
-        "SELECT EXISTS(SELECT 1 FROM XRefs WHERE to_address = :address)");
+bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address,
+                                 RDXRefType type) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_HAS_XREFS_TO, "\
+            SELECT EXISTS( \
+                SELECT 1 FROM XRefs \
+                WHERE to_address = :to_address \
+                AND (:type = :none OR type = :type) \
+           ) \
+    )");
 
-    if(!stmt) return false;
-    _rd_db_bind_param_int(ctx, stmt, ":address",
+    _rd_db_bind_param_int(ctx, stmt, ":to_address",
                           (sqlite3_int64)rd_i_rel(ctx, address));
 
-    bool r = false;
-    if(sqlite3_step(stmt) == SQLITE_ROW) r = sqlite3_column_int(stmt, 0);
-    return r;
+    _rd_db_bind_param_int(ctx, stmt, ":type", type);
+    _rd_db_bind_param_int(ctx, stmt, ":none", RD_XR_NONE);
+
+    return sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_int(stmt, 0) != 0;
 }
 
 bool _rd_i_db_query_get_address(RDContext* ctx, const char* name,
