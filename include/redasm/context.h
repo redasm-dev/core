@@ -33,6 +33,14 @@ typedef enum {
     RD_EXPORT_INPUT_PATCH,
 } RDExportFormat;
 
+typedef enum {
+    RD_UNDEFINE_SIMPLE = 0,
+    RD_UNDEFINE_FLOW = 1 << 0,
+    RD_UNDEFINE_NAMES = 1 << 1,
+    RD_UNDEFINE_COMMENTS = 1 << 2,
+    RD_UNDEFINE_ALL = 0xFFFF,
+} RDUndefineFlags;
+
 typedef struct RDProblem {
     struct {
         RDAddress value;
@@ -90,6 +98,7 @@ typedef struct RDExternalSlice {
 typedef struct RDXRef {
     RDAddress address;
     RDXRefType type;
+    RDConfidence confidence;
 } RDXRef;
 
 typedef struct RDXRefSlice {
@@ -155,12 +164,12 @@ RD_API const char* rd_to_hex(i64 v);
 RD_API const char* rd_to_hexaddr(const RDContext* self, usize v);
 RD_API const char* rd_render_text(RDContext* self, RDAddress address);
 RD_API bool rd_make_code(RDContext* self, RDAddress address);
-RD_API bool rd_auto_undefine(RDContext* self, RDAddress address);
-RD_API bool rd_library_undefine(RDContext* self, RDAddress address);
-RD_API bool rd_user_undefine(RDContext* self, RDAddress address);
-RD_API bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n);
-RD_API bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n);
-RD_API bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n);
+RD_API bool rd_auto_undefine(RDContext* self, RDAddress address, RDUndefineFlags flags);
+RD_API bool rd_library_undefine(RDContext* self, RDAddress address, RDUndefineFlags flags);
+RD_API bool rd_user_undefine(RDContext* self, RDAddress address, RDUndefineFlags flags);
+RD_API bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n, RDUndefineFlags flags);
+RD_API bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n, RDUndefineFlags flags);
+RD_API bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n, RDUndefineFlags flags);
 RD_API bool rd_set_noreturn(RDContext* self, RDAddress address);
 RD_API const char* rd_get_comment_inline(RDContext* self, RDAddress address);
 RD_API bool rd_set_comment_inline(RDContext* self, RDAddress address, const char* cmt);

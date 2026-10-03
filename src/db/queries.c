@@ -368,14 +368,15 @@ RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
     return v;
 }
 
-void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefType type, RDConfidence c) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_XREF, "\
         INSERT INTO XRefs \
                 VALUES (:fromaddr, :toaddr, :type, :confidence) \
-            ON CONFLICT DO \
-                UPDATE SET type = EXCLUDED.type, \
-                           confidence = EXCLUDED.confidence \
+        ON CONFLICT DO UPDATE \
+            SET type = EXCLUDED.type, \
+                confidence = EXCLUDED.confidence \
+            WHERE EXCLUDED.confidence >= XRefs.confidence \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
@@ -385,6 +386,9 @@ void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
     _rd_db_bind_param_int(ctx, stmt, ":type", type);
     _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
     _rd_db_step(ctx, stmt);
+
+    // false: a higher confidence row won
+    return sqlite3_changes(ctx->db->handle) > 0;
 }
 
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -394,7 +398,7 @@ bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
             WHERE from_address = :fromaddr \
             AND to_address = :toaddr \
             AND confidence <= :confidence \
-            RETURNING type\
+            RETURNING type \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
@@ -402,7 +406,6 @@ bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
     _rd_db_bind_param_int(ctx, stmt, ":toaddr",
                           (sqlite3_int64)rd_i_rel(ctx, to));
     _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
-    _rd_db_step(ctx, stmt);
 
     bool deleted = false;
 
@@ -435,7 +438,7 @@ bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
         xref->base.address =
             rd_i_abs(ctx, (RDAddress)sqlite3_column_int64(stmt, 1));
         xref->base.type = (RDXRefType)sqlite3_column_int64(stmt, 2);
-        xref->confidence = (RDConfidence)sqlite3_column_int(stmt, 3);
+        xref->base.confidence = (RDConfidence)sqlite3_column_int(stmt, 3);
         return true;
     }
 
@@ -445,7 +448,7 @@ bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
 RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,
                                           RDXRefType type, RDXRefVect* refs) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_FROM, "\
-        SELECT to_address, type  \
+        SELECT to_address, type, confidence  \
         FROM XRefs \
         WHERE from_address = :fromaddr \
         AND (:type = 0 OR type = :type) \
@@ -458,11 +461,13 @@ RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,
     vect_clear(refs);
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        vect_push(refs, (RDXRef){
-                            .address = rd_i_abs(
-                                ctx, (RDAddress)sqlite3_column_int64(stmt, 0)),
-                            .type = (RDXRefType)sqlite3_column_int64(stmt, 1),
-                        });
+        vect_push(refs,
+                  (RDXRef){
+                      .address = rd_i_abs(
+                          ctx, (RDAddress)sqlite3_column_int64(stmt, 0)),
+                      .type = (RDXRefType)sqlite3_column_int(stmt, 1),
+                      .confidence = (RDConfidence)sqlite3_column_int(stmt, 2),
+                  });
     }
 
     return refs;
@@ -471,7 +476,7 @@ RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,
 RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
                                         RDXRefType type, RDXRefVect* refs) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_XREFS_TO, "\
-        SELECT from_address, type  \
+        SELECT from_address, type, confidence  \
         FROM XRefs \
         WHERE to_address = :toaddr \
         AND (:type = 0 OR type = :type) \
@@ -484,11 +489,13 @@ RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
     vect_clear(refs);
 
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        vect_push(refs, (RDXRef){
-                            .address = rd_i_abs(
-                                ctx, (RDAddress)sqlite3_column_int64(stmt, 0)),
-                            .type = (RDXRefType)sqlite3_column_int64(stmt, 1),
-                        });
+        vect_push(refs,
+                  (RDXRef){
+                      .address = rd_i_abs(
+                          ctx, (RDAddress)sqlite3_column_int64(stmt, 0)),
+                      .type = (RDXRefType)sqlite3_column_int(stmt, 1),
+                      .confidence = (RDConfidence)sqlite3_column_int(stmt, 2),
+                  });
     }
 
     return refs;
@@ -528,12 +535,11 @@ bool _rd_i_db_query_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c) {
 bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address,
                                    RDXRefType type) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_HAS_XREFS_FROM, "\
-            SELECT EXISTS( \
-                SELECT 1 FROM XRefs \
-                WHERE from_address = :from_address \
-                AND (:type = :none OR type = :type) \
-            ) \
-    ");
+        SELECT EXISTS( \
+            SELECT 1 FROM XRefs \
+            WHERE from_address = :from_address \
+            AND (:type = :none OR type = :type) \
+        )");
 
     _rd_db_bind_param_int(ctx, stmt, ":from_address",
                           (sqlite3_int64)rd_i_rel(ctx, address));
@@ -546,12 +552,11 @@ bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address,
 bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address,
                                  RDXRefType type) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_HAS_XREFS_TO, "\
-            SELECT EXISTS( \
-                SELECT 1 FROM XRefs \
-                WHERE to_address = :to_address \
-                AND (:type = :none OR type = :type) \
-           ) \
-    )");
+        SELECT EXISTS( \
+            SELECT 1 FROM XRefs \
+            WHERE to_address = :to_address \
+            AND (:type = :none OR type = :type) \
+        )");
 
     _rd_db_bind_param_int(ctx, stmt, ":to_address",
                           (sqlite3_int64)rd_i_rel(ctx, address));
@@ -703,7 +708,7 @@ void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address, const RDType* t,
     _rd_db_step(ctx, stmt);
 }
 
-bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
+bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDType* t) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_TYPE, "\
         SELECT name, count, modifier, confidence  \
         FROM Types \
@@ -718,7 +723,7 @@ bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
         usize count = (usize)sqlite3_column_int64(stmt, 1);
         RDTypeModifier mod = (RDTypeModifier)sqlite3_column_int(stmt, 2);
 
-        if(rd_type_init(&t->base, name, count, mod, ctx)) {
+        if(rd_type_init(t, name, count, mod, ctx)) {
             t->confidence = (RDConfidence)sqlite3_column_int64(stmt, 3);
             return true;
         }
@@ -1015,11 +1020,22 @@ void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address,
     _rd_db_step(ctx, stmt);
 }
 
+void _rd_i_db_query_del_all_comments(RDContext* ctx, RDAddress address) {
+    sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_ALL_COMMENTS, "\
+       DELETE FROM Comments \
+       WHERE address = :address \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":address",
+                          (sqlite3_int64)rd_i_rel(ctx, address));
+    _rd_db_step(ctx, stmt);
+}
+
 void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address,
                                 RDCommentPlacement p) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_DEL_COMMENT, "\
        DELETE FROM Comments \
-        WHERE address = :address AND placement = :placement \
+       WHERE address = :address AND placement = :placement \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":address",
@@ -1122,6 +1138,21 @@ void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
     _rd_db_bind_param_int(ctx, stmt, ":targetisaddr", target_is_addr);
 
     _rd_db_bind_param_str(ctx, stmt, ":message", msg);
+    _rd_db_step(ctx, stmt);
+}
+
+void _rd_i_db_query_del_problems_from(RDContext* ctx, RDAddress start,
+                                      RDAddress end) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_DEL_PROBLEMS_FROM, "\
+        DELETE FROM Problems \
+        WHERE from_is_address = 1 \
+        AND from_value >= :start AND from_value < :end \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":start",
+                          (sqlite3_int64)rd_i_rel(ctx, start));
+    _rd_db_bind_param_int(ctx, stmt, ":end", (sqlite3_int64)rd_i_rel(ctx, end));
     _rd_db_step(ctx, stmt);
 }
 
@@ -1309,32 +1340,6 @@ RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
     }
 
     return &ctx->ovr_ops_buf;
-}
-
-RDConfidence _rd_i_db_query_get_undefine_confidence(RDContext* ctx,
-                                                    RDAddress start,
-                                                    RDAddress end) {
-    sqlite3_stmt* stmt =
-        _rd_db_prepare_query(ctx, RD_QUERY_GET_UNDEFINE_CONFIDENCE, "\
-            SELECT MAX(confidence) FROM ( \
-                SELECT confidence FROM Types \
-                WHERE address >= :start AND address < :end \
-                UNION ALL \
-                SELECT confidence FROM XRefs \
-                WHERE from_address >= :start AND from_address < :end \
-            )\
-        ");
-
-    _rd_db_bind_param_int(ctx, stmt, ":start",
-                          (sqlite3_int64)rd_i_rel(ctx, start));
-    _rd_db_bind_param_int(ctx, stmt, ":end", (sqlite3_int64)rd_i_rel(ctx, end));
-
-    if(sqlite3_step(stmt) == SQLITE_ROW &&
-       sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-        return (RDConfidence)sqlite3_column_int(stmt, 0);
-    }
-
-    return RD_CONFIDENCE_AUTO;
 }
 
 void _rd_i_db_query_set_callconv(RDContext* ctx, const RDCallConv* cc) {

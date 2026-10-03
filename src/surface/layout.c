@@ -261,11 +261,11 @@ void rd_i_data_head_get(RDContext* ctx, const RDSegment* seg, usize idx,
     RDAddress address = rd_segment_get_start(seg) + idx;
 
     if(rd_flagsbuffer_has_type(seg->flags, idx)) {
-        RDTypeFull t;
+        RDType t;
         bool got = rd_i_db_get_type(ctx, address, &t);
         panic_if(!got, "type not found @ %s:%x", seg->name, address);
 
-        *out = (RDDataHead){.root = t.base, .offset = 0, .has_banner = true};
+        *out = (RDDataHead){.root = t, .offset = 0, .has_banner = true};
         return;
     }
 

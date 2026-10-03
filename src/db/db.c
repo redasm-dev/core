@@ -353,9 +353,9 @@ RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
     return _rd_i_db_query_get_all_externals(ctx, kind, v);
 }
 
-void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType type, RDConfidence c) {
-    _rd_i_db_query_add_xref(ctx, from, to, type, c);
+    return _rd_i_db_query_add_xref(ctx, from, to, type, c);
 }
 
 bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -431,7 +431,7 @@ void rd_i_db_set_type(RDContext* ctx, RDAddress address, const RDType* t,
     _rd_i_db_query_set_type(ctx, address, t, c);
 }
 
-bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
+bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDType* t) {
     return _rd_i_db_query_get_type(ctx, address, t);
 }
 
@@ -467,6 +467,10 @@ void rd_i_db_add_comment(RDContext* ctx, RDAddress address, const char* cmt,
     _rd_i_db_query_add_comment(ctx, address, cmt, p);
 }
 
+void rd_i_db_del_all_comments(RDContext* ctx, RDAddress address) {
+    _rd_i_db_query_del_all_comments(ctx, address);
+}
+
 void rd_i_db_del_comment(RDContext* ctx, RDAddress address,
                          RDCommentPlacement p) {
     _rd_i_db_query_del_comment(ctx, address, p);
@@ -484,6 +488,10 @@ bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address) {
 void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
                          const char* msg) {
     _rd_i_db_query_add_problem(ctx, from, target, msg);
+}
+
+void rd_i_db_del_problems_from(RDContext* ctx, RDAddress start, RDAddress end) {
+    _rd_i_db_query_del_problems_from(ctx, start, end);
 }
 
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
@@ -599,9 +607,4 @@ bool rd_i_db_has_ovr_operand(RDContext* ctx, RDAddress address) {
 RDOvrOperandVect* rd_i_db_get_all_ovr_operand(RDContext* ctx,
                                               RDAddress address) {
     return _rd_i_db_query_get_all_ovr_operand(ctx, address);
-}
-
-RDConfidence rd_i_db_get_undefine_confidence(RDContext* ctx, RDAddress start,
-                                             RDAddress end) {
-    return _rd_i_db_query_get_undefine_confidence(ctx, start, end);
 }

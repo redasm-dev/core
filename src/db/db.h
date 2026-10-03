@@ -49,7 +49,7 @@ bool rd_i_db_get_external_ord(RDContext* ctx, const char* module, u32 ord,
 RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
                                           RDExternalVect* v);
 
-void rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType t, RDConfidence c);
 bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDConfidence c, RDXRefType* type);
@@ -77,7 +77,7 @@ void rd_i_db_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
 
 void rd_i_db_set_type(RDContext* ctx, RDAddress address, const RDType* t,
                       RDConfidence c);
-bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
+bool rd_i_db_get_type(RDContext* ctx, RDAddress address, RDType* t);
 bool rd_i_db_get_root_type(RDContext* ctx, RDAddress* address, RDType* t);
 bool rd_i_db_del_type(RDContext* ctx, RDAddress address);
 
@@ -92,6 +92,7 @@ const char* rd_i_db_get_comment(RDContext* ctx, RDAddress address,
                                 RDCommentPlacement p, usize line);
 void rd_i_db_add_comment(RDContext* ctx, RDAddress address, const char* cmt,
                          RDCommentPlacement p);
+void rd_i_db_del_all_comments(RDContext* ctx, RDAddress address);
 void rd_i_db_del_comment(RDContext* ctx, RDAddress address,
                          RDCommentPlacement p);
 usize rd_i_db_get_comment_count(RDContext* ctx, RDAddress address,
@@ -100,6 +101,7 @@ bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address);
 
 void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
                          const char* msg);
+void rd_i_db_del_problems_from(RDContext* ctx, RDAddress start, RDAddress end);
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
                                                RDProblemsVect* v);
 bool rd_i_db_has_problems(RDContext* ctx);
@@ -121,6 +123,3 @@ bool rd_i_db_has_ovr_operand(RDContext* ctx, RDAddress address);
 
 RDOvrOperandVect* rd_i_db_get_all_ovr_operand(RDContext* ctx,
                                               RDAddress address);
-
-RDConfidence rd_i_db_get_undefine_confidence(RDContext* ctx, RDAddress start,
-                                             RDAddress end);

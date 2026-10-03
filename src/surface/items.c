@@ -190,10 +190,10 @@ static void _rd_render_refs(RDRenderer* r, RDAddress address) {
         const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
         if(!seg) continue;
 
-        RDTypeFull t;
-        if(!rd_i_get_type(ctx, xref->address, &t)) continue;
+        RDType t;
+        if(!rd_get_type(ctx, xref->address, &t)) continue;
 
-        bool is_ptr = rd_type_is_ptr(&t.base);
+        bool is_ptr = rd_type_is_ptr(&t);
         RDAddress ptr_address = 0, xref_address = xref->address;
 
         // try to follow the pointer location
@@ -205,21 +205,21 @@ static void _rd_render_refs(RDRenderer* r, RDAddress address) {
                 seg && rd_i_flagsbuffer_has_xref_in(
                            seg->flags, rd_i_address2index(seg, ptr_address));
 
-            if(has_xrefs_in && rd_i_get_type(ctx, ptr_address, &t))
+            if(has_xrefs_in && rd_get_type(ctx, ptr_address, &t))
                 xref_address = ptr_address;
             else
                 is_ptr = false;
         }
 
         // render strings only
-        if((strcmp(t.base.def->name, "char") != 0 &&
-            strcmp(t.base.def->name, "char16") != 0) ||
-           !t.base.count)
+        if((strcmp(t.def->name, "char") != 0 &&
+            strcmp(t.def->name, "char16") != 0) ||
+           !t.count)
             continue;
 
         rd_renderer_ws(r, RD_SURFACE_WS_REFS);
         if(is_ptr) rd_renderer_norm(r, " => ");
-        _rd_render_value(r, xref_address, &t.base, false);
+        _rd_render_value(r, xref_address, &t, false);
     }
 }
 

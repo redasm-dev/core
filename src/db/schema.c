@@ -127,4 +127,5 @@ CREATE TABLE IF NOT EXISTS Problems ( \
 \
 CREATE INDEX IF NOT EXISTS Names_NameIdx ON Names(name); \
 CREATE INDEX IF NOT EXISTS XRefs_ToIdx ON XRefs(to_address, from_address, type); \
+CREATE INDEX IF NOT EXISTS ProblemsFrom ON Problems(from_value, target_value); \
 ";

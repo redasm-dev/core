@@ -4,6 +4,7 @@
 #include "core/context.h"
 #include "core/engine.h"
 #include "core/stringfinder.h"
+#include "core/undefine.h"
 #include "io/flagsbuffer.h"
 #include "plugins/analyzer.h"
 #include "support/containers.h"
@@ -111,12 +112,12 @@ static void _rd_worker_apply_function_types(RDContext* ctx) {
             rd_i_function_set_type_def(f, tdef);
         }
         else if(rd_flagsbuffer_has_type(seg->flags, idx)) {
-            RDTypeFull t;
-            if(!rd_i_get_type(ctx, address, &t) || t.base.def == tdef) continue;
-            if(t.base.count > 0 || t.base.def->kind != RD_TKIND_FUNC) continue;
-            if(!(t.base.def->flags & RD_TFLAGS_BUILTIN)) continue;
+            RDType t;
+            if(!rd_i_db_get_type(ctx, address, &t) || t.def == tdef) continue;
+            if(t.count > 0 || t.def->kind != RD_TKIND_FUNC) continue;
+            if(!(t.def->flags & RD_TFLAGS_BUILTIN)) continue;
 
-            rd_i_set_type(ctx, address, tdef->name, 0, t.base.mod,
+            rd_i_set_type(ctx, address, tdef->name, 0, t.mod,
                           RD_CONFIDENCE_LIBRARY);
         }
     }
@@ -228,7 +229,15 @@ static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
         if(item->kind == RD_EI_CODE) goto keep;
 
         if(rd_flagsbuffer_has_code(seg->flags, start_idx)) {
-            rd_i_clear_n(ctx, item->address, item->n);
+            RDAddress start, end;
+            bool ok = rd_i_undefine_range(ctx, item->address, item->n,
+                                          RD_CONFIDENCE_MAX, RD_UNDEFINE_CLEAR,
+                                          &start, &end);
+            assert(ok && "reconcile: a forced undefine cannot be rejected");
+            RD_UNUSED(ok);
+
+            start_idx = start - rd_segment_get_start(seg);
+            end_idx = end - rd_segment_get_start(seg);
             goto keep;
         }
 

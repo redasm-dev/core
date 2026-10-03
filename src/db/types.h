@@ -80,7 +80,6 @@ typedef struct RDXRefVect {
 typedef struct RDXRefFull {
     RDXRef base;
     RDAddress from_address;
-    RDConfidence confidence;
 } RDXRefFull;
 
 typedef struct RDTypeVect {

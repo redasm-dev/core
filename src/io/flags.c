@@ -350,12 +350,12 @@ void rd_i_flags_clear_xref_in(RDFlags* self) {
 }
 
 void rd_i_flags_clear_flow(RDFlags* self) {
-    assert(rd_flags_has_code(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_FLOW;
 }
 
 void rd_i_flags_clear_jmpdst(RDFlags* self) {
-    assert(rd_flags_has_code(*self));
+    assert(!rd_flags_has_tail(*self));
     *self &= ~FL_JMPDST;
 }
 

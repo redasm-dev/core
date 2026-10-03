@@ -13,6 +13,7 @@
 #include "support/error.h"
 #include "support/stringpool.h"
 #include "support/utils.h"
+#include "types/type.h"
 #include <redasm/redasm.h>
 #include <redasm/types/def.h>
 #include <time.h>
@@ -154,11 +155,6 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c);
 
 bool rd_i_set_external(RDContext* self, const RDExternal* ext);
-
-bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c);
-bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
-                     RDConfidence c);
-void rd_i_clear_n(RDContext* self, RDAddress address, usize n);
 
 bool rd_i_add_comment(RDContext* self, RDAddress address, const char* cmt,
                       RDCommentPlacement p);

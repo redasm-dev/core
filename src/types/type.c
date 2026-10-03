@@ -1,5 +1,6 @@
 #include "type.h"
 #include "core/context.h"
+#include "core/undefine.h"
 #include "io/flagsbuffer.h"
 #include "support/error.h"
 #include "types/def.h"
@@ -184,6 +185,7 @@ bool rd_type_init(RDType* self, const char* name, usize n, RDTypeModifier mod,
     self->def = tdef;
     self->count = n;
     self->mod = mod;
+    self->confidence = RD_CONFIDENCE_PLACEHOLDER;
     return true;
 }
 
@@ -311,7 +313,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
         return false;
     }
 
-    if(!rd_i_undefine_n(ctx, address, sz, c)) return false;
+    if(!rd_i_undefine_n(ctx, address, sz, c, RD_UNDEFINE_SIMPLE)) return false;
 
     rd_i_type_unroll(ctx, address, &t);
     rd_i_db_set_type(ctx, address, &t, c);
@@ -319,7 +321,7 @@ bool rd_i_set_type(RDContext* ctx, RDAddress address, const char* name, usize n,
     return true;
 }
 
-bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
+bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t) {
     const RDSegment* seg = rd_i_db_find_segment(ctx, address);
     if(!seg) return false;
 
@@ -329,16 +331,6 @@ bool rd_i_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t) {
     bool ok = rd_i_db_get_type(ctx, address, t);
     assert(ok && "cannot find type in database");
     return true;
-}
-
-bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t) {
-    RDTypeFull tf;
-    if(rd_i_get_type(ctx, address, &tf)) {
-        if(t) *t = tf.base;
-        return true;
-    }
-
-    return false;
 }
 
 bool rd_auto_type(RDContext* ctx, RDAddress address, const char* name, usize n,

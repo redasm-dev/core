@@ -33,6 +33,7 @@ target_sources(${PROJECT_NAME}
         src/core/state.c
         src/core/stringfinder.c
         src/core/symbol.c
+        src/core/undefine.c
         src/core/worker.c
         src/db/db.c
         src/db/queries.c

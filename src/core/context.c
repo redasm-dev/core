@@ -2,6 +2,7 @@
 #include "core/engine.h"
 #include "core/mapping.h"
 #include "core/segment.h"
+#include "core/undefine.h"
 #include "core/worker.h"
 #include "io/buffer.h"
 #include "io/flagsbuffer.h"
@@ -26,23 +27,6 @@ static bool _rd_vect_contains_address(const RDAddressVect* v, RDAddress addr) {
     }
 
     return false;
-}
-
-static void _rd_teardown_range(RDContext* self, const RDSegment* seg,
-                               usize startidx, usize endidx, RDConfidence c) {
-    RDAddress curr = rd_i_index2address(seg, startidx);
-
-    for(usize i = startidx; i < endidx; i++, curr++) {
-        if(rd_flagsbuffer_has_type(seg->flags, i)) rd_i_db_del_type(self, curr);
-
-        // remove references outgoing from this location
-        if(rd_i_flagsbuffer_has_xref_out(seg->flags, i)) {
-            const RDXRefVect* refs = rd_i_get_xrefs_from_ex(
-                self, curr, RD_XR_NONE, &self->und_xrefs);
-            const RDXRef* r;
-            vect_each(r, refs) rd_i_del_xref(self, curr, r->address, c);
-        }
-    }
 }
 
 static bool _rd_read_ptr(const RDContext* ctx, unsigned int ptr_size,
@@ -112,11 +96,11 @@ void rd_i_expand_range(RDContext* self, const RDSegment* seg, usize* start,
 
         RDAddress address = rd_segment_get_start(seg) + i;
 
-        RDTypeFull t;
-        panic_if(!rd_i_get_type(self, address, &t), "type not found @ %" PRIX64,
-                 address);
+        RDType t;
+        panic_if(!rd_i_db_get_type(self, address, &t),
+                 "type not found @ %" PRIX64, address);
 
-        usize tend = i + rd_type_size(&t.base, self);
+        usize tend = i + rd_type_size(&t, self);
         if(tend > seglen) tend = seglen;
         if(tend > *end) *end = tend;
     }
@@ -217,14 +201,14 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
         RDAddress orig_address = address;
 
         if(rd_flagsbuffer_has_type(seg->flags, idx)) {
-            RDTypeFull t;
+            RDType t;
             if(rd_i_db_get_type(self, address, &t)) {
-                if(!strcmp(t.base.def->name, "char") && t.base.count > 0)
+                if(!strcmp(t.def->name, "char") && t.count > 0)
                     s = "str";
-                else if(!strcmp(t.base.def->name, "char16") && t.base.count > 0)
+                else if(!strcmp(t.def->name, "char16") && t.count > 0)
                     s = "str16";
                 else
-                    s = t.base.def->name;
+                    s = t.def->name;
             }
         }
         else if(rd_flagsbuffer_has_item(seg->flags, idx) ||
@@ -577,34 +561,13 @@ bool rd_make_code(RDContext* self, RDAddress address) {
 
     // tails/data/unknown: retract the old interpretation first.
     // The gate refuses if something higher-confidence lives here.
-    if(!rd_i_undefine_n(self, address, 1, RD_CONFIDENCE_USER)) return false;
+    if(!rd_i_undefine_n(self, address, 1, RD_CONFIDENCE_USER,
+                        RD_UNDEFINE_SIMPLE)) {
+        return false;
+    }
 
     rd_i_engine_enqueue_code(self, address, 1);
     return true;
-}
-
-bool rd_auto_undefine(RDContext* self, RDAddress address) {
-    return rd_i_undefine(self, address, RD_CONFIDENCE_AUTO);
-}
-
-bool rd_library_undefine(RDContext* self, RDAddress address) {
-    return rd_i_undefine(self, address, RD_CONFIDENCE_LIBRARY);
-}
-
-bool rd_user_undefine(RDContext* self, RDAddress address) {
-    return rd_i_undefine(self, address, RD_CONFIDENCE_USER);
-}
-
-bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n) {
-    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_AUTO);
-}
-
-bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n) {
-    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_LIBRARY);
-}
-
-bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n) {
-    return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_USER);
 }
 
 bool rd_placeholder_name(RDContext* self, RDAddress address, const char* name) {
@@ -716,47 +679,6 @@ bool rd_i_del_comment(RDContext* self, RDAddress address,
         rd_i_flagsbuffer_clear_comment(seg->flags, idx);
 
     return true;
-}
-
-bool rd_i_undefine(RDContext* self, RDAddress address, RDConfidence c) {
-    return rd_i_undefine_n(self, address, 1, c);
-}
-
-bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
-                     RDConfidence c) {
-    const RDSegment* seg = rd_i_db_find_segment(self, address);
-    if(!seg) return false;
-
-    usize startidx = rd_i_address2index(seg, address), endidx = startidx + n;
-    rd_i_expand_range(self, seg, &startidx, &endidx); // 1. true range
-
-    RDAddress startaddr = rd_i_index2address(seg, startidx);
-    RDAddress endaddr = startaddr + (RDAddress)(endidx - startidx);
-
-    RDConfidence maxc =
-        rd_i_db_get_undefine_confidence(self, startaddr, endaddr);
-    if(maxc > c) return false; // 2. gate
-
-    for(usize i = startidx; i < endidx; i++) { // 3. entities
-        if(rd_flagsbuffer_has_func(seg->flags, i))
-            rd_i_function_undeclare(self, seg, i);
-    }
-
-    _rd_teardown_range(self, seg, startidx, endidx, c);      // 4. DB rows
-    rd_i_flagsbuffer_undefine(seg->flags, startidx, endidx); // 5. flags
-    rd_i_engine_mark_dirty(self);                            // 6. dirty state
-    return true;
-}
-
-void rd_i_clear_n(RDContext* self, RDAddress address, usize n) {
-    const RDSegment* seg = rd_i_db_find_segment(self, address);
-    if(!seg) return;
-
-    usize startidx = rd_i_address2index(seg, address), endidx = startidx + n;
-    rd_i_expand_range(self, seg, &startidx, &endidx);
-
-    _rd_teardown_range(self, seg, startidx, endidx, RD_CONFIDENCE_MAX);
-    rd_i_flagsbuffer_clear(seg->flags, startidx, endidx);
 }
 
 bool rd_set_function(RDContext* self, RDAddress address) {
@@ -945,8 +867,8 @@ bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
         if(_rd_vect_contains_address(&visited, current)) break; // loop detected
         vect_push(&visited, current);
 
-        RDTypeFull t;
-        if(!rd_i_get_type(ctx, current, &t) || !rd_type_is_ptr(&t.base)) break;
+        RDType t;
+        if(!rd_get_type(ctx, current, &t) || !rd_type_is_ptr(&t)) break;
 
         RDAddress next;
         if(!rd_read_ptr(ctx, current, &next) || !rd_is_address(ctx, next))
@@ -1324,6 +1246,15 @@ bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
 
 bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c) {
+    switch(type) { // reject invalid types
+        case RD_DR_READ:
+        case RD_DR_WRITE:
+        case RD_DR_ADDRESS:
+        case RD_CR_JUMP:
+        case RD_CR_CALL: break;
+        default: return false;
+    }
+
     const RDSegment* fromseg = rd_i_db_find_segment(self, fromaddr);
     const RDSegment* toseg = rd_i_db_find_segment(self, toaddr);
     if(!fromseg || !toseg) return false;
@@ -1332,56 +1263,24 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     usize toidx = rd_i_address2index(toseg, toaddr);
 
     if(rd_flagsbuffer_has_tail(fromseg->flags, fromidx)) {
-        rd_i_add_problem(self, fromaddr, fromaddr, "ref FROM tail byte");
+        rd_i_add_problem(self, fromaddr, toaddr, "ref FROM tail byte");
         return false;
     }
 
-    bool isreftotail = rd_flagsbuffer_has_tail(toseg->flags, toidx);
-
-    if(isreftotail) // report only
+    if(rd_flagsbuffer_has_tail(toseg->flags, toidx)) {
         rd_i_add_problem(self, fromaddr, toaddr, "ref TO tail byte");
-
-    RDXRefFull xref;
-    if(rd_i_db_get_xref(self, fromaddr, toaddr, &xref) && xref.confidence > c)
         return false;
-
-    switch(type) {
-        case RD_DR_READ:
-        case RD_DR_WRITE:
-        case RD_DR_ADDRESS: {
-            rd_i_db_add_xref(self, fromaddr, toaddr, type, c);
-            rd_i_flagsbuffer_set_xref_out(fromseg->flags, fromidx);
-
-            if(!isreftotail) rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
-            break;
-        }
-
-        case RD_CR_JUMP: {
-            rd_i_db_add_xref(self, fromaddr, toaddr, type, c);
-            rd_i_flagsbuffer_set_xref_out(fromseg->flags, fromidx);
-
-            if(!isreftotail) {
-                rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
-                rd_i_engine_enqueue_jump(self, toaddr);
-            }
-
-            break;
-        }
-
-        case RD_CR_CALL: {
-            rd_i_db_add_xref(self, fromaddr, toaddr, type, c);
-            rd_i_flagsbuffer_set_xref_out(fromseg->flags, fromidx);
-
-            if(!isreftotail) {
-                rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
-                rd_i_engine_enqueue_call(self, toaddr, NULL);
-            }
-
-            break;
-        }
-
-        default: return false;
     }
+
+    if(!rd_i_db_add_xref(self, fromaddr, toaddr, type, c)) return false;
+
+    rd_i_flagsbuffer_set_xref_out(fromseg->flags, fromidx);
+    rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
+
+    if(type == RD_CR_JUMP)
+        rd_i_engine_enqueue_jump(self, toaddr);
+    else if(type == RD_CR_CALL)
+        rd_i_engine_enqueue_call(self, toaddr, NULL);
 
     rd_fire_xref_hook(self, "redasm.xref_added", fromaddr, toaddr, type);
     return true;
@@ -1410,12 +1309,15 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
         if(!rd_i_db_has_xrefs_to(self, toaddr, RD_XR_NONE)) {
             // the last xref of any kind: nothing points here any more
             rd_i_flagsbuffer_clear_xref_in(toseg->flags, to_idx);
-            rd_i_flagsbuffer_clear_jmpdst(toseg->flags, to_idx);
+
+            if(rd_i_flagsbuffer_has_jmpdst(toseg->flags, to_idx))
+                rd_i_flagsbuffer_clear_jmpdst(toseg->flags, to_idx);
         }
         else if(type == RD_CR_JUMP &&
                 rd_i_flagsbuffer_has_jmpdst(toseg->flags, to_idx) &&
                 !rd_i_db_has_xrefs_to(self, toaddr, RD_CR_JUMP)) {
-            // other xrefs remain (calls, data), but no jump justifies the bit
+
+            // other xrefs remain (calls, data), no jump justifies the bit
             rd_i_flagsbuffer_clear_jmpdst(toseg->flags, to_idx);
         }
     }

@@ -5,7 +5,6 @@
 #include "core/segment.h"
 #include "db/types.h"
 #include "types/def.h"
-#include "types/type.h"
 #include <redasm/context.h>
 
 enum {
@@ -31,6 +30,7 @@ enum {
     RD_QUERY_ADD_COMMENT,
     RD_QUERY_GET_COMMENT,
     RD_QUERY_DEL_COMMENT,
+    RD_QUERY_DEL_ALL_COMMENTS,
     RD_QUERY_GET_COMMENT_COUNT,
     RD_QUERY_HAS_ANY_COMMENT,
 
@@ -77,11 +77,10 @@ enum {
     RD_QUERY_GET_ALL_OVR_OPERAND,
 
     RD_QUERY_ADD_PROBLEM,
+    RD_QUERY_DEL_PROBLEMS_FROM,
     RD_QUERY_GET_ALL_PROBLEMS,
     RD_QUERY_GET_PROBLEM_COUNT,
     RD_QUERY_HAS_PROBLEMS,
-
-    RD_QUERY_GET_UNDEFINE_CONFIDENCE,
 
     RD_QUERY_COUNT,
 };
@@ -104,7 +103,7 @@ RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
                                                  RDExternalKind kind,
                                                  RDExternalVect* v);
 
-void _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefType type, RDConfidence c);
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDConfidence c, RDXRefType* type);
@@ -137,7 +136,7 @@ RDAddressVect* _rd_i_db_query_get_all_name_addresses(RDContext* ctx,
 
 void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address, const RDType* t,
                              RDConfidence c);
-bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDTypeFull* t);
+bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDType* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
 RDAddressVect* _rd_i_db_query_get_address_by_type(RDContext* ctx,
                                                   RDAddressVect* v,
@@ -162,6 +161,7 @@ const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address,
                                        RDCommentPlacement p, usize line);
 void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address,
                                 const char* cmt, RDCommentPlacement p);
+void _rd_i_db_query_del_all_comments(RDContext* ctx, RDAddress address);
 void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address,
                                 RDCommentPlacement p);
 usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
@@ -170,6 +170,8 @@ bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address);
 
 void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
                                 RDAddress target, const char* msg);
+void _rd_i_db_query_del_problems_from(RDContext* ctx, RDAddress start,
+                                      RDAddress end);
 const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
                                                       RDProblemsVect* v);
 usize _rd_i_db_query_get_problem_count(RDContext* ctx);
@@ -186,7 +188,3 @@ void _rd_i_db_query_del_ovr_operand(RDContext* ctx, RDAddress address, int idx);
 bool _rd_i_db_query_has_ovr_operand(RDContext* ctx, RDAddress address);
 RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
                                                      RDAddress address);
-
-RDConfidence _rd_i_db_query_get_undefine_confidence(RDContext* ctx,
-                                                    RDAddress start,
-                                                    RDAddress end);

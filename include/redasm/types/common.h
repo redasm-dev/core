@@ -25,6 +25,7 @@ typedef struct RDType {
     const RDTypeDef* def;
     usize count;
     RDTypeModifier mod;
+    RDConfidence confidence; // ignored in write mode
 } RDType;
 
 typedef struct RDParam {
