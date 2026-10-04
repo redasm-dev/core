@@ -354,16 +354,17 @@ RDFunction* rd_i_function_declare(RDContext* ctx, RDRelAddress address,
 void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg, usize idx) {
     if(!rd_flagsbuffer_has_func(seg->flags, idx)) return; // idempotent
 
-    RDRelAddress address = rd_segment_get_start(seg) + idx;
+    RDRelAddress rel_address = seg->rel_start + idx;
 
-    usize func_idx =
-        vect_lower_bound(&ctx->functions, &address, rd_i_function_kcmp_pred);
+    usize func_idx = vect_lower_bound(&ctx->functions, &rel_address,
+                                      rd_i_function_kcmp_pred);
 
     // FL_FUNC and ctx->functions are set together by rd_i_function_declare:
     // one without the other is a bug, not a tolerable state
     panic_if(func_idx >= vect_length(&ctx->functions) ||
-                 (*vect_at(&ctx->functions, func_idx))->rel_address != address,
-             "FL_FUNC set with no record @ %" PRIX64, address);
+                 (*vect_at(&ctx->functions, func_idx))->rel_address !=
+                     rel_address,
+             "FL_FUNC set with no record @ %" PRIX64, rel_address);
 
     RDFunction* f = *vect_at(&ctx->functions, func_idx);
     rd_fire_func_hook(ctx, "redasm.func_removing", f, func_idx);
