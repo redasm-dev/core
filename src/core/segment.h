@@ -3,10 +3,9 @@
 #include <redasm/common.h>
 #include <redasm/segment.h>
 
-// flags overlay
-enum {
-    OFL_QUEUED = (1 << 0),
-};
+typedef enum {
+    OFL_QUEUED = 1 << 0,
+} RDFlagsOverlay;
 
 typedef struct RDSegment {
     const RDContext* context;
@@ -28,6 +27,6 @@ RDSegment* rd_i_segment_create(RDContext* ctx, const char* name,
 void rd_i_segment_destroy(RDSegment* self);
 
 // Overlay Flags management
-void rd_i_segment_set_queued(const RDSegment* self, usize idx);
-bool rd_i_segment_has_queued(const RDSegment* self, usize idx);
-void rd_i_segment_clear_queued(const RDSegment* self, usize idx);
+void rd_i_segment_set_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f);
+bool rd_i_segment_has_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f);
+void rd_i_segment_clear_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f);

@@ -109,7 +109,7 @@ RDSurfacePos rd_i_surfacestate_get_end_selection(const RDSurfaceState* self) {
 }
 
 void rd_i_surfacestate_clear_selection(RDSurfaceState* self) {
-    self->sel_pos = self->pos;
+    if(self) self->sel_pos = self->pos;
 }
 
 void rd_i_surfacestate_clear_history(RDSurfaceState* self) {

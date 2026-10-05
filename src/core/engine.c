@@ -86,7 +86,7 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
 
     usize idx = rd_i_address2index(seg, address);
 
-    if(rd_i_segment_has_queued(seg, idx)) return false;
+    if(rd_i_segment_has_ovl(seg, idx, OFL_QUEUED)) return false;
 
     // tail = pointing into the middle of an existing instruction:
     // plugin bug or deliberate obfuscation: reject and surface as problem
@@ -100,7 +100,7 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
     // already fully decoded at this boundary: tick would be a no-op
     if(rd_flagsbuffer_has_code(seg->flags, idx)) return false;
 
-    rd_i_segment_set_queued(seg, idx);
+    rd_i_segment_set_ovl(seg, idx, OFL_QUEUED);
     return true;
 }
 
@@ -422,7 +422,7 @@ u16 rd_i_engine_tick(RDContext* ctx) {
 
     usize idx =
         rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
-    rd_i_segment_clear_queued(ctx->engine.segment, idx);
+    rd_i_segment_clear_ovl(ctx->engine.segment, idx, OFL_QUEUED);
 
     if(!_rd_engine_should_decode(ctx, idx, &instr)) return instr.length;
     if(!_rd_engine_do_decode(ctx, idx, &instr)) return instr.length;

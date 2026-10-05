@@ -189,7 +189,7 @@ bool rd_surfacegraph_has_selection(const RDSurfaceGraph* self) {
 }
 
 void rd_surfacegraph_clear_selection(RDSurfaceGraph* self) {
-    rd_i_surfacestate_clear_selection(&self->state);
+    if(self) rd_i_surfacestate_clear_selection(&self->state);
 }
 
 RDSurfacePos rd_surfacegraph_get_pos(const RDSurfaceGraph* self) {

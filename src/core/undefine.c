@@ -1,64 +1,59 @@
 #include "undefine.h"
 #include "core/context.h"
 #include "db/db.h"
+#include "db/types.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include <inttypes.h>
 
-static RDConfidence _rd_get_max_xrefs_confidence(const RDXRefVect* xrefs) {
-    RDConfidence c = RD_CONFIDENCE_PLACEHOLDER;
+#define RD_UNDEFINE_PUBLIC_MASK 0xFFFF
 
-    const RDXRef* xref;
-    vect_each(xref, xrefs) {
-        if(xref->confidence > c) c = xref->confidence;
-    }
+typedef struct RDUndefineRange {
+    RDAddress start_address;
+    RDAddress end_address; // exclusive
+} RDUndefineRange;
 
-    return c;
-}
+typedef struct RDUndefineState {
+    RDXRefVect xrefs;
+    RDAddressVect q_targets; // jump targets of what was removed, still to visit
+    RDConfidence confidence;
+    RDUndefineFlags flags;
+} RDUndefineState;
 
-static bool _rd_flag_is_entity(const RDFlagsBuffer* flags, usize idx) {
-    return rd_flagsbuffer_has_name(flags, idx) ||
+// a jump to one of these is not followed: the callee / the symbol stays
+static bool _rd_is_root(const RDFlagsBuffer* flags, usize idx) {
+    return rd_flagsbuffer_has_func(flags, idx) ||
            rd_flagsbuffer_has_exported(flags, idx) ||
            rd_flagsbuffer_has_imported(flags, idx);
 }
 
-static bool _rd_has_inbound_xrefs_in(RDContext* self, RDUndefineState* state,
-                                     RDAddress addr) {
-    vect_clear(&state->xrefs);
-    rd_i_db_get_xrefs_to(self, addr, RD_XR_NONE, &state->xrefs);
-
-    const RDXRef* x;
-    vect_each(x, &state->xrefs) {
-        if(x->address < state->start || x->address >= addr) return true;
-    }
-
-    return false;
-}
-
 static bool _rd_strip_flags(RDContext* self, const RDSegment* seg, usize idx,
-                            RDAddress address, RDUndefineState* state,
-                            bool apply) {
+                            RDUndefineState* state, bool apply) {
     if(!apply && state->confidence == RD_CONFIDENCE_MAX) return true;
 
-    // outgoing xrefs are derived from what was decoded here, from any byte
+    RDAddress address = rd_segment_get_start(seg) + idx;
+
+    // outgoing xrefs are derived from what was decoded here
     if(rd_i_flagsbuffer_has_xref_out(seg->flags, idx)) {
         vect_clear(&state->xrefs);
         rd_i_db_get_xrefs_from(self, address, RD_XR_NONE, &state->xrefs);
 
         if(!apply) {
-            if(state->confidence < _rd_get_max_xrefs_confidence(&state->xrefs))
-                return false;
+            const RDXRef* xref;
+            vect_each(xref, &state->xrefs) {
+                if(state->confidence < xref->confidence) return false;
+            }
         }
         else if(vect_is_empty(&state->xrefs)) {
-            // no rows behind this flag: it is stale
+            // stale flag: no rows behind
             rd_i_flagsbuffer_clear_xref_out(seg->flags, idx);
         }
         else {
-            const RDXRef* x;
-            vect_each(x, &state->xrefs) {
-                bool ok =
-                    rd_i_del_xref(self, address, x->address, state->confidence);
+            const RDXRef* xref;
+            vect_each(xref, &state->xrefs) {
+                bool ok = rd_i_del_xref(self, address, xref->address,
+                                        state->confidence);
                 assert(ok && "undefine: the probe approved a protected xref");
                 RD_UNUSED(ok);
             }
@@ -96,12 +91,11 @@ static bool _rd_strip_flags(RDContext* self, const RDSegment* seg, usize idx,
 // gate for [idx, idx + len) of one item
 static bool _rd_probe_flags(RDContext* self, const RDSegment* seg, usize idx,
                             usize len, RDUndefineState* state) {
-    RDAddress base = rd_segment_get_start(seg);
     usize end = idx + len, seg_len = rd_flagsbuffer_get_length(seg->flags);
     if(end > seg_len) end = seg_len;
 
     for(usize i = idx; i < end; i++) {
-        if(!_rd_strip_flags(self, seg, i, base + i, state, false)) return false;
+        if(!_rd_strip_flags(self, seg, i, state, false)) return false;
     }
 
     return true;
@@ -116,19 +110,52 @@ static bool _rd_probe_xrefs_in(RDContext* self, const RDSegment* seg, usize idx,
     rd_i_db_get_xrefs_to(self, rd_segment_get_start(seg) + idx, RD_XR_NONE,
                          &state->xrefs);
 
-    return state->confidence >= _rd_get_max_xrefs_confidence(&state->xrefs);
+    const RDXRef* xref;
+    vect_each(xref, &state->xrefs) {
+        if(state->confidence < xref->confidence) return false;
+    }
+
+    return true;
 }
 
-static bool _rd_probe_undefine_n(RDContext* self, RDUndefineState* state) {
-    assert(state);
+// jump targets of the instructions in [idx, end_idx). Collected while their
+// xrefs still exist: the exec deletes them.
+static void _rd_collect_jumps(RDContext* self, const RDSegment* seg, usize idx,
+                              usize end_idx, RDUndefineState* state) {
+    while(idx < end_idx) {
+        if(!rd_flagsbuffer_has_code(seg->flags, idx)) {
+            idx++;
+            continue;
+        }
 
-    const RDSegment* seg = rd_i_db_find_segment(self, state->start);
+        if(rd_i_flagsbuffer_has_xref_out(seg->flags, idx)) {
+            vect_clear(&state->xrefs);
+            rd_i_db_get_xrefs_from(self, rd_segment_get_start(seg) + idx,
+                                   RD_CR_JUMP, &state->xrefs);
+
+            const RDXRef* xref;
+            vect_each(xref, &state->xrefs)
+                vect_push(&state->q_targets, xref->address);
+        }
+
+        idx += rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+    }
+}
+
+static bool _rd_probe_undefine_range(RDContext* self, RDUndefineState* state,
+                                     RDUndefineRange* r) {
+    assert(state);
+    assert(r);
+
+    if(r->start_address >= r->end_address) return false;
+
+    const RDSegment* seg = rd_i_db_find_segment(self, r->start_address);
     if(!seg) return false;
 
-    if(state->end > rd_segment_get_end(seg))
-        state->end = rd_segment_get_end(seg);
+    if(r->end_address > rd_segment_get_end(seg))
+        r->end_address = rd_segment_get_end(seg);
 
-    usize idx = rd_i_address2index(seg, state->start);
+    usize idx = rd_i_address2index(seg, r->start_address);
 
     // back to the head of its run
     rd_i_flagsbuffer_expand_tails(seg->flags, &idx, NULL);
@@ -144,13 +171,13 @@ static bool _rd_probe_undefine_n(RDContext* self, RDUndefineState* state) {
         panic_if(!ok || addr >= root_addr + rd_type_size(&root, self),
                  "inner head @ %" PRIX64 " is outside its nearest type", addr);
 
-        idx = root_addr - rd_segment_get_start(seg); // restart from the root
+        // restart from the root
+        idx = root_addr - rd_segment_get_start(seg);
     }
 
-    // recompute start
-    state->start = rd_segment_get_start(seg) + idx;
+    r->start_address = rd_segment_get_start(seg) + idx; // recompute start
 
-    usize end_idx = idx + (state->end - state->start);
+    usize first = idx, end_idx = idx + (r->end_address - r->start_address);
     bool last_code = false;
 
     while(idx < end_idx) {
@@ -202,14 +229,8 @@ static bool _rd_probe_undefine_n(RDContext* self, RDUndefineState* state) {
     while((state->flags & RD_UNDEFINE_FLOW) && last_code && idx < seg_len &&
           rd_flagsbuffer_has_code(seg->flags, idx) &&
           rd_flagsbuffer_has_flow(seg->flags, idx) &&
-          !_rd_flag_is_entity(seg->flags, idx)) {
-        RDAddress addr = rd_segment_get_start(seg) + idx;
+          !_rd_is_root(seg->flags, idx)) {
         usize len = rd_i_flagsbuffer_get_range_length(seg->flags, idx);
-
-        // is 'addr' still reached by something outside [state->start, addr)?
-        if(rd_i_flagsbuffer_has_xref_in(seg->flags, idx) &&
-           _rd_has_inbound_xrefs_in(self, state, addr))
-            break;
 
         // protected: truncate, never fail (what was asked already passed)
         if(!_rd_probe_flags(self, seg, idx, len, state)) break;
@@ -217,16 +238,21 @@ static bool _rd_probe_undefine_n(RDContext* self, RDUndefineState* state) {
         idx += len;
     }
 
-    state->end = rd_segment_get_start(seg) + idx;
+    if(state->flags & RD_UNDEFINE_TRACE)
+        _rd_collect_jumps(self, seg, first, idx, state); // NOLINT
+
+    r->end_address = rd_segment_get_start(seg) + idx;
     return true;
 }
 
-static void _rd_exec_undefine_n(RDContext* self, RDUndefineState* state) {
-    const RDSegment* seg = rd_i_db_find_segment(self, state->start);
+static void _rd_exec_undefine_n(RDContext* self, RDUndefineState* state,
+                                const RDUndefineRange* r) {
+    const RDSegment* seg = rd_i_db_find_segment(self, r->start_address);
     assert(seg);
 
     RDAddress base = rd_segment_get_start(seg);
-    usize idx = state->start - base, end_idx = state->end - base, i = idx;
+    usize idx = r->start_address - base, end_idx = r->end_address - base,
+          i = idx;
     bool clear = state->flags & RD_UNDEFINE_CLEAR;
 
     // entity records need the flags that the wipe below drops
@@ -258,10 +284,10 @@ static void _rd_exec_undefine_n(RDContext* self, RDUndefineState* state) {
         rd_i_flagsbuffer_undefine(seg->flags, idx, end_idx);
 
     for(i = idx; i < end_idx; i++)
-        _rd_strip_flags(self, seg, i, base + i, state, true);
+        _rd_strip_flags(self, seg, i, state, true);
 
     // the diagnostics of code that no longer exists have no subject
-    rd_i_db_del_problems_from(self, state->start, state->end);
+    rd_i_db_del_problems_from(self, r->start_address, r->end_address);
 
     // the instruction after the range lost its predecessor:
     // it no longer falls into anything
@@ -281,69 +307,110 @@ bool rd_i_undefine_n(RDContext* self, RDAddress address, usize n,
     return rd_i_undefine_range(self, address, n, c, flags, NULL, NULL);
 }
 
+// probe + exec of ONE range. false: the gate said no, nothing was touched.
+static bool _rd_undefine_one(RDContext* self, RDUndefineState* state,
+                             RDUndefineRange* r) {
+    if(!_rd_probe_undefine_range(self, state, r)) return false;
+
+    _rd_exec_undefine_n(self, state, r);
+    return true;
+}
+
+// still something to remove?
+// Undefined code is not code any more, so this is also what ends loops and
+// jumps back into what was already removed.
+static bool _rd_is_candidate(RDContext* self, RDAddress address) {
+    const RDSegment* seg = rd_i_db_find_segment(self, address);
+    if(!seg) return false;
+
+    usize idx = rd_i_address2index(seg, address);
+    if(!rd_flagsbuffer_has_code(seg->flags, idx)) return false;
+    if(_rd_is_root(seg->flags, idx)) return false;
+
+    // the location flowed in from the previous item.
+    // If that one is still code, it stays, and so does this.
+    if(idx > 0 && rd_flagsbuffer_has_flow(seg->flags, idx)) {
+        usize prev_idx = idx - 1;
+        rd_i_flagsbuffer_expand_tails(seg->flags, &prev_idx, NULL);
+        if(rd_flagsbuffer_has_code(seg->flags, prev_idx)) return false;
+    }
+
+    return true;
+}
+
 bool rd_i_undefine_range(RDContext* self, RDAddress address, usize n,
                          RDConfidence c, RDUndefineFlags flags,
                          RDAddress* start, RDAddress* end) {
-    RDUndefineState und_state = {
-        .start = address,
-        .end = address + n,
-        .confidence = c,
-        .flags = flags,
-    };
+    // a rewind keeps the arrival bits; FLOW / TRACE remove code because
+    // arrival is lost
+    assert(!((flags & RD_UNDEFINE_FLOW) && (flags & RD_UNDEFINE_CLEAR)));
 
     // never leave the outputs undefined: on failure they hold the request
     if(start) *start = address;
     if(end) *end = address + n;
 
-    if(!_rd_probe_undefine_n(self, &und_state)) {
-        vect_destroy(&und_state.xrefs);
+    RDUndefineState state = {.confidence = c, .flags = flags};
+    RDUndefineRange req = {
+        .start_address = address,
+        .end_address = address + n,
+    };
+
+    // the request is all or nothing
+    if(!_rd_undefine_one(self, &state, &req)) {
+        vect_destroy(&state.q_targets);
+        vect_destroy(&state.xrefs);
         return false;
     }
 
-    RD_LOG_DEBUG("undefining range %" PRIX64 " - %" PRIX64, und_state.start,
-                 und_state.end);
+    if(start) *start = req.start_address;
+    if(end) *end = req.end_address;
 
-    _rd_exec_undefine_n(self, &und_state);
+    // what it pulls in is best effort: a protected target is simply left alone
+    while(!vect_is_empty(&state.q_targets)) {
+        usize last = vect_length(&state.q_targets) - 1;
+        RDAddress addr = *vect_at(&state.q_targets, last);
+        vect_del(&state.q_targets, last, 1);
 
-    if(start) *start = und_state.start;
-    if(end) *end = und_state.end;
+        if(!_rd_is_candidate(self, addr)) continue;
 
-    vect_destroy(&und_state.xrefs);
+        RDUndefineRange r = {.start_address = addr, .end_address = addr + 1};
+        _rd_undefine_one(self, &state, &r);
+    }
+
+    vect_destroy(&state.q_targets);
+    vect_destroy(&state.xrefs);
     return true;
 }
 
-bool rd_auto_undefine(RDContext* self, RDAddress address,
-                      RDUndefineFlags flags) {
+bool rd_auto_undefine(RDContext* self, RDAddress address, usize flags) {
     return rd_i_undefine(self, address, RD_CONFIDENCE_AUTO,
                          flags & RD_UNDEFINE_PUBLIC_MASK);
 }
 
-bool rd_library_undefine(RDContext* self, RDAddress address,
-                         RDUndefineFlags flags) {
+bool rd_library_undefine(RDContext* self, RDAddress address, usize flags) {
     return rd_i_undefine(self, address, RD_CONFIDENCE_LIBRARY,
                          flags & RD_UNDEFINE_PUBLIC_MASK);
 }
 
-bool rd_user_undefine(RDContext* self, RDAddress address,
-                      RDUndefineFlags flags) {
+bool rd_user_undefine(RDContext* self, RDAddress address, usize flags) {
     return rd_i_undefine(self, address, RD_CONFIDENCE_USER,
                          flags & RD_UNDEFINE_PUBLIC_MASK);
 }
 
 bool rd_auto_undefine_n(RDContext* self, RDAddress address, usize n,
-                        RDUndefineFlags flags) {
+                        usize flags) {
     return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_AUTO,
                            flags & RD_UNDEFINE_PUBLIC_MASK);
 }
 
 bool rd_library_undefine_n(RDContext* self, RDAddress address, usize n,
-                           RDUndefineFlags flags) {
+                           usize flags) {
     return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_LIBRARY,
                            flags & RD_UNDEFINE_PUBLIC_MASK);
 }
 
 bool rd_user_undefine_n(RDContext* self, RDAddress address, usize n,
-                        RDUndefineFlags flags) {
+                        usize flags) {
     return rd_i_undefine_n(self, address, n, RD_CONFIDENCE_USER,
                            flags & RD_UNDEFINE_PUBLIC_MASK);
 }

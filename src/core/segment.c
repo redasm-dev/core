@@ -76,17 +76,18 @@ void rd_i_segment_destroy(RDSegment* self) {
     rd_free(self);
 }
 
-void rd_i_segment_set_queued(const RDSegment* self, usize idx) {
+void rd_i_segment_set_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f) {
     usize n = self->rel_end - self->rel_start;
-    if(idx < n) self->ovl_flags[idx] |= OFL_QUEUED;
+    if(idx < n) self->ovl_flags[idx] |= (u8)f;
 }
 
-bool rd_i_segment_has_queued(const RDSegment* self, usize idx) {
+bool rd_i_segment_has_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f) {
     usize n = self->rel_end - self->rel_start;
-    return idx < n ? self->ovl_flags[idx] & OFL_QUEUED : false;
+    return idx < n ? (self->ovl_flags[idx] & f) : false;
 }
 
-void rd_i_segment_clear_queued(const RDSegment* self, usize idx) {
+void rd_i_segment_clear_ovl(const RDSegment* self, usize idx,
+                            RDFlagsOverlay f) {
     usize n = self->rel_end - self->rel_start;
-    if(idx < n) self->ovl_flags[idx] &= (u8)~OFL_QUEUED;
+    if(idx < n) self->ovl_flags[idx] &= (u8)~f;
 }
