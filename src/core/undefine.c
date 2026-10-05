@@ -312,6 +312,11 @@ static bool _rd_undefine_one(RDContext* self, RDUndefineState* state,
                              RDUndefineRange* r) {
     if(!_rd_probe_undefine_range(self, state, r)) return false;
 
+    if(state->flags & RD_UNDEFINE_FLOW) {
+        RD_LOG_DEBUG("undefining flow %" PRIX64 " - %" PRIX64, r->start_address,
+                     r->end_address);
+    }
+
     _rd_exec_undefine_n(self, state, r);
     return true;
 }
