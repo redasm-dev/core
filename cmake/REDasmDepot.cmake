@@ -23,7 +23,8 @@ function(redasm_add_dependency NAME)
     endif()
 
     if(REDASM_DEPOT_DIR AND IS_DIRECTORY "${REDASM_DEPOT_DIR}/${NAME}")
-        set(CPM_${NAME}_SOURCE "${REDASM_DEPOT_DIR}/${NAME}")
+        string(TOUPPER "${NAME}" _upper)
+        set(FETCHCONTENT_SOURCE_DIR_${_upper} "${REDASM_DEPOT_DIR}/${NAME}")
     elseif(REDASM_OFFLINE)
         if(REDASM_USE_BUNDLED)
             message(FATAL_ERROR "${NAME}: REDASM_OFFLINE with REDASM_USE_BUNDLED needs "
