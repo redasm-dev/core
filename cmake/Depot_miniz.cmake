@@ -7,6 +7,12 @@ redasm_add_dependency(
         "CMAKE_POSITION_INDEPENDENT_CODE ON"
 )
 
-if(NOT TARGET miniz::miniz)
+if(miniz_ADDED AND NOT TARGET miniz)
+    add_library(miniz STATIC "${miniz_SOURCE_DIR}/miniz.c")
+    target_include_directories(miniz PUBLIC "${miniz_SOURCE_DIR}")
+    set_target_properties(miniz PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
+if(miniz_ADDED AND NOT TARGET miniz::miniz)
     add_library(miniz::miniz ALIAS miniz)
 endif()
