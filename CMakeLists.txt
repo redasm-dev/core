@@ -156,7 +156,12 @@ install(
 )
 
 install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
+    FILES 
+        "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/REDasmDepot.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake"
+
+    DESTINATION 
+        ${CMAKE_INSTALL_LIBDIR}/cmake/redasm
 )
 

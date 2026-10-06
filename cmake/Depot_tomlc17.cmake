@@ -1,4 +1,4 @@
-CPMAddPackage(
+redasm_add_dependency(
     NAME tomlc17
     GIT_TAG "R20260501"
     GITHUB_REPOSITORY "cktan/tomlc17"
