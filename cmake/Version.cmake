@@ -52,6 +52,6 @@ function(redasm_generate_version)
 
     install(
         FILES ${CMAKE_CURRENT_BINARY_DIR}/include/redasm/abi.h 
-        DESTINATION include/redasm
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/redasm
     )
 endfunction()
