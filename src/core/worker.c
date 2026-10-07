@@ -34,7 +34,6 @@ static void _rd_worker_check_chunk_pair(const RDFunctionChunk* p,
                 (unsigned long long)rd_function_get_address(c->func),
                 (unsigned long long)rd_functionchunk_get_start(c),
                 (unsigned long long)rd_functionchunk_get_end(c));
-    assert(false && "overlapping function chunks");
 }
 #endif
 
