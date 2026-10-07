@@ -72,6 +72,12 @@ static bool _rd_function_is_tail_call(const RDFunction* self,
     return rd_flagsbuffer_has_func(seg->flags, rd_i_address2index(seg, target));
 }
 
+static bool _rd_function_falls_into(const RDSegment* seg, RDAddress address) {
+    return address < rd_segment_get_end(seg) &&
+           rd_flagsbuffer_has_flow(seg->flags,
+                                   rd_i_address2index(seg, address));
+}
+
 static RDGraphNode _rd_function_get_or_add_block(RDContext* ctx, RDGraph* g,
                                                  RDAddress start,
                                                  const RDFunction* func,
@@ -232,13 +238,15 @@ void rd_i_function_rebuild_graph(RDFunction* self,
                     }
 
                     // false edge: fall-through
-                    RDGraphNode dst = _rd_function_get_or_add_block(
-                        ctx, g, nextaddr, self, &w, chunks);
+                    if(_rd_function_falls_into(seg, nextaddr)) {
+                        RDGraphNode dst = _rd_function_get_or_add_block(
+                            ctx, g, nextaddr, self, &w, chunks);
 
-                    if(dst) {
-                        RDGraphEdge e = rd_graph_add_edge(g, src, dst);
-                        const char* c = rd_get_theme_color(RD_THEME_FAIL);
-                        rd_graph_set_edge_color(g, &e, c);
+                        if(dst) {
+                            RDGraphEdge e = rd_graph_add_edge(g, src, dst);
+                            const char* c = rd_get_theme_color(RD_THEME_FAIL);
+                            rd_graph_set_edge_color(g, &e, c);
+                        }
                     }
                 }
                 else { // unconditional: single jump edge per target
