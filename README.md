@@ -1,5 +1,5 @@
 # REDasm Core Engine
-This repository contains the standalone, headless binary analysis engine and disassembly library driving [GUI](https://github.com/redasm-dev/redasm) and [Unit Testing Suite](https://github.com/redasm-dev/tests).  
+This repository contains the standalone disassembler library driving [GUI](https://github.com/redasm-dev/redasm) and [Unit Testing Suite](https://github.com/redasm-dev/tests).  
 
 It's minimal an lightweight on purpose, written in **pure C17** and completely decoupled from the user interface.
 
