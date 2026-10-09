@@ -1,120 +1,121 @@
-#include "graphs/graph.h"
+#include "graphing/graph.h"
 #include "support/containers.h"
 #include <assert.h>
 #include <redasm/allocator.h>
 #include <redasm/graph/layout.h>
-#include <string.h>
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-#define RD_EGO_PADDING 16
-#define RD_EGO_PADDING_DIV2 ((int)(RD_EGO_PADDING / 2.0F))
-#define RD_EGO_PADDING_DIV4 ((int)(RD_EGO_PADDING_DIV2 / 2.0F))
-#define RD_EGO_NODE_PADDING (2 * RD_EGO_PADDING)
+#define RD_LLAYOUT_PADDING 16
+#define RD_LLAYOUT_PADDING_DIV2 ((int)(RD_LLAYOUT_PADDING / 2.0F))
+#define RD_LLAYOUT_PADDING_DIV4 ((int)(RD_LLAYOUT_PADDING_DIV2 / 2.0F))
+#define RD_LLAYOUT_NODE_PADDING (2 * RD_LLAYOUT_PADDING)
 
 // ---------------------------------------------------------------------------
-// Forward declaration (RDEgoBlock and RDEgoEdge reference each other)
+// Forward declaration (RDLLBlock and RDLLEdge reference each other)
 // ---------------------------------------------------------------------------
 
-typedef struct RDEgoBlock RDEgoBlock;
+typedef struct RDLLBlock RDLLBlock;
 
 // ---------------------------------------------------------------------------
 // Point: a waypoint on a routed edge (grid coordinates, not pixels yet)
 // ---------------------------------------------------------------------------
 
-typedef struct RDEgoPoint {
+typedef struct RDLLPoint {
     int row, col, index;
-} RDEgoPoint;
+} RDLLPoint;
 
-typedef struct RDEgoPointVect {
-    RDEgoPoint* data;
+typedef struct RDLLPointVect {
+    RDLLPoint* data;
     usize length;
     usize capacity;
-} RDEgoPointVect;
+} RDLLPointVect;
 
 // ---------------------------------------------------------------------------
 // Edge: owns its waypoints and final pixel routes
 // src_block / dst_block are stable pointers (blocks vect is pre-reserved)
 // ---------------------------------------------------------------------------
 
-typedef struct RDEgoEdge {
-    RDEgoBlock* src_block;
-    RDEgoBlock* dst_block;
+typedef struct RDLLEdge {
+    RDLLBlock* src_block;
+    RDLLBlock* dst_block;
     RDGraphPointVect routes;
     RDGraphPointVect arrow;
     int start_index;
-    RDEgoPointVect points;
-} RDEgoEdge;
+    RDLLPointVect points;
+} RDLLEdge;
 
-typedef struct RDEgoEdgeVect {
-    RDEgoEdge* data;
+typedef struct RDLLEdgeVect {
+    RDLLEdge* data;
     usize length;
     usize capacity;
-} RDEgoEdgeVect;
+} RDLLEdgeVect;
 
 // ---------------------------------------------------------------------------
-// Block: one per REAL graph node.
-// The synthetic super-root (see below) is a separate, single instance living
-// outside this vector. It never corresponds to a real RDGraphNode, so it can't
-// be indexed the way real blocks are.
+// Block: one per graph node
 // ---------------------------------------------------------------------------
 
-struct RDEgoBlock {
+struct RDLLBlock {
     RDGraphNode node;
+    // populated in create_blocks, consumed in make_acyclic
     RDNodeVect incoming;
+    // spanning-tree children (make_acyclic output)
     RDNodeVect new_outgoing;
-    RDEgoEdgeVect routed_edges;
+    RDLLEdgeVect routed_edges; // populated in perform_edge_routing
     float x, y;
     int width, height;
     int col, colcount;
     int row, rowcount;
 };
 
-typedef struct RDEgoBlockVect {
-    RDEgoBlock* data;
+typedef struct RDLLBlockVect {
+    RDLLBlock* data;
     usize length;
     usize capacity;
-} RDEgoBlockVect;
+} RDLLBlockVect;
 
 // ---------------------------------------------------------------------------
 // Layout state: everything lives here, freed at the end
 // ---------------------------------------------------------------------------
 
-typedef struct RDEgoLayout {
+typedef struct RDLayeredLayout {
     RDGraph* graph;
-    RDEgoLayoutKind kind;
+    RDLayeredLayoutKind kind;
 
-    RDEgoBlock vroot;
+    // one per node, pre-reserved for stable ptrs
+    RDLLBlockVect blocks;
+    RDNodeVect block_order; // BFS order from make_acyclic
 
-    RDEgoBlockVect blocks;
-    RDNodeVect block_order;
-
+    // grid dimensions (set after compute_layout, before grids are allocated)
     int rowcount;
     int colcount;
 
+    // flat (rowcount+1) x (colcount+1) grids, row-major
+    // horiz_lanes[row][col] = number of horizontal lanes claimed at this cell
+    // vert_lanes[row][col]  = number of vertical lanes claimed at this cell
+    // edge_valid[row][col] = true if a vertical edge may pass
     int* horiz_lanes;
     int* vert_lanes;
     bool* edge_valid;
 
-    int* col_width;
-    int* row_height;
-    int* col_x;
-    int* row_y;
-    int* col_edge_x;
-    int* row_edge_y;
-    int* col_edge_count;
-    int* row_edge_count;
-} RDEgoLayout;
+    // 1-D sizing / position arrays (allocated after grid dims are known)
+    int* col_width;      // max half-width of nodes in each col pair
+    int* row_height;     // max height of nodes in each row
+    int* col_x;          // pixel x of each column
+    int* row_y;          // pixel y of each row
+    int* col_edge_x;     // pixel x of each column's edge channel
+    int* row_edge_y;     // pixel y of each row's edge channel
+    int* col_edge_count; // max horiz lanes in each col
+    int* row_edge_count; // max vert  lanes in each row
+} RDLayeredLayout;
 
 // ---------------------------------------------------------------------------
-// Helpers: block lookup (nodes are 1-based, array is 0-based).
-// Only ever called with real nodes, the vroot is accessed directly via
-// &ll->vroot, never through this indexed lookup.
+// Helpers: block lookup (nodes are 1-based, array is 0-based)
 // ---------------------------------------------------------------------------
 
-static inline RDEgoBlock* _rd_ego_block(RDEgoLayout* ll, RDGraphNode n) {
+static inline RDLLBlock* _rd_ll_block(RDLayeredLayout* ll, RDGraphNode n) {
     return &ll->blocks.data[rd_i_node2index(n)];
 }
 
@@ -122,59 +123,62 @@ static inline RDEgoBlock* _rd_ego_block(RDEgoLayout* ll, RDGraphNode n) {
 // Grid helpers
 // ---------------------------------------------------------------------------
 
-static inline int _rd_ego_stride(const RDEgoLayout* ll) {
+static inline int _rd_ll_stride(const RDLayeredLayout* ll) {
     return ll->colcount + 1;
 }
 
-static inline int _rd_ego_horiz(const RDEgoLayout* ll, int row, int col) {
-    return ll->horiz_lanes[(row * _rd_ego_stride(ll)) + col];
+static inline int _rd_ll_horiz(const RDLayeredLayout* ll, int row, int col) {
+    return ll->horiz_lanes[(row * _rd_ll_stride(ll)) + col];
 }
 
-static inline void _rd_ego_horiz_set(RDEgoLayout* ll, int row, int col, int v) {
-    ll->horiz_lanes[(row * _rd_ego_stride(ll)) + col] = v;
+static inline void _rd_ll_horiz_set(RDLayeredLayout* ll, int row, int col,
+                                    int v) {
+    ll->horiz_lanes[(row * _rd_ll_stride(ll)) + col] = v;
 }
 
-static inline int _rd_ego_vert(const RDEgoLayout* ll, int row, int col) {
-    return ll->vert_lanes[(row * _rd_ego_stride(ll)) + col];
+static inline int _rd_ll_vert(const RDLayeredLayout* ll, int row, int col) {
+    return ll->vert_lanes[(row * _rd_ll_stride(ll)) + col];
 }
 
-static inline void _rd_ego_vert_set(RDEgoLayout* ll, int row, int col, int v) {
-    ll->vert_lanes[(row * _rd_ego_stride(ll)) + col] = v;
+static inline void _rd_ll_vert_set(RDLayeredLayout* ll, int row, int col,
+                                   int v) {
+    ll->vert_lanes[(row * _rd_ll_stride(ll)) + col] = v;
 }
 
-static inline bool _rd_ego_valid(const RDEgoLayout* ll, int row, int col) {
-    return ll->edge_valid[(row * _rd_ego_stride(ll)) + col];
+static inline bool _rd_ll_valid(const RDLayeredLayout* ll, int row, int col) {
+    return ll->edge_valid[(row * _rd_ll_stride(ll)) + col];
 }
 
-static inline void _rd_ego_valid_set(RDEgoLayout* ll, int row, int col,
-                                     bool v) {
-    ll->edge_valid[(row * _rd_ego_stride(ll)) + col] = v;
+static inline void _rd_ll_valid_set(RDLayeredLayout* ll, int row, int col,
+                                    bool v) {
+    ll->edge_valid[(row * _rd_ll_stride(ll)) + col] = v;
 }
 
 // ---------------------------------------------------------------------------
 // Edge point helpers
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_edge_add_point(RDEgoEdge* e, int row, int col, int index) {
+static void _rd_ll_edge_add_point(RDLLEdge* e, int row, int col, int index) {
+    // set index on previous point before pushing the new one
     usize len = vect_length(&e->points);
     if(len > 0) vect_at(&e->points, len - 1)->index = index;
-    vect_push(&e->points, ((RDEgoPoint){.row = row, .col = col, .index = 0}));
+    vect_push(&e->points, ((RDLLPoint){.row = row, .col = col, .index = 0}));
 }
 
 // ---------------------------------------------------------------------------
 // Step 1: create_blocks
-// Build one EgoBlock per real node and populate incoming lists.
+// Build one LLBlock per node and populate incoming lists.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_create_blocks(RDEgoLayout* ll) {
+static void _rd_ll_create_blocks(RDLayeredLayout* ll) {
     const RDGraphNode* n;
     vect_each(n, &ll->graph->nodes) {
         RDNodeAttributes* attr = rd_i_graph_get_node_attributes(ll->graph, *n);
         assert(attr && "node attributes not found");
-        attr->height += RD_EGO_NODE_PADDING;
+        attr->height += RD_LLAYOUT_NODE_PADDING;
 
         // vect_reserve guarantees no realloc, so push is safe
-        vect_push(&ll->blocks, ((RDEgoBlock){
+        vect_push(&ll->blocks, ((RDLLBlock){
                                    .node = *n,
                                    .width = attr->width,
                                    .height = attr->height,
@@ -182,13 +186,13 @@ static void _rd_ego_create_blocks(RDEgoLayout* ll) {
     }
 
     // populate incoming lists by walking all outgoing edges
-    const RDEgoBlock* b;
+    const RDLLBlock* b;
     vect_each(b, &ll->blocks) {
         const RDEdgeVect* out =
             rd_i_graph_get_outgoing_edges(ll->graph, b->node);
         const RDGraphEdge* e;
         vect_each(e, out) {
-            RDEgoBlock* dst = _rd_ego_block(ll, e->dst);
+            RDLLBlock* dst = _rd_ll_block(ll, e->dst);
             vect_push(&dst->incoming, b->node);
         }
     }
@@ -196,35 +200,23 @@ static void _rd_ego_create_blocks(RDEgoLayout* ll) {
 
 // ---------------------------------------------------------------------------
 // Step 2: make_acyclic
-// BFS spanning tree: each real node becomes a child of exactly one parent.
+// BFS spanning tree: each node becomes a child of exactly one parent.
 // Result is stored in block->new_outgoing.
+// Uses a simple fixed-size queue backed on the heap.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
+static void _rd_ll_make_acyclic(RDLayeredLayout* ll) {
     usize total = vect_length(&ll->blocks);
     bool* visited = rd_alloc0(total, sizeof(bool));
     assert(visited);
 
+    // simple dynamic queue of node ids
     RDNodeVect queue = {0};
     vect_reserve(&queue, total);
 
-    const RDEgoBlock* seed;
-    vect_each(seed, &ll->blocks) {
-        if(!vect_is_empty(&seed->incoming)) continue;
-
-        visited[rd_i_node2index(seed->node)] = true;
-        vect_push(&queue, seed->node);
-        vect_push(&ll->vroot.new_outgoing, seed->node);
-    }
-
-    if(vect_is_empty(&queue)) {
-        // fully cyclic, no external entry anywhere: fall back to the
-        // queried function alone
-        RDGraphNode root = ll->graph->root;
-        visited[rd_i_node2index(root)] = true;
-        vect_push(&queue, root);
-        vect_push(&ll->vroot.new_outgoing, root);
-    }
+    RDGraphNode root = ll->graph->root;
+    visited[rd_i_node2index(root)] = true;
+    vect_push(&queue, root);
 
     bool changed = true;
 
@@ -235,7 +227,7 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
         usize head = 0;
         while(head < vect_length(&queue)) {
             RDGraphNode cur = queue.data[head++];
-            RDEgoBlock* block = _rd_ego_block(ll, cur);
+            RDLLBlock* block = _rd_ll_block(ll, cur);
             vect_push(&ll->block_order, cur);
 
             const RDEdgeVect* out =
@@ -244,7 +236,7 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
             vect_each(e, out) {
                 if(visited[rd_i_node2index(e->dst)]) continue;
 
-                RDEgoBlock* dst = _rd_ego_block(ll, e->dst);
+                RDLLBlock* dst = _rd_ll_block(ll, e->dst);
 
                 if(vect_length(&dst->incoming) == 1) {
                     // only one unvisited parent left: add as tree child
@@ -267,7 +259,7 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
                 }
             }
         }
-        // reset queue for next pass
+        // reset queue for next pass (we used head as cursor above)
         vect_clear(&queue);
 
         // no more single-entry nodes: pick the best unvisited node to continue
@@ -275,7 +267,7 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
         RDGraphNode best_parent = 0;
         usize best_edges = 0;
 
-        const RDEgoBlock* vb;
+        const RDLLBlock* vb;
         vect_each(vb, &ll->blocks) {
             if(!visited[rd_i_node2index(vb->node)]) continue;
 
@@ -285,7 +277,7 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
             vect_each(e, out) {
                 if(visited[rd_i_node2index(e->dst)]) continue;
 
-                RDEgoBlock* dst = _rd_ego_block(ll, e->dst);
+                RDLLBlock* dst = _rd_ll_block(ll, e->dst);
                 usize inc = vect_length(&dst->incoming);
 
                 if(!best || inc < best_edges ||
@@ -298,8 +290,8 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
         }
 
         if(best) {
-            RDEgoBlock* bp = _rd_ego_block(ll, best_parent);
-            RDEgoBlock* dst = _rd_ego_block(ll, best);
+            RDLLBlock* bp = _rd_ll_block(ll, best_parent);
+            RDLLBlock* dst = _rd_ll_block(ll, best);
 
             RDGraphNode* it;
             vect_each(it, &dst->incoming) {
@@ -323,22 +315,19 @@ static void _rd_ego_make_acyclic(RDEgoLayout* ll) {
 // ---------------------------------------------------------------------------
 // Step 3: compute_layout (recursive)
 // Assigns col / row / colcount / rowcount to every block.
-// Identical to layered.c's algorithm, it only ever reads/writes through
-// the RDEgoBlock* it's given and recurses into ->new_outgoing, so it works
-// unchanged whether that block is a real node or the synthetic vroot.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_adjust_layout(RDEgoLayout* ll, RDEgoBlock* block, int col,
-                                  int row) {
+static void _rd_ll_adjust_layout(RDLayeredLayout* ll, RDLLBlock* block, int col,
+                                 int row) {
     block->col += col;
     block->row += row;
 
     const RDGraphNode* n;
     vect_each(n, &block->new_outgoing)
-        _rd_ego_adjust_layout(ll, _rd_ego_block(ll, *n), col, row);
+        _rd_ll_adjust_layout(ll, _rd_ll_block(ll, *n), col, row);
 }
 
-static void _rd_ego_compute_layout(RDEgoLayout* ll, RDEgoBlock* block) {
+static void _rd_ll_compute_layout(RDLayeredLayout* ll, RDLLBlock* block) {
     int col = 0;
     int rowcount = 1;
     int childcol = 0;
@@ -347,48 +336,48 @@ static void _rd_ego_compute_layout(RDEgoLayout* ll, RDEgoBlock* block) {
     // recurse first
     const RDGraphNode* n;
     vect_each(n, &block->new_outgoing) {
-        _rd_ego_compute_layout(ll, _rd_ego_block(ll, *n));
-        RDEgoBlock* child = _rd_ego_block(ll, *n);
+        _rd_ll_compute_layout(ll, _rd_ll_block(ll, *n));
+        RDLLBlock* child = _rd_ll_block(ll, *n);
         if((child->rowcount + 1) > rowcount) rowcount = child->rowcount + 1;
         childcol = child->col;
     }
 
-    if(ll->kind != RD_EGO_LAYOUT_WIDE &&
+    if(ll->kind != RD_LAYERED_LAYOUT_WIDE &&
        vect_length(&block->new_outgoing) == 2) {
 
-        RDEgoBlock* left = _rd_ego_block(ll, block->new_outgoing.data[0]);
-        RDEgoBlock* right = _rd_ego_block(ll, block->new_outgoing.data[1]);
+        RDLLBlock* left = _rd_ll_block(ll, block->new_outgoing.data[0]);
+        RDLLBlock* right = _rd_ll_block(ll, block->new_outgoing.data[1]);
 
         if(vect_length(&left->new_outgoing) == 0) {
             left->col = right->col - 2;
             int add = left->col < 0 ? -left->col : 0;
-            _rd_ego_adjust_layout(ll, right, add, 1);
-            _rd_ego_adjust_layout(ll, left, add, 1);
+            _rd_ll_adjust_layout(ll, right, add, 1);
+            _rd_ll_adjust_layout(ll, left, add, 1);
             col = right->colcount + add;
         }
         else if(vect_length(&right->new_outgoing) == 0) {
-            _rd_ego_adjust_layout(ll, left, 0, 1);
-            _rd_ego_adjust_layout(ll, right, left->col + 2, 1);
+            _rd_ll_adjust_layout(ll, left, 0, 1);
+            _rd_ll_adjust_layout(ll, right, left->col + 2, 1);
             col = left->colcount > (right->col + 2) ? left->colcount
                                                     : (right->col + 2);
         }
         else {
-            _rd_ego_adjust_layout(ll, left, 0, 1);
-            _rd_ego_adjust_layout(ll, right, left->colcount, 1);
+            _rd_ll_adjust_layout(ll, left, 0, 1);
+            _rd_ll_adjust_layout(ll, right, left->colcount, 1);
             col = left->colcount + right->colcount;
         }
 
         block->colcount = col > 2 ? col : 2;
 
-        if(ll->kind == RD_EGO_LAYOUT_MEDIUM)
+        if(ll->kind == RD_LAYERED_LAYOUT_MEDIUM)
             block->col = (left->col + right->col) / 2;
         else
             block->col = single ? childcol : (col - 2) / 2;
     }
     else {
         vect_each(n, &block->new_outgoing) {
-            RDEgoBlock* child = _rd_ego_block(ll, *n);
-            _rd_ego_adjust_layout(ll, child, col, 1);
+            RDLLBlock* child = _rd_ll_block(ll, *n);
+            _rd_ll_adjust_layout(ll, child, col, 1);
             col += child->colcount;
         }
 
@@ -409,18 +398,12 @@ static void _rd_ego_compute_layout(RDEgoLayout* ll, RDEgoBlock* block) {
 // ---------------------------------------------------------------------------
 // Step 4: prepare_edge_routing
 // Allocate and initialise the three flat grids.
-//
-// DIFFERENCE FROM layered.c: grid size comes from ll->vroot's rowcount /
-// colcount, not from the real query node's vroot is the actual top of
-// the compute_layout recursion here, so only its counts reflect the whole
-// graph's extent.
-// The real query node's own counts only reflect its own subtree, same as any
-// other non-top block.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_prepare_edge_routing(RDEgoLayout* ll) {
-    ll->rowcount = ll->vroot.rowcount;
-    ll->colcount = ll->vroot.colcount;
+static void _rd_ll_prepare_edge_routing(RDLayeredLayout* ll) {
+    RDLLBlock* root = _rd_ll_block(ll, ll->graph->root);
+    ll->rowcount = root->rowcount;
+    ll->colcount = root->colcount;
 
     usize cells = (usize)(ll->rowcount + 1) * (usize)(ll->colcount + 1);
 
@@ -432,9 +415,9 @@ static void _rd_ego_prepare_edge_routing(RDEgoLayout* ll) {
     // all cells valid by default
     memset(ll->edge_valid, 1, cells * sizeof(bool));
 
-    // mark cells occupied by (real) nodes as invalid for vertical routing
-    const RDEgoBlock* b;
-    vect_each(b, &ll->blocks) _rd_ego_valid_set(ll, b->row, b->col + 1, false);
+    // mark cells occupied by nodes as invalid for vertical routing
+    const RDLLBlock* b;
+    vect_each(b, &ll->blocks) _rd_ll_valid_set(ll, b->row, b->col + 1, false);
 }
 
 // ---------------------------------------------------------------------------
@@ -443,13 +426,13 @@ static void _rd_ego_prepare_edge_routing(RDEgoLayout* ll) {
 
 // Find the lowest lane index that is free across all cells in [mincol..maxcol]
 // for the given row in horiz_lanes, then claim it.
-static int _rd_ego_find_horiz_index(RDEgoLayout* ll, int row, int mincol,
-                                    int maxcol) {
+static int _rd_ll_find_horiz_index(RDLayeredLayout* ll, int row, int mincol,
+                                   int maxcol) {
     int i = 0;
     while(true) {
         bool valid = true;
         for(int col = mincol; col <= maxcol; col++) {
-            if(_rd_ego_horiz(ll, row, col) > i) {
+            if(_rd_ll_horiz(ll, row, col) > i) {
                 valid = false;
                 break;
             }
@@ -458,21 +441,21 @@ static int _rd_ego_find_horiz_index(RDEgoLayout* ll, int row, int mincol,
         i++;
     }
     for(int col = mincol; col <= maxcol; col++) {
-        if(_rd_ego_horiz(ll, row, col) <= i)
-            _rd_ego_horiz_set(ll, row, col, i + 1);
+        if(_rd_ll_horiz(ll, row, col) <= i)
+            _rd_ll_horiz_set(ll, row, col, i + 1);
     }
     return i;
 }
 
 // Find the lowest lane index that is free across all cells in [minrow..maxrow]
 // for the given col in vert_lanes, then claim it.
-static int _rd_ego_find_vert_index(RDEgoLayout* ll, int col, int minrow,
-                                   int maxrow) {
+static int _rd_ll_find_vert_index(RDLayeredLayout* ll, int col, int minrow,
+                                  int maxrow) {
     int i = 0;
     while(true) {
         bool valid = true;
         for(int row = minrow; row <= maxrow; row++) {
-            if(_rd_ego_vert(ll, row, col) > i) {
+            if(_rd_ll_vert(ll, row, col) > i) {
                 valid = false;
                 break;
             }
@@ -481,8 +464,7 @@ static int _rd_ego_find_vert_index(RDEgoLayout* ll, int col, int minrow,
         i++;
     }
     for(int row = minrow; row <= maxrow; row++) {
-        if(_rd_ego_vert(ll, row, col) <= i)
-            _rd_ego_vert_set(ll, row, col, i + 1);
+        if(_rd_ll_vert(ll, row, col) <= i) _rd_ll_vert_set(ll, row, col, i + 1);
     }
     return i;
 }
@@ -490,24 +472,19 @@ static int _rd_ego_find_vert_index(RDEgoLayout* ll, int col, int minrow,
 // ---------------------------------------------------------------------------
 // Step 5: route_edge
 // Finds a non-overlapping grid path from start to end and stores waypoints.
-// Identical to layered.c: already direction-agnostic (min/maxrow are
-// computed either way), which is exactly what lets edges whose source and
-// destination ranks go in either order ancestor->root and
-// root->descendant alike route through the same code path without special
-// casing.
 // ---------------------------------------------------------------------------
 
-static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
-                                    RDEgoBlock* end) {
-    RDEgoEdge edge = {
+static RDLLEdge _rd_ll_route_edge(RDLayeredLayout* ll, RDLLBlock* start,
+                                  RDLLBlock* end) {
+    RDLLEdge edge = {
         .src_block = start,
         .dst_block = end,
     };
 
     // claim initial vertical lane leaving the source block
-    int i = _rd_ego_vert(ll, start->row + 1, start->col + 1);
-    _rd_ego_vert_set(ll, start->row + 1, start->col + 1, i + 1);
-    _rd_ego_edge_add_point(&edge, start->row + 1, start->col + 1, 0);
+    int i = _rd_ll_vert(ll, start->row + 1, start->col + 1);
+    _rd_ll_vert_set(ll, start->row + 1, start->col + 1, i + 1);
+    _rd_ll_edge_add_point(&edge, start->row + 1, start->col + 1, 0);
     edge.start_index = i;
 
     bool horiz = false;
@@ -534,7 +511,7 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
         }
         else {
             for(int row = minrow; row < maxrow; row++) {
-                if(!_rd_ego_valid(ll, row, col)) {
+                if(!_rd_ll_valid(ll, row, col)) {
                     col_ok = false;
                     break;
                 }
@@ -550,7 +527,7 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
             }
             else {
                 for(int row = minrow; row < maxrow; row++) {
-                    if(!_rd_ego_valid(ll, row, ecol)) {
+                    if(!_rd_ll_valid(ll, row, ecol)) {
                         end_ok = false;
                         break;
                     }
@@ -568,7 +545,7 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
                     bool ok = true;
                     if(try_col >= 0 && try_col <= ll->colcount) {
                         for(int row = minrow; row < maxrow; row++) {
-                            if(!_rd_ego_valid(ll, row, try_col)) {
+                            if(!_rd_ll_valid(ll, row, try_col)) {
                                 ok = false;
                                 break;
                             }
@@ -582,7 +559,7 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
                     ok = true;
                     if(try_col >= 0 && try_col <= ll->colcount) {
                         for(int row = minrow; row < maxrow; row++) {
-                            if(!_rd_ego_valid(ll, row, try_col)) {
+                            if(!_rd_ll_valid(ll, row, try_col)) {
                                 ok = false;
                                 break;
                             }
@@ -602,8 +579,8 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
     if(col != (start->col + 1)) {
         int mincol = col < (start->col + 1) ? col : (start->col + 1);
         int maxcol = col < (start->col + 1) ? (start->col + 1) : col;
-        int idx = _rd_ego_find_horiz_index(ll, start->row + 1, mincol, maxcol);
-        _rd_ego_edge_add_point(&edge, start->row + 1, col, idx);
+        int idx = _rd_ll_find_horiz_index(ll, start->row + 1, mincol, maxcol);
+        _rd_ll_edge_add_point(&edge, start->row + 1, col, idx);
         horiz = true;
     }
 
@@ -611,18 +588,18 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
     if(end->row != (start->row + 1)) {
         if(col == (start->col + 1)) {
             // temporarily "unmark" the initial slot to avoid counting it twice
-            int cur = _rd_ego_vert(ll, start->row + 1, start->col + 1);
-            _rd_ego_vert_set(ll, start->row + 1, start->col + 1,
-                             cur > 0 ? cur - 1 : 0);
+            int cur = _rd_ll_vert(ll, start->row + 1, start->col + 1);
+            _rd_ll_vert_set(ll, start->row + 1, start->col + 1,
+                            cur > 0 ? cur - 1 : 0);
         }
-        int idx = _rd_ego_find_vert_index(ll, col, minrow, maxrow);
+        int idx = _rd_ll_find_vert_index(ll, col, minrow, maxrow);
         if(col == (start->col + 1)) {
             // re-claim the initial slot
-            int cur = _rd_ego_vert(ll, start->row + 1, start->col + 1);
-            _rd_ego_vert_set(ll, start->row + 1, start->col + 1, cur + 1);
+            int cur = _rd_ll_vert(ll, start->row + 1, start->col + 1);
+            _rd_ll_vert_set(ll, start->row + 1, start->col + 1, cur + 1);
             edge.start_index = idx;
         }
-        _rd_ego_edge_add_point(&edge, end->row, col, idx);
+        _rd_ll_edge_add_point(&edge, end->row, col, idx);
         horiz = false;
     }
 
@@ -630,14 +607,14 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
     if(col != (end->col + 1)) {
         int mincol = col < (end->col + 1) ? col : (end->col + 1);
         int maxcol = col < (end->col + 1) ? (end->col + 1) : col;
-        int idx = _rd_ego_find_horiz_index(ll, end->row, mincol, maxcol);
-        _rd_ego_edge_add_point(&edge, end->row, end->col + 1, idx);
+        int idx = _rd_ll_find_horiz_index(ll, end->row, mincol, maxcol);
+        _rd_ll_edge_add_point(&edge, end->row, end->col + 1, idx);
         horiz = true;
     }
 
     // if last segment was horizontal, claim the final vertical arrival lane
     if(horiz) {
-        int idx = _rd_ego_find_vert_index(ll, end->col + 1, end->row, end->row);
+        int idx = _rd_ll_find_vert_index(ll, end->col + 1, end->row, end->row);
         usize len = vect_length(&edge.points);
         if(len > 0) vect_at(&edge.points, len - 1)->index = idx;
     }
@@ -647,19 +624,18 @@ static RDEgoEdge _rd_ego_route_edge(RDEgoLayout* ll, RDEgoBlock* start,
 
 // ---------------------------------------------------------------------------
 // Step 5: perform_edge_routing
-// Route every (real) edge in BFS order and store results on the source
-// block.
+// Route every edge in BFS order and store results on the source block.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_perform_edge_routing(RDEgoLayout* ll) {
+static void _rd_ll_perform_edge_routing(RDLayeredLayout* ll) {
     const RDGraphNode* n;
     vect_each(n, &ll->block_order) {
-        RDEgoBlock* block = _rd_ego_block(ll, *n);
+        RDLLBlock* block = _rd_ll_block(ll, *n);
         const RDEdgeVect* out = rd_i_graph_get_outgoing_edges(ll->graph, *n);
         const RDGraphEdge* e;
         vect_each(e, out) {
-            RDEgoBlock* dst = _rd_ego_block(ll, e->dst);
-            RDEgoEdge edge = _rd_ego_route_edge(ll, block, dst);
+            RDLLBlock* dst = _rd_ll_block(ll, e->dst);
+            RDLLEdge edge = _rd_ll_route_edge(ll, block, dst);
             vect_push(&block->routed_edges, edge);
         }
     }
@@ -670,7 +646,7 @@ static void _rd_ego_perform_edge_routing(RDEgoLayout* ll) {
 // Walk every grid cell and record the max lane count per row / col.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_compute_edge_count(RDEgoLayout* ll) {
+static void _rd_ll_compute_edge_count(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
@@ -680,8 +656,8 @@ static void _rd_ego_compute_edge_count(RDEgoLayout* ll) {
 
     for(int row = 0; row < rows; row++) {
         for(int col = 0; col < cols; col++) {
-            int h = _rd_ego_horiz(ll, row, col);
-            int v = _rd_ego_vert(ll, row, col);
+            int h = _rd_ll_horiz(ll, row, col);
+            int v = _rd_ll_vert(ll, row, col);
             if(h > ll->row_edge_count[row]) ll->row_edge_count[row] = h;
             if(v > ll->col_edge_count[col]) ll->col_edge_count[col] = v;
         }
@@ -693,7 +669,7 @@ static void _rd_ego_compute_edge_count(RDEgoLayout* ll) {
 // Determine pixel width of each column and pixel height of each row.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_compute_row_col_sizes(RDEgoLayout* ll) {
+static void _rd_ll_compute_row_col_sizes(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
@@ -701,7 +677,7 @@ static void _rd_ego_compute_row_col_sizes(RDEgoLayout* ll) {
     ll->row_height = rd_alloc0((usize)rows, sizeof(int));
     assert(ll->col_width && ll->row_height);
 
-    const RDEgoBlock* b;
+    const RDLLBlock* b;
     vect_each(b, &ll->blocks) {
         int hw = b->width / 2;
         if(hw > ll->col_width[b->col]) ll->col_width[b->col] = hw;
@@ -716,7 +692,7 @@ static void _rd_ego_compute_row_col_sizes(RDEgoLayout* ll) {
 // Convert sizes + edge counts into pixel positions.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_compute_row_col_positions(RDEgoLayout* ll) {
+static void _rd_ll_compute_row_col_positions(RDLayeredLayout* ll) {
     int rows = ll->rowcount + 1;
     int cols = ll->colcount + 1;
 
@@ -726,18 +702,18 @@ static void _rd_ego_compute_row_col_positions(RDEgoLayout* ll) {
     ll->row_edge_y = rd_alloc0((usize)rows, sizeof(int));
     assert(ll->col_x && ll->row_y && ll->col_edge_x && ll->row_edge_y);
 
-    int x = RD_EGO_PADDING;
+    int x = RD_LLAYOUT_PADDING;
     for(int i = 0; i < ll->colcount; i++) {
         ll->col_edge_x[i] = x;
-        x += (RD_EGO_PADDING_DIV2 * ll->col_edge_count[i]);
+        x += (RD_LLAYOUT_PADDING_DIV2 * ll->col_edge_count[i]);
         ll->col_x[i] = x;
         x += ll->col_width[i];
     }
 
-    int y = RD_EGO_PADDING;
+    int y = RD_LLAYOUT_PADDING;
     for(int i = 0; i < ll->rowcount; i++) {
         ll->row_edge_y[i] = y;
-        y += (RD_EGO_PADDING_DIV2 * ll->row_edge_count[i]);
+        y += (RD_LLAYOUT_PADDING_DIV2 * ll->row_edge_count[i]);
         ll->row_y[i] = y;
         y += ll->row_height[i];
     }
@@ -745,41 +721,41 @@ static void _rd_ego_compute_row_col_positions(RDEgoLayout* ll) {
     ll->col_edge_x[ll->colcount] = x;
     ll->row_edge_y[ll->rowcount] = y;
 
-    rd_graph_set_area_width(ll->graph, x + RD_EGO_PADDING +
-                                           (RD_EGO_PADDING_DIV2 *
+    rd_graph_set_area_width(ll->graph, x + RD_LLAYOUT_PADDING +
+                                           (RD_LLAYOUT_PADDING_DIV2 *
                                             ll->col_edge_count[ll->colcount]));
 
-    rd_graph_set_area_height(ll->graph, y + RD_EGO_PADDING +
-                                            (RD_EGO_PADDING_DIV2 *
+    rd_graph_set_area_height(ll->graph, y + RD_LLAYOUT_PADDING +
+                                            (RD_LLAYOUT_PADDING_DIV2 *
                                              ll->row_edge_count[ll->rowcount]));
 }
 
 // ---------------------------------------------------------------------------
 // Step 9: compute_node_positions
-// Place each (real) block in pixel space.
+// Place each block in pixel space.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_compute_node_positions(RDEgoLayout* ll) {
-    RDEgoBlock* b;
+static void _rd_ll_compute_node_positions(RDLayeredLayout* ll) {
+    RDLLBlock* b;
     // iterate by pointer since we need to write back x/y
     for(usize i = 0; i < vect_length(&ll->blocks); i++) {
         b = &ll->blocks.data[i];
 
-        float cx =
-            ((float)(ll->col_x[b->col] + ll->col_width[b->col]) +
-             (RD_EGO_PADDING_DIV4 * (float)ll->col_edge_count[b->col + 1])) -
-            ((float)(b->width) / 2.0F);
+        float cx = ((float)(ll->col_x[b->col] + ll->col_width[b->col]) +
+                    (RD_LLAYOUT_PADDING_DIV4 *
+                     (float)ll->col_edge_count[b->col + 1])) -
+                   ((float)(b->width) / 2.0F);
 
         float right_bound =
             ((float)(ll->col_x[b->col] + ll->col_width[b->col] +
                      ll->col_width[b->col + 1]) +
-             (RD_EGO_PADDING_DIV2 * (float)ll->col_edge_count[b->col + 1]));
+             (RD_LLAYOUT_PADDING_DIV2 * (float)ll->col_edge_count[b->col + 1]));
 
         if((cx + (float)b->width) > right_bound)
             cx = right_bound - (float)b->width;
 
         b->x = cx;
-        b->y = (float)(ll->row_y[b->row] + RD_EGO_PADDING);
+        b->y = (float)(ll->row_y[b->row] + RD_LLAYOUT_PADDING);
 
         rd_graph_set_node_x(ll->graph, b->node, (int)b->x);
         rd_graph_set_node_y(ll->graph, b->node, (int)b->y);
@@ -791,28 +767,28 @@ static void _rd_ego_compute_node_positions(RDEgoLayout* ll) {
 // Convert grid waypoints to pixel polylines and write back to the graph.
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_precompute_edge_coords(RDEgoLayout* ll) {
+static void _rd_ll_precompute_edge_coords(RDLayeredLayout* ll) {
     for(usize bi = 0; bi < vect_length(&ll->blocks); bi++) {
-        RDEgoBlock* block = &ll->blocks.data[bi];
+        RDLLBlock* block = &ll->blocks.data[bi];
 
         for(usize ei = 0; ei < vect_length(&block->routed_edges); ei++) {
-            RDEgoEdge* edge = &block->routed_edges.data[ei];
+            RDLLEdge* edge = &block->routed_edges.data[ei];
             if(vect_length(&edge->points) == 0) continue;
 
-            RDEgoPoint* first = vect_at(&edge->points, 0);
+            RDLLPoint* first = vect_at(&edge->points, 0);
             int scol = first->col;
             int lidx = edge->start_index;
 
             RDGraphPoint lastpt = {
-                .x = ll->col_edge_x[scol] + (RD_EGO_PADDING_DIV2 * lidx),
+                .x = ll->col_edge_x[scol] + (RD_LLAYOUT_PADDING_DIV2 * lidx),
                 .y = rd_graph_get_node_y(ll->graph, block->node) +
                      rd_graph_get_node_height(ll->graph, block->node) -
-                     RD_EGO_NODE_PADDING,
+                     RD_LLAYOUT_NODE_PADDING,
             };
 
             vect_push(&edge->routes, lastpt);
 
-            const RDEgoPoint* pt;
+            const RDLLPoint* pt;
             vect_each(pt, &edge->points) {
                 int endrow = pt->row;
                 int endcol = pt->col;
@@ -823,12 +799,12 @@ static void _rd_ego_precompute_edge_coords(RDEgoLayout* ll) {
                     newpt = (RDGraphPoint){
                         .x = lastpt.x,
                         .y = ll->row_edge_y[endrow] +
-                             (RD_EGO_PADDING_DIV2 * eidx) + 4,
+                             (RD_LLAYOUT_PADDING_DIV2 * eidx) + 4,
                     };
                 else
                     newpt = (RDGraphPoint){
                         .x = ll->col_edge_x[endcol] +
-                             (RD_EGO_PADDING_DIV2 * eidx),
+                             (RD_LLAYOUT_PADDING_DIV2 * eidx),
                         .y = lastpt.y,
                     };
 
@@ -866,15 +842,15 @@ static void _rd_ego_precompute_edge_coords(RDEgoLayout* ll) {
 // Cleanup: free everything owned by the layout state
 // ---------------------------------------------------------------------------
 
-static void _rd_ego_destroy(RDEgoLayout* ll) {
+static void _rd_ll_destroy(RDLayeredLayout* ll) {
     // free per-block dynamic data
     for(usize i = 0; i < vect_length(&ll->blocks); i++) {
-        RDEgoBlock* b = &ll->blocks.data[i];
+        RDLLBlock* b = &ll->blocks.data[i];
         vect_destroy(&b->incoming);
         vect_destroy(&b->new_outgoing);
 
         for(usize j = 0; j < vect_length(&b->routed_edges); j++) {
-            RDEgoEdge* e = &b->routed_edges.data[j];
+            RDLLEdge* e = &b->routed_edges.data[j];
             vect_destroy(&e->points);
             vect_destroy(&e->routes);
             vect_destroy(&e->arrow);
@@ -884,18 +860,12 @@ static void _rd_ego_destroy(RDEgoLayout* ll) {
     vect_destroy(&ll->blocks);
     vect_destroy(&ll->block_order);
 
-    // vroot lives outside ll->blocks (it's not a real node), so its own
-    // dynamic fields aren't freed by the loop above
-    vect_destroy(&ll->vroot.incoming); // unused, always empty
-    vect_destroy(&ll->vroot.new_outgoing);
-    vect_destroy(&ll->vroot.routed_edges); // unused, always empty
-
     // free flat grids
     rd_free(ll->horiz_lanes);
     rd_free(ll->vert_lanes);
     rd_free(ll->edge_valid);
 
-    // free sizing arrays
+    // free sizing array
     rd_free(ll->col_width);
     rd_free(ll->row_height);
     rd_free(ll->col_x);
@@ -910,10 +880,10 @@ static void _rd_ego_destroy(RDEgoLayout* ll) {
 // Public entry point
 // ---------------------------------------------------------------------------
 
-bool rd_graph_compute_ego(RDGraph* self, RDEgoLayoutKind kind) {
+bool rd_graph_compute_layered(RDGraph* self, RDLayeredLayoutKind kind) {
     if(!self || !self->root) return false;
 
-    RDEgoLayout ll = {
+    RDLayeredLayout ll = {
         .graph = self,
         .kind = kind,
     };
@@ -921,19 +891,17 @@ bool rd_graph_compute_ego(RDGraph* self, RDEgoLayoutKind kind) {
     usize node_count = vect_length(&self->nodes);
     vect_reserve(&ll.blocks, node_count); // stable pointers throughout
 
-    _rd_ego_create_blocks(&ll);
-    _rd_ego_make_acyclic(&ll);
+    _rd_ll_create_blocks(&ll);
+    _rd_ll_make_acyclic(&ll);
+    _rd_ll_compute_layout(&ll, _rd_ll_block(&ll, self->root));
+    _rd_ll_prepare_edge_routing(&ll);
+    _rd_ll_perform_edge_routing(&ll);
+    _rd_ll_compute_edge_count(&ll);
+    _rd_ll_compute_row_col_sizes(&ll);
+    _rd_ll_compute_row_col_positions(&ll);
+    _rd_ll_compute_node_positions(&ll);
+    _rd_ll_precompute_edge_coords(&ll);
 
-    _rd_ego_compute_layout(&ll, &ll.vroot);
-
-    _rd_ego_prepare_edge_routing(&ll);
-    _rd_ego_perform_edge_routing(&ll);
-    _rd_ego_compute_edge_count(&ll);
-    _rd_ego_compute_row_col_sizes(&ll);
-    _rd_ego_compute_row_col_positions(&ll);
-    _rd_ego_compute_node_positions(&ll);
-    _rd_ego_precompute_edge_coords(&ll);
-
-    _rd_ego_destroy(&ll);
+    _rd_ll_destroy(&ll);
     return true;
 }

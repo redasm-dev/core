@@ -1,9 +1,10 @@
 #pragma once
 
 #include "core/segment.h"
+#include "function/chunk.h"
 #include "support/utils.h"
 #include "types/def.h"
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 
 typedef struct RDFunction {
     u32 gen;
@@ -16,20 +17,6 @@ typedef struct RDFunction {
     RDGraph* graph;
     RDCharVect fmt_buf;
 } RDFunction;
-
-typedef struct RDFunctionChunk {
-    const RDFunction* func;
-    RDRelAddress start;
-    RDRelAddress end; // exclusive
-    usize n_instructions;
-    bool has_noret;
-} RDFunctionChunk;
-
-typedef struct RDFunctionChunkVect {
-    RDFunctionChunk** data;
-    usize length;
-    usize capacity;
-} RDFunctionChunkVect;
 
 typedef struct RDFunctionVect {
     RDFunctionChunkVect chunks;
@@ -51,9 +38,4 @@ void rd_i_function_rebuild(RDFunction* self);
 void rd_i_function_rebuild_graph(RDFunction* self, RDFunctionChunkVect* chunks);
 RDFunctionChunk* rd_i_function_get_chunk(const RDFunction* self, RDGraphNode n);
 
-void rd_i_functionchunk_sort(RDFunctionChunkVect* self);
-void rd_i_functionchunk_destroy(RDFunctionChunkVect* self);
-
 void rd_i_functionvect_destroy(RDFunctionVect* self);
-
-int rd_i_functionchunk_kcmp_pred(const void* key, const void* item);

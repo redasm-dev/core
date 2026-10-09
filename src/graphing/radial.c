@@ -1,4 +1,4 @@
-#include "graphs/graph.h"
+#include "graphing/graph.h"
 #include "support/containers.h"
 #include <assert.h>
 #include <math.h>

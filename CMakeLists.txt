@@ -25,7 +25,6 @@ target_sources(${PROJECT_NAME}
         src/core/callconv.c
         src/core/context.c
         src/core/engine.c
-        src/core/function.c
         src/core/mapping.c
         src/core/registers.c
         src/core/segment.c
@@ -40,10 +39,12 @@ target_sources(${PROJECT_NAME}
         src/db/schema.c
         src/db/types.c
         src/db/schema.c
-        src/graphs/ego.c
-        src/graphs/graph.c
-        src/graphs/layered.c
-        src/graphs/radial.c
+        src/function/chunk.c
+        src/function/function.c
+        src/graphing/ego.c
+        src/graphing/graph.c
+        src/graphing/layered.c
+        src/graphing/radial.c
         src/io/buffer.c
         src/io/flags.c
         src/io/flagsbuffer.c

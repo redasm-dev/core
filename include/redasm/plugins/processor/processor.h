@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/plugins/plugin.h>
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/rdil/rdil.h>

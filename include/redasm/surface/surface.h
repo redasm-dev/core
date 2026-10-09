@@ -1,6 +1,6 @@
 #pragma once
 
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/segment.h>
 #include <redasm/surface/common.h>
 

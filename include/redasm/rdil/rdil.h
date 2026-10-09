@@ -1,7 +1,7 @@
 #pragma once
 
 #include <redasm/common.h>
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/plugins/processor/instruction.h>
 #include <redasm/rdil/opcodes.h>
 #include <redasm/registers.h>

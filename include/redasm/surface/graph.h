@@ -1,7 +1,7 @@
 #pragma once
 
 #include <redasm/common.h>
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/surface/common.h>
 
 typedef struct RDSurfaceGraph RDSurfaceGraph;

@@ -1,13 +1,12 @@
 #include "function.h"
 #include "core/context.h"
-#include "graphs/graph.h"
+#include "graphing/graph.h"
 #include "io/flags.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include <inttypes.h>
 #include <redasm/allocator.h>
-#include <redasm/function.h>
 
 typedef struct RDFunctionWorkItem {
     RDAddress address;
@@ -512,30 +511,4 @@ void rd_i_functionvect_destroy(RDFunctionVect* self) {
     RDFunction** f;
     vect_each(f, self) { _rd_function_destroy(*f); }
     vect_destroy(self);
-}
-
-int rd_i_functionchunk_kcmp_pred(const void* key, const void* item) {
-    RDRelAddress rel_address = *(const RDRelAddress*)key;
-    const RDFunctionChunk* c = *(const RDFunctionChunk**)item;
-    if(rel_address < c->start) return -1;
-    if(rel_address >= c->end) return 1;
-    return 0;
-}
-
-RDAddress rd_functionchunk_get_start(const RDFunctionChunk* self) {
-    const RDContext* ctx = self->func->context;
-    return rd_i_abs(ctx, self->start);
-}
-
-RDAddress rd_functionchunk_get_end(const RDFunctionChunk* self) {
-    const RDContext* ctx = self->func->context;
-    return rd_i_abs(ctx, self->end);
-}
-
-usize rd_functionchunk_get_instruction_count(const RDFunctionChunk* self) {
-    return self->n_instructions;
-}
-
-bool rd_functionchunk_has_noret(const RDFunctionChunk* self) {
-    return self->has_noret;
 }

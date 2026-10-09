@@ -1,4 +1,4 @@
-#include "graphs/graph.h"
+#include "graphing/graph.h"
 #include "core/context.h"
 #include "io/flagsbuffer.h"
 #include "support/containers.h"

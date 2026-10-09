@@ -1,7 +1,7 @@
 #pragma once
 
 #include "db/types.h"
-#include "graphs/graph.h"
+#include "graphing/graph.h"
 #include <redasm/callgraph.h>
 
 typedef struct RDCallGraph {

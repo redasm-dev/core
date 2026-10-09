@@ -1,9 +1,9 @@
 #pragma once
 
 #include "core/callconv.h"
-#include "core/function.h"
 #include "core/segment.h"
 #include "db/types.h"
+#include "function/function.h"
 #include "types/def.h"
 #include <redasm/context.h>
 

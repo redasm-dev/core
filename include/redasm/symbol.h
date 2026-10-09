@@ -2,7 +2,7 @@
 
 #include <redasm/common.h>
 #include <redasm/config.h>
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/segment.h>
 #include <redasm/types/type.h>
 

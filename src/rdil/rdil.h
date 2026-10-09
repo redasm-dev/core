@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/function.h"
 #include "core/registers.h"
+#include "function/function.h"
 #include "plugins/processor/processor.h"
 #include <redasm/rdil/rdil.h>
 

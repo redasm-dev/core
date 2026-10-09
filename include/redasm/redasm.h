@@ -4,7 +4,7 @@
 #include <redasm/callconv.h>
 #include <redasm/callgraph.h>
 #include <redasm/context.h>
-#include <redasm/function.h>
+#include <redasm/function/function.h>
 #include <redasm/graph/graph.h>
 #include <redasm/graph/layout.h>
 #include <redasm/hooks.h>
