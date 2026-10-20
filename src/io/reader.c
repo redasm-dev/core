@@ -132,6 +132,26 @@ usize rd_reader_read(RDReader* self, void* v, usize n) {
     return r;
 }
 
+usize rd_reader_read_block(RDReader* self, usize n, usize blocksize,
+                           RDReaderCallback cb, void* userdata) {
+    if(!self || self->error || !n || !blocksize || !cb) return 0;
+
+    usize remaining = n;
+    char* block = rd_alloc(blocksize);
+
+    while(remaining) {
+        usize want = remaining < blocksize ? remaining : blocksize;
+        usize n_read = rd_reader_read(self, block, want);
+        if(!n_read) break; // EOF reached
+
+        cb(block, n_read, userdata);
+        remaining -= n;
+    }
+
+    rd_free(block);
+    return n - remaining;
+}
+
 bool rd_reader_read_exact(RDReader* self, void* v, usize n) {
     if(self->error) return false;
     if(!n) return true;
@@ -246,8 +266,9 @@ const char* rd_reader_read_str(RDReader* self, usize* len) {
         if(len) *len = slen;
         self->position += slen + 1;
     }
-    else
+    else {
         self->error = true;
+    }
 
     return s;
 }
