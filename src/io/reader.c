@@ -139,13 +139,22 @@ usize rd_reader_read_block(RDReader* self, usize n, usize blocksize,
     usize remaining = n;
     char* block = rd_alloc(blocksize);
 
+    RDReaderBlock b = {
+        .pos = rd_reader_tell(self),
+        .data = block,
+        .userdata = userdata,
+    };
+
     while(remaining) {
         usize want = remaining < blocksize ? remaining : blocksize;
         usize n_read = rd_reader_read(self, block, want);
-        if(!n_read) break; // EOF reached
+        if(!n_read || self->error) break; // EOF reached
 
-        cb(block, n_read, userdata);
-        remaining -= n;
+        b.length = n_read;
+        cb(&b);
+        b.pos += n_read;
+
+        remaining -= n_read;
     }
 
     rd_free(block);

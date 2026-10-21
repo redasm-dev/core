@@ -86,8 +86,9 @@ RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
 
         assert(pr.processorplugin);
     }
-    else
+    else {
         rd_i_loader_destroy(plugin, pr.loader);
+    }
 
     rd_i_reader_destroy(req.input);
     return pr;

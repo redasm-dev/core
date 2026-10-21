@@ -3,9 +3,16 @@
 #include <redasm/config.h>
 
 typedef struct RDReader RDReader;
-typedef void (*RDReaderCallback)(const char* data, usize n, void* userdata);
 
-// clang-format off
+typedef struct RDReaderBlock {
+    const char* data;
+    usize length;
+    usize pos;
+    void* userdata;
+} RDReaderBlock;
+
+typedef void (*RDReaderCallback)(const RDReaderBlock*);
+
 RD_API RDReader* rd_reader_open(const char* filepath);
 RD_API RDReader* rd_reader_open_data(const void* data, usize n);
 RD_API bool rd_reader_close(RDReader* self);
@@ -19,7 +26,8 @@ RD_API bool rd_reader_has_error(const RDReader* self);
 RD_API void rd_reader_clear_error(RDReader* self);
 RD_API bool rd_reader_at_end(const RDReader* self);
 RD_API usize rd_reader_read(RDReader* self, void* v, usize n);
-RD_API usize rd_reader_read_block(RDReader* self, usize n, usize blocksize, RDReaderCallback cb, void* userdata);
+RD_API usize rd_reader_read_block(RDReader* self, usize n, usize blocksize,
+                                  RDReaderCallback cb, void* userdata);
 RD_API bool rd_reader_read_exact(RDReader* self, void* v, usize n);
 RD_API bool rd_reader_read_byte(RDReader* self, u8* v);
 RD_API bool rd_reader_read_le16(RDReader* self, u16* v);
@@ -50,4 +58,3 @@ RD_API bool rd_reader_expect_le64(RDReader* self, u64 v);
 RD_API bool rd_reader_expect_be16(RDReader* self, u16 v);
 RD_API bool rd_reader_expect_be32(RDReader* self, u32 v);
 RD_API bool rd_reader_expect_be64(RDReader* self, u64 v);
-// clang-format on
