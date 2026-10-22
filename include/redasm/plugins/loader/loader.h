@@ -20,7 +20,8 @@ typedef enum {
 } RDLoaderFlags;
 
 typedef struct RDLoaderPlugin {
-    RD_PLUGIN_HEADER;
+    RD_PLUGIN_HEADER
+
     usize instance_size;
 
     RDLoader* (*create)(const struct RDLoaderPlugin*);
@@ -30,6 +31,7 @@ typedef struct RDLoaderPlugin {
     bool (*load)(RDLoader*, RDContext*);
     const char* (*get_name)(const RDLoader*);
     const char* (*get_processor)(const RDLoader*);
+    const char* (*get_platform)(const RDLoader*);
     void (*get_options)(RDLoader* self, RDLoaderOptionBuilder* b);
 } RDLoaderPlugin;
 

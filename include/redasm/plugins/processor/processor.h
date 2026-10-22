@@ -37,7 +37,8 @@ typedef struct RDQueryReg {
 
 // clang-format off
 typedef struct RDProcessorPlugin {
-    RD_PLUGIN_HEADER;
+    RD_PLUGIN_HEADER
+
     const char* name;
     const char* operand_sep;
     unsigned int code_ptr_size;

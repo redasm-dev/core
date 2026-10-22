@@ -2,24 +2,28 @@
 
 #include <redasm/config.h>
 
+#define _RD_PLUGIN_TYPES(X)                                                    \
+    X(RDLoaderPlugin, loader)                                                  \
+    X(RDProcessorPlugin, processor)                                            \
+    X(RDPlatformPlugin, platform)                                              \
+    X(RDAnalyzerPlugin, analyzer)                                              \
+    X(RDCommandPlugin, command)
+
+#define _RD_PLUGIN_TYPEDEF_X(type, name) typedef struct type type;
+#define _RD_PLUGIN_UNION_X(type, name) const type* name;
+
 #define RD_PLUGIN_HEADER                                                       \
     u32 flags;                                                                 \
     void* userdata;                                                            \
-    const char* id
+    const char* id;
 
 #define RD_PF_LAST (1u << 31)
 
-typedef struct RDLoaderPlugin RDLoaderPlugin;
-typedef struct RDProcessorPlugin RDProcessorPlugin;
-typedef struct RDAnalyzerPlugin RDAnalyzerPlugin;
-typedef struct RDCommandPlugin RDCommandPlugin;
+_RD_PLUGIN_TYPES(_RD_PLUGIN_TYPEDEF_X)
 
 typedef struct RDPlugin {
     union {
-        const RDLoaderPlugin* loader;
-        const RDProcessorPlugin* processor;
-        const RDAnalyzerPlugin* analyzer;
-        const RDCommandPlugin* command;
+        _RD_PLUGIN_TYPES(_RD_PLUGIN_UNION_X)
     };
 } RDPlugin;
 
@@ -61,6 +65,7 @@ RD_API const RDLoaderPlugin* rd_loader_find(const char* id);
 RD_API const RDProcessorPlugin* rd_processor_find(const char* id);
 RD_API const RDAnalyzerPlugin* rd_analyzer_find(const char* id);
 RD_API const RDCommandPlugin* rd_command_find(const char* id);
+RD_API const RDPlatformPlugin* rd_platform_find(const char* id);
 
 // Module entry point.
 // Gives static analysis a visible external reference so 'rd_module' isn't

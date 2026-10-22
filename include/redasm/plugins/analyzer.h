@@ -10,7 +10,7 @@ typedef enum RDAnalyzerFlags {
 } RDAnalyzerFlags;
 
 typedef struct RDAnalyzerPlugin {
-    RD_PLUGIN_HEADER;
+    RD_PLUGIN_HEADER
 
     const char* name;
     u32 order;

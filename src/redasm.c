@@ -115,10 +115,31 @@ RDAcceptResult rd_accept(const RDTestResult* tr, const RDAcceptParams* params) {
     if(ok) {
         rd_i_processor_setup(res.context);
 
+        const char* platform_id =
+            rd_i_loader_get_platform(tr->loaderplugin, tr->loader);
+
+        if(platform_id) {
+            const RDPlatformPlugin* platform = rd_platform_find(platform_id);
+
+            if(platform)
+                rd_i_set_platform(res.context, platform);
+            else
+                RD_LOG_WARN("platform '%s' not found", platform_id);
+        }
+
         res.status = RD_ACCEPT_OK;
-        RD_LOG_INFO("accepted loader '%s' and processor '%s'",
-                    res.context->loaderplugin->id,
-                    res.context->processorplugin->id);
+
+        if(res.context->platformplugin) {
+            RD_LOG_INFO(
+                "accepted loader '%s', processor '%s' and platform '%s'",
+                res.context->loaderplugin->id, res.context->processorplugin->id,
+                res.context->platformplugin->id);
+        }
+        else {
+            RD_LOG_INFO("accepted loader '%s' and processor '%s'",
+                        res.context->loaderplugin->id,
+                        res.context->processorplugin->id);
+        }
     }
     else {
         RD_LOG_FAIL("loader '%s' failed", tr->loaderplugin->id);

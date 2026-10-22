@@ -29,6 +29,12 @@ void rd_i_loader_destroy(const RDLoaderPlugin* plugin, RDLoader* ldr) {
     if(!plugin->create && plugin->instance_size) rd_free(ldr);
 }
 
+const char* rd_i_loader_get_platform(const RDLoaderPlugin* plugin,
+                                     const RDLoader* ldr) {
+    if(!plugin || !plugin->get_platform) return NULL;
+    return plugin->get_platform(ldr);
+}
+
 RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
     if(!inputbuf) return (RDTestResultSlice){0};
 

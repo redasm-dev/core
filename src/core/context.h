@@ -47,8 +47,10 @@ typedef struct RDContext {
     const RDTestResult* testresult; // live only during loaderplugin->load()
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
+    const RDPlatformPlugin* platformplugin;
     RDAnalyzerItemVect analyzerplugins;
 
+    RDPlatform* platform;
     RDProcessor* processor;
 
     RDStringPool strings;
@@ -141,6 +143,7 @@ RDContext* rd_i_context_create(const RDLoaderPlugin* lplugin,
                                const char* filename, const char* dbpath);
 
 void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* plugin);
+void rd_i_set_platform(RDContext* self, const RDPlatformPlugin* plugin);
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
                    RDName* n);

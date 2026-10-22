@@ -13,6 +13,16 @@
 #include <redasm/support/logging.h>
 #include <string.h>
 
+#define RD_RETURN_PLUGIN_FIND_IMPL(id, kind)                                   \
+    do {                                                                       \
+        if(!(id)) return NULL;                                                 \
+        RDPlugin** it;                                                         \
+        vect_each(it, &rd_i_state.kind##s) {                                   \
+            if(!strcmp((*it)->kind->id, id)) return (*it)->kind;               \
+        }                                                                      \
+        return NULL;                                                           \
+    } while(0)
+
 RDGlobalState rd_i_state = {0};
 
 static void _rd_i_state_unload_modules(void) {
@@ -106,6 +116,7 @@ void rd_i_state_deinit(void) {
     RDPlugin** it;
     vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }
     vect_each(it, &rd_i_state.processors) { rd_free(*it); }
+    vect_each(it, &rd_i_state.platforms) { rd_free(*it); }
     vect_each(it, &rd_i_state.loaders) { rd_free(*it); }
     vect_each(it, &rd_i_state.commands) { rd_free(*it); }
 
@@ -144,47 +155,23 @@ void rd_set_log_callback(RDLogCallback cb, void* userdata) {
 }
 
 const RDLoaderPlugin* rd_loader_find(const char* id) {
-    if(!id) return NULL;
-
-    RDPlugin** it;
-    vect_each(it, &rd_i_state.loaders) {
-        if(!strcmp((*it)->loader->id, id)) return (*it)->loader;
-    }
-
-    return NULL;
+    RD_RETURN_PLUGIN_FIND_IMPL(id, loader);
 }
 
 const RDProcessorPlugin* rd_processor_find(const char* id) {
-    if(!id) return NULL;
-
-    RDPlugin** it;
-    vect_each(it, &rd_i_state.processors) {
-        if(!strcmp((*it)->processor->id, id)) return (*it)->processor;
-    }
-
-    return NULL;
+    RD_RETURN_PLUGIN_FIND_IMPL(id, processor);
 }
 
 const RDAnalyzerPlugin* rd_analyzer_find(const char* id) {
-    if(!id) return NULL;
-
-    RDPlugin** it;
-    vect_each(it, &rd_i_state.analyzers) {
-        if(!strcmp((*it)->analyzer->id, id)) return (*it)->analyzer;
-    }
-
-    return NULL;
+    RD_RETURN_PLUGIN_FIND_IMPL(id, analyzer);
 }
 
 const RDCommandPlugin* rd_command_find(const char* id) {
-    if(!id) return NULL;
+    RD_RETURN_PLUGIN_FIND_IMPL(id, command);
+}
 
-    RDPlugin** it;
-    vect_each(it, &rd_i_state.commands) {
-        if(!strcmp((*it)->command->id, id)) return (*it)->command;
-    }
-
-    return NULL;
+const RDPlatformPlugin* rd_platform_find(const char* id) {
+    RD_RETURN_PLUGIN_FIND_IMPL(id, platform);
 }
 
 bool rd_module_load(const char* filepath) {

@@ -21,6 +21,8 @@ typedef struct RDTestResult {
 
 RDLoader* rd_i_loader_create(const RDLoaderPlugin* plugin);
 void rd_i_loader_destroy(const RDLoaderPlugin* plugin, RDLoader* ldr);
+const char* rd_i_loader_get_platform(const RDLoaderPlugin* plugin,
+                                     const RDLoader* ldr);
 
 RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
                          const char* filepath);

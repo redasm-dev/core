@@ -26,6 +26,7 @@ typedef struct RDGlobalState {
 
     RDPluginVect loaders;
     RDPluginVect processors;
+    RDPluginVect platforms;
     RDPluginVect analyzers;
     RDPluginVect commands;
 

@@ -8,6 +8,7 @@
 #include "io/flagsbuffer.h"
 #include "io/reader.h"
 #include "plugins/analyzer.h"
+#include "plugins/platform.h"
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/scratch.h"
@@ -138,6 +139,15 @@ void rd_i_set_processor(RDContext* self, const RDProcessorPlugin* plugin) {
     self->processor = rd_i_processor_create(plugin);
 
     rd_i_typedef_register_builtins(self);
+}
+
+void rd_i_set_platform(RDContext* self, const RDPlatformPlugin* plugin) {
+    panic_if(self->platformplugin, "platform already set");
+
+    self->platformplugin = plugin;
+    self->platform = rd_i_platform_create(plugin);
+
+    self->platformplugin->setup(self, self->platform);
 }
 
 bool rd_i_get_name(RDContext* self, RDAddress address, bool autoname,
@@ -757,6 +767,7 @@ void rd_destroy(RDContext* self) {
     vect_each(def, &self->typedefs) rd_typedef_destroy(*def);
     vect_destroy(&self->typedefs);
 
+    rd_i_platform_destroy(self->platformplugin, self->platform);
     rd_i_processor_destroy(self->processorplugin, self->processor);
     rd_i_reader_destroy(self->input_reader);
     rd_i_reader_destroy(self->reader);

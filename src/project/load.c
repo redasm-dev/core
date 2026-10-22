@@ -16,6 +16,7 @@ typedef struct RDProjectManifest {
 
     const RDLoaderPlugin* loaderplugin;
     const RDProcessorPlugin* processorplugin;
+    const RDPlatformPlugin* platformplugin;
 
     int min_string;
     RDAddress base_address;
@@ -60,6 +61,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
     {.key = "analysis.string_terminators", .type = TOML_ARRAY, .array_type = &(RDTomlSchema){.type = TOML_INT64}},
     {.key = "analysis.loader", .type = TOML_STRING},
     {.key = "analysis.processor", .type = TOML_STRING},
+    {.key = "analysis.platform", .type = TOML_STRING, .optional = true},
     {.key = "analysis.analyzers", .type = TOML_ARRAY, .array_type = ANALYZER_SCHEMA},
     {.key = "analysis.entry_point", .type = TOML_INT64, .optional = true},
 
@@ -92,8 +94,9 @@ static bool _rd_project_resolve_paths(const char* filepath,
             return false;
         }
     }
-    else
+    else {
         out->working_dir = rd_strdup(workingdir);
+    }
 
     const char* stem = rd_path_stem(manifest->file_name);
 
@@ -185,6 +188,9 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
 
     const char* processor_id =
         toml_seek(out->toml.toptab, "analysis.processor").u.s;
+    const char* platform_id =
+        toml_seek(out->toml.toptab, "analysis.platform").u.s;
+
     assert(processor_id);
 
     out->processorplugin = rd_processor_find(processor_id);
@@ -192,6 +198,18 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
     if(!out->processorplugin) {
         RD_LOG_FAIL("processor '%s' not found", processor_id);
         return false;
+    }
+
+    if(platform_id) {
+        out->platformplugin = rd_platform_find(platform_id);
+
+        if(!out->platformplugin) {
+            RD_LOG_FAIL("platform '%s' not found", platform_id);
+            return false;
+        }
+    }
+    else {
+        out->platformplugin = NULL;
     }
 
     toml_datum_t ep = toml_seek(out->toml.toptab, "analysis.entry_point");
@@ -298,6 +316,10 @@ static RDContext* _rd_project_create_context(mz_zip_archive* zip,
     ctx->engine.step = RD_WS_DONE;
     rd_i_db_load(ctx);
     rd_i_processor_setup(ctx);
+
+    if(manifest->platformplugin)
+        rd_i_set_platform(ctx, manifest->platformplugin);
+
     rd_i_chunks_build_all(ctx);
     return ctx;
 
@@ -339,6 +361,19 @@ RDAcceptResult rd_project_load(const char* filepath, const char* workingdir) {
     if(!res.context) goto cleanup;
 
     res.status = RD_ACCEPT_OK;
+
+    if(res.context->platformplugin) {
+        RD_LOG_INFO("project restored with loader '%s', processor '%s' and "
+                    "platform '%s'",
+                    res.context->loaderplugin->id,
+                    res.context->processorplugin->id,
+                    res.context->platformplugin->id);
+    }
+    else {
+        RD_LOG_INFO("project restored with loader '%s' and processor '%s'",
+                    res.context->loaderplugin->id,
+                    res.context->processorplugin->id);
+    }
 
 cleanup:
     if(res.status != RD_ACCEPT_OK) {

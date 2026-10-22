@@ -62,6 +62,7 @@ target_sources(${PROJECT_NAME}
         src/plugins/command.c
         src/plugins/common.c
         src/plugins/module.c
+        src/plugins/platform.c
         src/project/save.c
         src/project/load.c
         src/rdil/opcodes.c

@@ -39,6 +39,10 @@ static const char* _rd_project_write_manifest(const RDContext* ctx,
 
     str_append(v, rd_i_format(&buf, "loader = \"%s\"\n", ctx->loaderplugin->id));
     str_append(v, rd_i_format(&buf, "processor = \"%s\"\n", ctx->processorplugin->id));
+
+    if(ctx->platformplugin)
+        str_append(v, rd_i_format(&buf, "platform = \"%s\"\n", ctx->platformplugin->id));
+
     str_append(v, "analyzers = [");
 
     for(usize i = 0; i < vect_length(&ctx->analyzerplugins); i++) {
