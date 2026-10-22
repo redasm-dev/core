@@ -7,6 +7,7 @@
 
 typedef struct RDReader {
     const RDSegment* segment;
+    RDCharVect read_block_buf;
     RDBuffer* buffer;
     usize position;
     bool buffer_owned;

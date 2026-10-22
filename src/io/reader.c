@@ -76,8 +76,10 @@ void rd_i_reader_destroy(RDReader* self) {
         RD_LOG_WARN("reader stack is not empty (save/restore mismatch)");
 
     vect_destroy(&self->stack);
+    vect_destroy(&self->read_block_buf);
 
     if(self->buffer_owned) rd_i_buffer_destroy(self->buffer);
+
     rd_free(self);
 }
 
@@ -136,18 +138,19 @@ usize rd_reader_read_block(RDReader* self, usize n, usize blocksize,
                            RDReaderCallback cb, void* userdata) {
     if(!self || self->error || !n || !blocksize || !cb) return 0;
 
-    usize remaining = n;
-    char* block = rd_alloc(blocksize);
+    vect_resize(&self->read_block_buf, blocksize);
 
     RDReaderBlock b = {
         .pos = rd_reader_tell(self),
-        .data = block,
+        .data = self->read_block_buf.data,
         .userdata = userdata,
     };
 
+    usize remaining = n;
+
     while(remaining) {
         usize want = remaining < blocksize ? remaining : blocksize;
-        usize n_read = rd_reader_read(self, block, want);
+        usize n_read = rd_reader_read(self, self->read_block_buf.data, want);
         if(!n_read || self->error) break; // EOF reached
 
         b.length = n_read;
@@ -157,7 +160,6 @@ usize rd_reader_read_block(RDReader* self, usize n, usize blocksize,
         remaining -= n_read;
     }
 
-    rd_free(block);
     return n - remaining;
 }
 
