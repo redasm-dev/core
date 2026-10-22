@@ -192,8 +192,9 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
                 s = rd_i_format(buf, "%s_%s_%" PRIX64, kind_prefix, ext.module,
                                 address);
             }
-            else
+            else {
                 s = rd_i_format(buf, "%s_%" PRIX64, kind_prefix, address);
+            }
         }
     }
 
@@ -219,8 +220,9 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
             if(rd_i_db_get_root_type(self, &root_address, &root))
                 s = rd_i_type_path(self, address, &self->autoname_buf);
         }
-        else if(rd_flagsbuffer_has_func(seg->flags, idx))
+        else if(rd_flagsbuffer_has_func(seg->flags, idx)) {
             s = "sub";
+        }
 
         if(!s) s = "loc";
         rd_i_format(buf, "%s_%" PRIX64, s, orig_address);
@@ -338,11 +340,11 @@ bool rd_map_segment(RDContext* self, const char* name, RDRelAddress addr,
     if(rd_i_db_add_segment(self, s)) {
         RD_LOG_INFO("mapping segment '%s' (%" PRIX64 " - %" PRIX64 ")", name,
                     rd_segment_get_start(s), rd_segment_get_end(s));
+        return true;
     }
-    else
-        rd_i_segment_destroy(s);
 
-    return true;
+    rd_i_segment_destroy(s);
+    return false;
 }
 
 bool rd_map_segment_n(RDContext* self, const char* name, RDRelAddress addr,
@@ -361,8 +363,9 @@ bool rd_map_input(RDContext* self, RDOffset off, RDRelAddress addr,
             "mapping input @ offset %" PRIX64 " (%" PRIX64 " - %" PRIX64 ")",
             off, rd_inputmapping_get_start(m), rd_inputmapping_get_end(m));
     }
-    else
+    else {
         rd_i_inputmapping_destroy(m);
+    }
 
     return true;
 }
