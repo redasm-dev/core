@@ -1,5 +1,6 @@
 #include "graphing/graph.h"
 #include "core/context.h"
+#include "core/worker.h"
 #include "function/chunk.h"
 #include "support/containers.h"
 #include <inttypes.h>
@@ -94,6 +95,14 @@ RDFunctionGraph* rd_functiongraph_create(RDContext* ctx) {
 
 bool rd_functiongraph_populate(RDFunctionGraph* self, RDAddress entry) {
     RDContext* ctx = self->base.context;
+
+    if(ctx->engine.step < RD_WS_DONE) {
+        RD_LOG_WARN("function graphs are available after analysis has "
+                    "finished (current step: %s)",
+                    rd_i_worker_get_step_name(ctx->engine.step));
+        return false;
+    }
+
     _rd_functiongraph_clear(self);
 
     if(!rd_is_address(ctx, entry)) return false;

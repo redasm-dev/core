@@ -12,17 +12,6 @@
 #include "support/error.h"
 #include <redasm/support/logging.h>
 
-// clang-format off
-static const char* const RD_STEP_NAMES[] = {
-    "Init",
-    "Reconcile",
-    "Emulate", "Analyze", "Symbols",
-    "Finalize", "Done",
-};
-// clang-format on
-
-static_assert(rd_count_of(RD_STEP_NAMES) == RD_WS_COUNT, "step names mismatch");
-
 #if !defined(NDEBUG)
 static void _rd_worker_check_chunk_pair(const RDContext* ctx, const RDChunk* p,
                                         const RDChunk* c) {
@@ -320,6 +309,15 @@ static void _rd_worker_step_finalize(RDContext* ctx) {
                 rd_i_db_get_problem_count(ctx));
 }
 
+const char* rd_i_worker_get_step_name(RDWorkerSteps s) {
+    switch(s) {
+        RD_WORKER_STEPS(RD_WORKER_STEP_CASE_X)
+        default: unreachable();
+    }
+
+    return NULL;
+}
+
 bool rd_step(RDContext* self, RDWorkerStatus* status) {
     if(!self) return false;
 
@@ -328,7 +326,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 
     if(status) {
         status->is_busy = is_busy;
-        status->step = RD_STEP_NAMES[self->engine.step];
+        status->step = rd_i_worker_get_step_name(self->engine.step);
         status->segment = self->engine.segment;
         status->pending_calls = queue_length(&self->engine.qcall);
         status->pending_jumps = queue_length(&self->engine.qjump);
