@@ -38,20 +38,20 @@ typedef void (*RDHookFunc)(RDContext*, const RDHookEvent*, void* userdata);
 RD_API bool rd_register_hook(RDContext* ctx, RDHookKind kind, const char* name,
                              RDHookFunc h, void* userdata);
 
-RD_API void rd_fire_hook(RDContext* ctx, const char* name);
-RD_API void rd_fire_decode_hook(RDContext* ctx, const char* name,
+RD_API void rd_emit_hook(RDContext* ctx, const char* name);
+RD_API void rd_emit_decode_hook(RDContext* ctx, const char* name,
                                 RDInstruction*);
-RD_API void rd_fire_emulate_hook(RDContext* ctx, const char* name,
+RD_API void rd_emit_emulate_hook(RDContext* ctx, const char* name,
                                  const RDInstruction*);
-RD_API void rd_fire_address_hook(RDContext* ctx, const char* name,
+RD_API void rd_emit_address_hook(RDContext* ctx, const char* name,
                                  RDAddress addr);
-RD_API void rd_fire_str_hook(RDContext* ctx, const char* name, RDAddress addr,
+RD_API void rd_emit_str_hook(RDContext* ctx, const char* name, RDAddress addr,
                              const char* str, usize n);
-RD_API void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,
+RD_API void rd_emit_xref_hook(RDContext* ctx, const char* name, RDAddress from,
                               RDAddress to, RDXRefType type);
-RD_API bool rd_fire_render_mnemonic_hook(RDContext*, const char* name,
+RD_API bool rd_emit_render_mnemonic_hook(RDContext*, const char* name,
                                          RDRenderer* r,
                                          const RDInstruction* instr);
-RD_API bool rd_fire_render_operand_hook(RDContext*, const char* name,
+RD_API bool rd_emit_render_operand_hook(RDContext*, const char* name,
                                         RDRenderer* r,
                                         const RDInstruction* instr, usize idx);

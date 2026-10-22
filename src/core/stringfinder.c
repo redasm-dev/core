@@ -84,7 +84,7 @@ static void _rd_strings_try_classify(RDContext* ctx, const RDSegment* seg,
 
     if(rd_auto_type(ctx, address, type, vect_length(str), RD_TYPE_NONE)) {
         const char* hook = rd_i_format(fmt_buf, "redasm.%s_string_found", type);
-        rd_fire_str_hook(ctx, hook, address, str->data, vect_length(str));
+        rd_emit_str_hook(ctx, hook, address, str->data, vect_length(str));
     }
 }
 

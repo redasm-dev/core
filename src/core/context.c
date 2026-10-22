@@ -1293,7 +1293,7 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     else if(type == RD_CR_CALL)
         rd_i_engine_enqueue_call(self, toaddr, NULL);
 
-    rd_fire_xref_hook(self, "redasm.xref_added", fromaddr, toaddr, type);
+    rd_emit_xref_hook(self, "redasm.xref_added", fromaddr, toaddr, type);
     return true;
 }
 
@@ -1333,7 +1333,7 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
         }
     }
 
-    rd_fire_xref_hook(self, "redasm.xref_removed", fromaddr, toaddr, type);
+    rd_emit_xref_hook(self, "redasm.xref_removed", fromaddr, toaddr, type);
     return true;
 }
 

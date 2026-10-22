@@ -278,7 +278,7 @@ static void _rd_worker_step_analyze(RDContext* ctx) {
 }
 
 static void _rd_worker_step_symbols(RDContext* ctx) {
-    rd_fire_hook(ctx, "redasm.symbols");
+    rd_emit_hook(ctx, "redasm.symbols");
 
     _rd_worker_resolve_ordinals(ctx);
     _rd_worker_dedup_names(ctx);
@@ -302,7 +302,7 @@ static void _rd_worker_step_finalize(RDContext* ctx) {
     }
 #endif
 
-    rd_fire_hook(ctx, "redasm.finalized");
+    rd_emit_hook(ctx, "redasm.finalized");
 
     ctx->engine.step++;
 

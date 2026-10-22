@@ -25,7 +25,7 @@ bool rd_i_function_declare(RDContext* ctx, const RDSegment* seg, usize idx,
 
     rd_i_flagsbuffer_set_func(seg->flags, idx);
     rd_i_db_set_function(ctx, address, type);
-    rd_fire_address_hook(ctx, "redasm.func_added", address);
+    rd_emit_address_hook(ctx, "redasm.func_added", address);
     return true;
 }
 
@@ -37,7 +37,7 @@ void rd_i_function_undeclare(RDContext* ctx, const RDSegment* seg, usize idx) {
     rd_i_flagsbuffer_clear_func(seg->flags, idx);
     _rd_i_db_query_del_function(ctx, address);
     rd_i_chunks_del(ctx, address);
-    rd_fire_address_hook(ctx, "redasm.func_removed", address);
+    rd_emit_address_hook(ctx, "redasm.func_removed", address);
 }
 
 void rd_i_function_set_type_def(RDContext* ctx, RDAddress address,

@@ -15,7 +15,7 @@ static inline bool _rd_hookkind_is_exclusive(RDHookKind kind) {
     return kind == RD_HOOK_RENDER_MNEMONIC || kind == RD_HOOK_RENDER_OPERAND;
 }
 
-static bool _rd_fire_hook(RDContext* ctx, const RDHookEvent* e) {
+static bool _rd_emit_hook(RDContext* ctx, const RDHookEvent* e) {
     if(!e->name) return false;
 
     const char* interned = rd_i_strpool_intern(&ctx->strings, e->name);
@@ -98,55 +98,55 @@ bool rd_register_hook(RDContext* ctx, RDHookKind kind, const char* name,
     return true;
 }
 
-void rd_fire_hook(RDContext* ctx, const char* name) {
-    _rd_fire_hook(ctx, &(RDHookEvent){
+void rd_emit_hook(RDContext* ctx, const char* name) {
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_GENERAL,
                            .name = name,
                        });
 }
 
-void rd_fire_decode_hook(RDContext* ctx, const char* name,
+void rd_emit_decode_hook(RDContext* ctx, const char* name,
                          RDInstruction* instr) {
     if(!instr) return;
 
-    _rd_fire_hook(ctx, &(RDHookEvent){
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_DECODE,
                            .name = name,
                            .decode = {.instr = instr},
                        });
 }
 
-void rd_fire_emulate_hook(RDContext* ctx, const char* name,
+void rd_emit_emulate_hook(RDContext* ctx, const char* name,
                           const RDInstruction* instr) {
     if(!instr) return;
 
-    _rd_fire_hook(ctx, &(RDHookEvent){
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_EMULATE,
                            .name = name,
                            .emulate = {.instr = instr},
                        });
 }
 
-void rd_fire_address_hook(RDContext* ctx, const char* name, RDAddress addr) {
-    _rd_fire_hook(ctx, &(RDHookEvent){
+void rd_emit_address_hook(RDContext* ctx, const char* name, RDAddress addr) {
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_ADDRESS,
                            .name = name,
                            .addr = {.address = addr},
                        });
 }
 
-void rd_fire_str_hook(RDContext* ctx, const char* name, RDAddress addr,
+void rd_emit_str_hook(RDContext* ctx, const char* name, RDAddress addr,
                       const char* str, usize n) {
-    _rd_fire_hook(ctx, &(RDHookEvent){
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_STR,
                            .name = name,
                            .str = {.address = addr, .s = str, .n = n},
                        });
 }
 
-void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,
+void rd_emit_xref_hook(RDContext* ctx, const char* name, RDAddress from,
                        RDAddress to, RDXRefType type) {
-    _rd_fire_hook(ctx, &(RDHookEvent){
+    _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_XREF,
                            .name = name,
                            .xref =
@@ -158,11 +158,11 @@ void rd_fire_xref_hook(RDContext* ctx, const char* name, RDAddress from,
                        });
 }
 
-bool rd_fire_render_mnemonic_hook(RDContext* ctx, const char* name,
+bool rd_emit_render_mnemonic_hook(RDContext* ctx, const char* name,
                                   RDRenderer* r, const RDInstruction* instr) {
     if(!r || !instr) return false;
 
-    return _rd_fire_hook(ctx,
+    return _rd_emit_hook(ctx,
                          &(RDHookEvent){
                              .kind = RD_HOOK_RENDER_MNEMONIC,
                              .name = name,
@@ -170,13 +170,13 @@ bool rd_fire_render_mnemonic_hook(RDContext* ctx, const char* name,
                          });
 }
 
-bool rd_fire_render_operand_hook(RDContext* ctx, const char* name,
+bool rd_emit_render_operand_hook(RDContext* ctx, const char* name,
                                  RDRenderer* r, const RDInstruction* instr,
                                  usize idx) {
     if(!r || !instr || idx >= RD_MAX_OPERANDS) return false;
     if(instr->operands[idx].kind == RD_OP_NULL) return false;
 
-    return _rd_fire_hook(
+    return _rd_emit_hook(
         ctx, &(RDHookEvent){
                  .kind = RD_HOOK_RENDER_OPERAND,
                  .name = name,
