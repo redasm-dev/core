@@ -214,6 +214,13 @@ RDPluginSlice rd_get_all_processor_plugins(void) {
     };
 }
 
+RDPluginSlice rd_get_all_platform_plugins(void) {
+    return (RDPluginSlice){
+        .data = (const RDPlugin**)rd_i_state.platforms.data,
+        .length = rd_i_state.platforms.length,
+    };
+}
+
 RDPluginSlice rd_get_all_analyzer_plugins(void) {
     return (RDPluginSlice){
         .data = (const RDPlugin**)rd_i_state.analyzers.data,

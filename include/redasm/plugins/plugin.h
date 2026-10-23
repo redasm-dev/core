@@ -59,6 +59,7 @@ typedef struct RDModuleSlice {
 RD_API RDModuleSlice rd_get_all_modules(void);
 RD_API RDPluginSlice rd_get_all_loader_plugins(void);
 RD_API RDPluginSlice rd_get_all_processor_plugins(void);
+RD_API RDPluginSlice rd_get_all_platform_plugins(void);
 RD_API RDPluginSlice rd_get_all_analyzer_plugins(void);
 RD_API RDPluginSlice rd_get_all_command_plugins(void);
 RD_API const RDLoaderPlugin* rd_loader_find(const char* id);
