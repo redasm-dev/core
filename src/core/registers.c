@@ -65,9 +65,9 @@ bool rd_i_reg_resolve_id(RDContext* ctx, RDReg id, RDRegResolved* out) {
 }
 
 bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
-                     RDRegValue value) {
+                     RDRegValue value, RDAddress setter) {
     RDRegister r = {.name = res->name};
-    const RDRegister* curr = hmap_get(map, &r);
+    RDRegister* curr = hmap_get(map, &r);
 
     if(res->mask.mask != RD_REGMASK_FULL) { // merge partial write
         RDRegValue base = curr ? curr->value : 0;
@@ -75,9 +75,14 @@ bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
                 ((value << res->mask.shift) & res->mask.mask);
     }
 
-    // Applies to full-width writes too.
-    if(curr && curr->value == value) return false;
+    if(curr) {
+        curr->setter = setter;
+        if(curr->value == value) return false;
+        curr->value = value;
+        return true;
+    }
 
+    r.setter = setter;
     r.value = value;
     hmap_set(map, &r);
     return true;
@@ -100,10 +105,25 @@ bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res) {
     return true;
 }
 
+bool rd_i_regmap_get_info(const RDRegisterHMap* map, const RDRegResolved* res,
+                          RDRegValueInfo* info) {
+    RDRegister key = {.name = res->name};
+    const RDRegister* r = hmap_get(map, &key);
+    if(!r) return false;
+
+    if(info) {
+        info->value = (r->value & res->mask.mask) >> res->mask.shift;
+        info->setter = r->setter;
+    }
+
+    return true;
+}
+
 bool rd_set_regval(RDContext* ctx, const char* regname, u64 value) {
     RDRegResolved res;
     return rd_i_reg_resolve_name(ctx, regname, &res) &&
-           rd_i_regmap_set(&ctx->engine.current.registers, &res, value);
+           rd_i_regmap_set(&ctx->engine.current.registers, &res, value,
+                           ctx->engine.current.address);
 }
 
 bool rd_get_regval(RDContext* ctx, const char* regname, RDRegValue* value) {
@@ -121,7 +141,8 @@ bool rd_del_regval(RDContext* ctx, const char* regname) {
 bool rd_set_regval_id(RDContext* ctx, RDReg id, RDRegValue value) {
     RDRegResolved res;
     return rd_i_reg_resolve_id(ctx, id, &res) &&
-           rd_i_regmap_set(&ctx->engine.current.registers, &res, value);
+           rd_i_regmap_set(&ctx->engine.current.registers, &res, value,
+                           ctx->engine.current.address);
 }
 
 bool rd_get_regval_id(RDContext* ctx, RDReg id, RDRegValue* value) {
@@ -211,6 +232,19 @@ bool rd_get_sregval_id(RDContext* ctx, RDAddress address, RDReg id,
                        RDRegValue* value) {
     const char* regname = _rd_sreg_name(ctx, id);
     return regname && rd_get_sregval(ctx, address, regname, value);
+}
+
+bool rd_get_regval_info(RDContext* ctx, const char* regname,
+                        RDRegValueInfo* info) {
+    RDRegResolved res;
+    return rd_i_reg_resolve_name(ctx, regname, &res) &&
+           rd_i_regmap_get_info(&ctx->engine.current.registers, &res, info);
+}
+
+bool rd_get_regval_info_id(RDContext* ctx, RDReg id, RDRegValueInfo* info) {
+    RDRegResolved res;
+    return rd_i_reg_resolve_id(ctx, id, &res) &&
+           rd_i_regmap_get_info(&ctx->engine.current.registers, &res, info);
 }
 
 RDSegmentRegNameSlice rd_get_all_sreg_names(const RDContext* ctx) {

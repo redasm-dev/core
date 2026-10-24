@@ -423,7 +423,8 @@ bool rd_il_get_regval(const RDIL* self, const char* regname,
 bool rd_il_set_regval(RDIL* self, const char* regname, RDRegValue value) {
     RDRegResolved res;
     return rd_i_reg_resolve_name(self->context, regname, &res) &&
-           rd_i_regmap_set(&self->registers, &res, value);
+           rd_i_regmap_set(&self->registers, &res, value,
+                           self->context->engine.current.address);
 }
 
 bool rd_il_del_regval(RDIL* self, const char* regname) {
@@ -441,7 +442,8 @@ bool rd_il_get_regval_id(const RDIL* self, RDReg id, RDRegValue* value) {
 bool rd_il_set_regval_id(RDIL* self, RDReg id, RDRegValue value) {
     RDRegResolved res;
     return rd_i_reg_resolve_id(self->context, id, &res) &&
-           rd_i_regmap_set(&self->registers, &res, value);
+           rd_i_regmap_set(&self->registers, &res, value,
+                           self->context->engine.current.address);
 }
 
 bool rd_il_del_regval_id(RDIL* self, RDReg id) {

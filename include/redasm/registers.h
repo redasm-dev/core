@@ -9,6 +9,11 @@
 typedef u32 RDReg;
 typedef u64 RDRegValue;
 
+typedef struct RDRegValueInfo {
+    RDAddress setter; // instruction that last wrote the register
+    RDRegValue value;
+} RDRegValueInfo;
+
 typedef struct RDRegMask {
     RDRegValue mask;
     u8 shift;
@@ -56,6 +61,9 @@ RD_API bool rd_del_auto_sregval_id(RDContext* ctx, RDAddress address, RDReg id);
 RD_API bool rd_del_library_sregval_id(RDContext* ctx, RDAddress address, RDReg id);
 RD_API bool rd_del_user_sregval_id(RDContext* ctx, RDAddress address, RDReg id);
 RD_API bool rd_get_sregval_id(RDContext* ctx, RDAddress address, RDReg id, RDRegValue* value);
+
+RD_API bool rd_get_regval_info(RDContext* ctx, const char* regname, RDRegValueInfo* info);
+RD_API bool rd_get_regval_info_id(RDContext* ctx, RDReg id, RDRegValueInfo* info);
 
 RD_API RDSegmentRegNameSlice rd_get_all_sreg_names(const RDContext* ctx);
 RD_API RDSegmentRegSlice rd_get_all_sregval(RDContext* ctx, const char* regname);
