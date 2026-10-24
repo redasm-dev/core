@@ -60,6 +60,7 @@ static bool _rd_emit_bus(RDContext* ctx, const char* name, RDAddress addr,
                                   .name = name,
                                   .bus =
                                       {
+                                          .from = ctx->engine.current.address,
                                           .address = addr,
                                           .size = size,
                                           .has_value = has_value,

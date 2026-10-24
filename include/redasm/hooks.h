@@ -30,7 +30,7 @@ typedef struct RDHookEvent {
         struct { RDAddress from, to; RDXRefType type; } xref;
         struct { RDRenderer* renderer; const RDInstruction* instr; } render_mnemonic;
         struct { RDRenderer* renderer; const RDInstruction* instr; usize idx; } render_operand;
-        struct { RDAddress address; usize size; bool has_value; u64 value; } bus;
+        struct { RDAddress from, address; usize size; bool has_value; u64 value; } bus;
     };
 } RDHookEvent;
 // clang-format on
