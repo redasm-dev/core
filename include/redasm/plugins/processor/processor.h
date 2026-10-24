@@ -22,8 +22,9 @@ typedef enum {
 } RDQueryRegKind;
 
 typedef enum {
+    RD_QUERY_REG_WANT_NONE = 0,
     RD_QUERY_REG_WANT_MASK = 1 << 0,
-    RD_QUERY_REG_WANT_CANONICAL = 1 << 1,
+    RD_QUERY_REG_WANT_ROOT = 1 << 1,
 } RDQueryRegWant;
 
 typedef struct RDQueryReg {
@@ -31,7 +32,7 @@ typedef struct RDQueryReg {
     RDQueryRegWant want;
     RDReg id;
     const char* name;
-    const char* canonical_name;
+    const char* root_name;
     RDRegMask mask;
 } RDQueryReg;
 

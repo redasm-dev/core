@@ -20,8 +20,11 @@ static bool _builtin_binary_load(RDLoader* ldr, RDContext* ctx) {
     const RDReader* r = rd_get_input_reader(ctx);
     usize n = rd_reader_get_length(r);
 
+    rd_set_base_address(ctx, la.baseaddress);
+
     rd_map_segment_n(ctx, "BINARY", la.address, n, RD_SP_RWX);
     rd_map_input_n(ctx, la.offset, la.address, n);
+
     rd_set_entry_point(ctx, la.entrypoint, NULL);
     return true;
 }

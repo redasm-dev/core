@@ -53,6 +53,21 @@ static bool _rd_emit_hook(RDContext* ctx, const RDHookEvent* e) {
     return true;
 }
 
+static bool _rd_emit_bus(RDContext* ctx, const char* name, RDAddress addr,
+                         usize size, bool has_value, u64 value) {
+    return _rd_emit_hook(ctx, &(RDHookEvent){
+                                  .kind = RD_HOOK_BUS,
+                                  .name = name,
+                                  .bus =
+                                      {
+                                          .address = addr,
+                                          .size = size,
+                                          .has_value = has_value,
+                                          .value = has_value ? value : 0,
+                                      },
+                              });
+}
+
 bool rd_register_hook(RDContext* ctx, RDHookKind kind, const char* name,
                       RDHookFunc h, void* userdata) {
     if(!name || !h) return false;
@@ -112,7 +127,10 @@ void rd_emit_decode_hook(RDContext* ctx, const char* name,
     _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_DECODE,
                            .name = name,
-                           .decode = {.instr = instr},
+                           .decode =
+                               {
+                                   .instr = instr,
+                               },
                        });
 }
 
@@ -123,7 +141,10 @@ void rd_emit_emulate_hook(RDContext* ctx, const char* name,
     _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_EMULATE,
                            .name = name,
-                           .emulate = {.instr = instr},
+                           .emulate =
+                               {
+                                   .instr = instr,
+                               },
                        });
 }
 
@@ -131,7 +152,10 @@ void rd_emit_address_hook(RDContext* ctx, const char* name, RDAddress addr) {
     _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_ADDRESS,
                            .name = name,
-                           .addr = {.address = addr},
+                           .addr =
+                               {
+                                   .address = addr,
+                               },
                        });
 }
 
@@ -140,7 +164,12 @@ void rd_emit_str_hook(RDContext* ctx, const char* name, RDAddress addr,
     _rd_emit_hook(ctx, &(RDHookEvent){
                            .kind = RD_HOOK_STR,
                            .name = name,
-                           .str = {.address = addr, .s = str, .n = n},
+                           .str =
+                               {
+                                   .address = addr,
+                                   .s = str,
+                                   .n = n,
+                               },
                        });
 }
 
@@ -162,12 +191,15 @@ bool rd_emit_render_mnemonic_hook(RDContext* ctx, const char* name,
                                   RDRenderer* r, const RDInstruction* instr) {
     if(!r || !instr) return false;
 
-    return _rd_emit_hook(ctx,
-                         &(RDHookEvent){
-                             .kind = RD_HOOK_RENDER_MNEMONIC,
-                             .name = name,
-                             .render_mnemonic = {.renderer = r, .instr = instr},
-                         });
+    return _rd_emit_hook(ctx, &(RDHookEvent){
+                                  .kind = RD_HOOK_RENDER_MNEMONIC,
+                                  .name = name,
+                                  .render_mnemonic =
+                                      {
+                                          .renderer = r,
+                                          .instr = instr,
+                                      },
+                              });
 }
 
 bool rd_emit_render_operand_hook(RDContext* ctx, const char* name,
@@ -176,10 +208,22 @@ bool rd_emit_render_operand_hook(RDContext* ctx, const char* name,
     if(!r || !instr || idx >= RD_MAX_OPERANDS) return false;
     if(instr->operands[idx].kind == RD_OP_NULL) return false;
 
-    return _rd_emit_hook(
-        ctx, &(RDHookEvent){
-                 .kind = RD_HOOK_RENDER_OPERAND,
-                 .name = name,
-                 .render_operand = {.renderer = r, .instr = instr, .idx = idx},
-             });
+    return _rd_emit_hook(ctx, &(RDHookEvent){
+                                  .kind = RD_HOOK_RENDER_OPERAND,
+                                  .name = name,
+                                  .render_operand =
+                                      {
+                                          .renderer = r,
+                                          .instr = instr,
+                                          .idx = idx,
+                                      },
+                              });
+}
+
+void rd_bus_write(RDContext* ctx, RDAddress addr, usize size, u64 value) {
+    _rd_emit_bus(ctx, "redasm.bus_write", addr, size, true, value);
+}
+
+void rd_bus_write_unknown(RDContext* ctx, RDAddress addr, usize size) {
+    _rd_emit_bus(ctx, "redasm.bus_write", addr, size, false, 0);
 }

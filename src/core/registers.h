@@ -4,7 +4,7 @@
 #include <redasm/registers.h>
 
 typedef struct RDRegResolved {
-    const char* name; // interned, canonical
+    const char* name; // interned, root
     RDRegMask mask;
 } RDRegResolved;
 

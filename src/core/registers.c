@@ -4,7 +4,11 @@
 #include "support/hash/murmur3.h"
 
 static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
-    RDQueryReg q = {.kind = RD_QUERY_REG_BY_ID, .id = id};
+    RDQueryReg q = {
+        .kind = RD_QUERY_REG_BY_ID,
+        .id = id,
+    };
+
     return rd_query_reg(ctx, &q) ? q.name : NULL;
 }
 
@@ -33,14 +37,14 @@ bool rd_i_reg_resolve_name(RDContext* ctx, const char* regname,
 
     RDQueryReg q = {
         .kind = RD_QUERY_REG_BY_NAME,
-        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_CANONICAL,
+        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_ROOT,
         .name = regname,
     };
 
     if(!rd_query_reg(ctx, &q)) return false;
 
     out->mask = q.mask;
-    out->name = rd_i_strpool_intern(&ctx->strings, q.canonical_name);
+    out->name = rd_i_strpool_intern(&ctx->strings, q.root_name);
     return true;
 }
 
@@ -49,14 +53,14 @@ bool rd_i_reg_resolve_id(RDContext* ctx, RDReg id, RDRegResolved* out) {
 
     RDQueryReg q = {
         .kind = RD_QUERY_REG_BY_ID,
-        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_CANONICAL,
+        .want = RD_QUERY_REG_WANT_MASK | RD_QUERY_REG_WANT_ROOT,
         .id = id,
     };
 
     if(!rd_query_reg(ctx, &q)) return false;
 
     out->mask = q.mask;
-    out->name = rd_i_strpool_intern(&ctx->strings, q.canonical_name);
+    out->name = rd_i_strpool_intern(&ctx->strings, q.root_name);
     return true;
 }
 

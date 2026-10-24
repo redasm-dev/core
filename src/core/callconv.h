@@ -12,7 +12,7 @@ typedef struct RDArgRegsVect {
 typedef struct RDCallConv {
     const char* name; // interned
 
-    RDArgRegsVect arg_regs; // interned canonical register name
+    RDArgRegsVect arg_regs; // interned root register name
     RDArgOrder arg_order;
     RDStackCleanup stack_cleanup;
     usize shadow_space;

@@ -108,6 +108,7 @@ typedef struct RDXRefSlice {
 } RDXRefSlice;
 
 typedef struct RDLoadAddressing {
+    RDAddress baseaddress;
     RDAddress entrypoint;
     RDAddress address;
     RDOffset offset;

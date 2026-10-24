@@ -159,8 +159,8 @@ bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
         return false;
     }
 
-    if((q->want & RD_QUERY_REG_WANT_CANONICAL) && !q->canonical_name) {
-        RD_LOG_WARN("canonical register name for '%s' is NULL", q->name);
+    if((q->want & RD_QUERY_REG_WANT_ROOT) && !q->root_name) {
+        RD_LOG_WARN("root register name for '%s' is NULL", q->name);
         return false;
     }
 

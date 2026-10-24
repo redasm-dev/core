@@ -12,6 +12,7 @@ typedef enum {
     RD_HOOK_ADDRESS,
     RD_HOOK_STR,
     RD_HOOK_XREF,
+    RD_HOOK_BUS,
     RD_HOOK_RENDER_MNEMONIC,
     RD_HOOK_RENDER_OPERAND,
 } RDHookKind;
@@ -29,6 +30,7 @@ typedef struct RDHookEvent {
         struct { RDAddress from, to; RDXRefType type; } xref;
         struct { RDRenderer* renderer; const RDInstruction* instr; } render_mnemonic;
         struct { RDRenderer* renderer; const RDInstruction* instr; usize idx; } render_operand;
+        struct { RDAddress address; usize size; bool has_value; u64 value; } bus;
     };
 } RDHookEvent;
 // clang-format on
@@ -55,3 +57,6 @@ RD_API bool rd_emit_render_mnemonic_hook(RDContext*, const char* name,
 RD_API bool rd_emit_render_operand_hook(RDContext*, const char* name,
                                         RDRenderer* r,
                                         const RDInstruction* instr, usize idx);
+
+RD_API void rd_bus_write(RDContext* ctx, RDAddress addr, usize size, u64 value);
+RD_API void rd_bus_write_unknown(RDContext* ctx, RDAddress addr, usize size);
