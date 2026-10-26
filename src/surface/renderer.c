@@ -403,8 +403,9 @@ void rd_i_renderer_instr(RDRenderer* self, RDAddress address) {
     if(rd_i_engine_decode(self->context, address, seg, idx, &instr)) {
         rd_i_processor_render_instruction(self, &instr);
     }
-    else
+    else {
         rd_renderer_unkn(self);
+    }
 }
 
 void rd_renderer_norm(RDRenderer* self, const char* s) {

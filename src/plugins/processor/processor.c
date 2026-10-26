@@ -7,6 +7,14 @@
 #include <redasm/support/logging.h>
 #include <stddef.h>
 
+static const char* _rd_regtable_find_name(const RDRegisterDef* defs, RDReg id) {
+    for(const RDRegisterDef* d = defs; d->name; d++) {
+        if(d->id == id) return d->name;
+    }
+
+    return NULL;
+}
+
 RDProcessor* rd_i_processor_create(const RDProcessorPlugin* plugin) {
     if(!plugin) return NULL;
 
@@ -39,10 +47,11 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
     const unsigned int ADDR_W = plugin->ptr_size * 2;
 
     switch(op->kind) {
-        case RD_OP_STUB:
+        case RD_OP_STUB: {
             rd_renderer_text(r, "???", RD_THEME_BACKGROUND,
                              RD_THEME_FOREGROUND);
             break;
+        }
 
         case RD_OP_CNST:
             rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_NOADDR);
@@ -50,9 +59,20 @@ bool rd_i_processor_render_operand(RDRenderer* r, const RDInstruction* instr,
 
         case RD_OP_REG: rd_renderer_reg(r, op->reg); break;
 
-        case RD_OP_IMM:
-            rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_DEFAULT);
+        case RD_OP_IMM: {
+            RDXRefFull xref;
+
+            if(rd_i_get_xref(r->context, instr->address, (RDAddress)op->imm,
+                             &xref) &&
+               xref.base.type == RD_DR_ADDRESS) {
+                rd_renderer_loc(r, (RDAddress)op->imm, ADDR_W, RD_NUM_DEFAULT);
+            }
+            else {
+                rd_renderer_num(r, op->s_imm, 16, 0, RD_NUM_DEFAULT);
+            }
+
             break;
+        }
 
         case RD_OP_ADDR:
             rd_renderer_loc(r, op->addr, ADDR_W, RD_NUM_DEFAULT);
@@ -162,6 +182,65 @@ bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
     if((q->want & RD_QUERY_REG_WANT_ROOT) && !q->root_name) {
         RD_LOG_WARN("root register name for '%s' is NULL", q->name);
         return false;
+    }
+
+    return true;
+}
+
+bool rd_query_reg_table(RDQueryReg* q, const RDRegisterDef* defs) {
+    if(!q || !defs) return false;
+
+    const RDRegisterDef* found = NULL;
+
+    for(const RDRegisterDef* d = defs; d->name; d++) {
+        if(q->kind == RD_QUERY_REG_BY_ID) {
+            if(d->id != q->id) continue;
+        }
+        else if(q->kind == RD_QUERY_REG_BY_NAME) {
+            if(!q->name) return false;
+            if(strcmp(d->name, q->name) != 0) continue;
+        }
+        else {
+            return false;
+        }
+
+        found = d;
+        break;
+    }
+
+    if(!found) return false;
+
+    q->id = found->id;
+    q->name = found->name;
+
+    if(q->want & RD_QUERY_REG_WANT_MASK) {
+        // a root is written in full: only sub-registers mask and shift
+        if(found->root == RD_REGID_INVALID || !found->bits ||
+           found->bits >= 64) {
+            q->mask = (RDRegMask){.mask = RD_REGMASK_FULL, .shift = 0};
+        }
+        else {
+            q->mask = (RDRegMask){
+                .mask = (((RDRegValue)1 << found->bits) - 1) << found->shift,
+                .shift = found->shift,
+            };
+        }
+    }
+
+    if(q->want & RD_QUERY_REG_WANT_ROOT) {
+        if(found->root == RD_REGID_INVALID) {
+            q->root_name = found->name;
+        }
+        else {
+            q->root_name = _rd_regtable_find_name(defs, found->root);
+
+            if(!q->root_name) {
+                RD_LOG_WARN("register '%s': root id %" PRIx32 " is not in the "
+                            "register table",
+                            found->name, found->root);
+                return false;
+            }
+        }
     }
 
     return true;

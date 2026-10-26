@@ -12,7 +12,7 @@ typedef struct RDRegister {
     HMapHeader hmap_hdr;
 
     const char* name;
-    RDAddress setter;
+    RDRegSetter setter;
     RDRegValue value;
 } RDRegister;
 
@@ -32,7 +32,7 @@ bool rd_i_reg_resolve_name(RDContext* ctx, const char* regname,
                            RDRegResolved* out);
 
 bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
-                     RDRegValue value, RDAddress setter);
+                     RDRegValue value, RDRegSetter setter);
 bool rd_i_regmap_get(const RDRegisterHMap* map, const RDRegResolved* res,
                      RDRegValue* value);
 bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res);

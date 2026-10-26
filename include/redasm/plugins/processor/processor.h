@@ -16,6 +16,14 @@ typedef enum {
     RD_PF_BE = (1 << 0),
 } RDProcessorFlags;
 
+typedef struct RDRegisterDef {
+    RDReg id;
+    const char* name;
+    RDReg root; // RD_REGID_INVALID: this register IS a root (full width)
+    u8 bits;    // width of this view inside 'root' (unused for roots)
+    u8 shift;   // position of this view inside 'root' (unused for roots)
+} RDRegisterDef;
+
 typedef enum {
     RD_QUERY_REG_BY_ID = 0,
     RD_QUERY_REG_BY_NAME,
@@ -67,5 +75,6 @@ typedef struct RDProcessorPlugin {
 
 RD_API bool rd_register_processor(const RDProcessorPlugin* p);
 RD_API bool rd_query_reg(const RDContext* ctx, RDQueryReg* q);
+RD_API bool rd_query_reg_table(RDQueryReg* q, const RDRegisterDef* defs);
 RD_API unsigned int rd_get_ptr_size(const RDContext* ctx);
 RD_API unsigned int rd_get_code_ptr_size(const RDContext* ctx);

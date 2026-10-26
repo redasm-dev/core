@@ -9,8 +9,13 @@
 typedef u32 RDReg;
 typedef u64 RDRegValue;
 
+typedef struct RDRegSetter {
+    RDAddress value;
+    bool has_value;
+} RDRegSetter;
+
 typedef struct RDRegValueInfo {
-    RDAddress setter; // instruction that last wrote the register
+    RDRegSetter setter; // instruction that last wrote the register
     RDRegValue value;
 } RDRegValueInfo;
 
@@ -67,4 +72,6 @@ RD_API bool rd_get_regval_info_id(RDContext* ctx, RDReg id, RDRegValueInfo* info
 
 RD_API RDSegmentRegNameSlice rd_get_all_sreg_names(const RDContext* ctx);
 RD_API RDSegmentRegSlice rd_get_all_sregval(RDContext* ctx, const char* regname);
+
+RD_API bool rd_mark_regval_address(RDContext* ctx, RDReg id);
 // clang-format on
