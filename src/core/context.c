@@ -1197,6 +1197,23 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
     return r;
 }
 
+bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
+                   RDXRefFull* xref) {
+    const RDSegment* from_seg = rd_i_db_find_segment(self, from);
+    if(!from_seg) return false;
+
+    const RDSegment* to_seg = rd_i_db_find_segment(self, to);
+    if(!to_seg) return false;
+
+    usize from_idx = rd_i_address2index(from_seg, from);
+    if(!rd_i_flagsbuffer_has_xref_out(from_seg->flags, from_idx)) return false;
+
+    usize to_idx = rd_i_address2index(to_seg, to);
+    if(!rd_i_flagsbuffer_has_xref_in(to_seg->flags, to_idx)) return false;
+
+    return rd_i_db_get_xref(self, from, to, xref);
+}
+
 const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
                                       RDXRefType type) {
     return rd_i_get_xrefs_from_ex(self, fromaddr, type, &self->xrefs_from);

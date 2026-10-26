@@ -170,6 +170,8 @@ const RDXRefVect* rd_i_get_xrefs_from_ex(RDContext* self, RDAddress fromaddr,
                                          RDXRefType type, RDXRefVect* r);
 const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefType type, RDXRefVect* r);
+bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
+                   RDXRefFull* xref);
 
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
