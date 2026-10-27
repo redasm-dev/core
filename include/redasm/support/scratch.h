@@ -6,6 +6,7 @@ typedef struct RDScratchBuffer RDScratchBuffer;
 
 // clang-format off
 RD_API RDScratchBuffer* rd_scratch_create(void);
+RD_API RDScratchBuffer* rd_scratch_create_from_file(const char* filepath);
 RD_API void rd_scratch_destroy(RDScratchBuffer* self);
 RD_API void rd_scratch_resize(RDScratchBuffer* self, usize n);
 RD_API void rd_scratch_reserve(RDScratchBuffer* self, usize n);

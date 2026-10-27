@@ -22,8 +22,7 @@ typedef enum {
 
 #define RD_RF_GRAPH                                                            \
     ((RDRenderFlags)(RD_RF_NO_SEGMENT | RD_RF_NO_INDENT |                      \
-                     RD_RF_NO_SEGMENT_LINE | RD_RF_NO_FUNCTION |               \
-                     RD_RF_NO_COMMENTS))
+                     RD_RF_NO_SEGMENT_LINE | RD_RF_NO_COMMENTS))
 
 #define RD_RF_POPUP                                                            \
     ((RDRenderFlags)(RD_RF_NO_CURSOR | RD_RF_NO_SELECTION |                    \

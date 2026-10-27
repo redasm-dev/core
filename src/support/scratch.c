@@ -5,9 +5,34 @@
 #include <redasm/support/logging.h>
 #include <redasm/support/scratch.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 RDScratchBuffer* rd_scratch_create(void) {
     return (RDScratchBuffer*)rd_alloc0(1, sizeof(RDScratchBuffer));
+}
+
+RDScratchBuffer* rd_scratch_create_from_file(const char* filepath) {
+    if(!filepath) return NULL;
+
+    FILE* fp = fopen(filepath, "rb");
+    if(!fp) return NULL;
+
+    RDScratchBuffer* self = rd_scratch_create();
+
+    fseek(fp, 0, SEEK_END);
+    rd_scratch_resize(self, (usize)ftell(fp));
+    fseek(fp, 0, SEEK_SET);
+
+    usize n = fread(self->impl.data, 1, self->impl.length, fp);
+    fclose(fp);
+
+    if(n != self->impl.length) {
+        RD_LOG_FAIL("read %zu bytes, expected %zu", n, self->impl.length);
+        rd_scratch_destroy(self);
+        return NULL;
+    }
+
+    return self;
 }
 
 void rd_scratch_destroy(RDScratchBuffer* self) {
