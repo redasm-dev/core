@@ -16,6 +16,7 @@ typedef struct RDRenderer {
     int min_column;
     int max_column;
     unsigned int group_idx;
+    bool comment_mode;
     RDAddress curr_address;
     RDRowVect rows_front, rows_back;
     RDCharVect comment_buf;
@@ -39,7 +40,7 @@ static inline RDRenderMode rd_i_renderer_get_mode(const RDRenderer* self) {
 RDRenderer* rd_i_renderer_create(RDContext* ctx, RDRenderFlags flags);
 void rd_i_renderer_destroy(RDRenderer* self);
 const RDSegment* rd_i_renderer_find_segment(RDRenderer* self,
-                                                RDAddress address);
+                                            RDAddress address);
 void rd_i_renderer_clear(RDRenderer* self);
 void rd_i_renderer_swap(RDRenderer* self);
 void rd_i_renderer_set_min_columns(RDRenderer* self, int cols);

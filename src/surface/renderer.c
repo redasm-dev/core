@@ -71,6 +71,11 @@ static void _rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
                               RDThemeKind bg, bool escape_str) {
     assert(s && "invalid chunk string");
 
+    if(self->comment_mode) {
+        fg = RD_THEME_COMMENT;
+        bg = RD_THEME_BACKGROUND;
+    }
+
     RDRow* r = vect_last(&self->rows_back);
     r->curr_data.group_idx = ++self->group_idx;
 

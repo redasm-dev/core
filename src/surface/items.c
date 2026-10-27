@@ -10,6 +10,14 @@
 
 #define RD_SURFACE_WS_COMMENT 8
 #define RD_SURFACE_WS_REFS 8
+#define RD_SURFACE_COMMENT "; "
+
+#define RD_SURFACE_WRAP_COMMENT(r, ...)                                        \
+    do {                                                                       \
+        r->comment_mode = true;                                                \
+        __VA_ARGS__                                                            \
+        r->comment_mode = false;                                               \
+    } while(0)
 
 static void _rd_render_modifiers(RDRenderer* r, const RDSegment* seg, usize idx,
                                  RDThemeKind fg, RDThemeKind bg) {
@@ -50,8 +58,9 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             const unsigned int F = calc_ptr_size * 2;
             rd_renderer_loc(r, (RDAddress)v, F, RD_NUM_DEFAULT);
         }
-        else
+        else {
             rd_renderer_muted(r, "?");
+        }
 
         return;
     }
@@ -86,11 +95,13 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
                     rd_renderer_text(r, rd_i_escape_char((char)v, true),
                                      RD_THEME_MUTED, RD_THEME_BACKGROUND);
                 }
-                else
+                else {
                     rd_renderer_num(r, 0, 10, 0, RD_NUM_DEFAULT);
+                }
             }
-            else
+            else {
                 rd_renderer_muted(r, "?");
+            }
         }
 
         return;
@@ -176,8 +187,9 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
         else
             rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
     }
-    else
+    else {
         rd_renderer_muted(r, "?");
+    }
 }
 
 static void _rd_render_refs(RDRenderer* r, RDAddress address) {
@@ -186,75 +198,72 @@ static void _rd_render_refs(RDRenderer* r, RDAddress address) {
     RDContext* ctx = r->context;
     if(!rd_i_get_xrefs_from_ex(ctx, address, RD_XR_NONE, &r->xrefs)) return;
 
-    const RDXRef* xref;
-    vect_each(xref, &r->xrefs) {
-        const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
-        if(!seg) continue;
+    bool first = true;
 
-        RDType t;
-        if(!rd_get_type(ctx, xref->address, &t)) continue;
+    RD_SURFACE_WRAP_COMMENT(r, {
+        const RDXRef* xref;
+        vect_each(xref, &r->xrefs) {
+            const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
+            if(!seg) continue;
 
-        bool is_ptr = rd_type_is_ptr(&t);
-        RDAddress ptr_address = 0, xref_address = xref->address;
+            RDType t;
+            if(!rd_get_type(ctx, xref->address, &t)) continue;
 
-        // try to follow the pointer location
-        if(is_ptr && xref->type == RD_DR_READ &&
-           rd_follow_ptr(ctx, xref->address, &ptr_address)) {
-            seg = rd_i_db_find_segment(ctx, ptr_address);
+            // render strings only
+            if((strcmp(t.def->name, "char") != 0 &&
+                strcmp(t.def->name, "char16") != 0) ||
+               !t.count)
+                continue;
 
-            bool has_xrefs_in =
-                seg && rd_i_flagsbuffer_has_xref_in(
-                           seg->flags, rd_i_address2index(seg, ptr_address));
+            if(first) {
+                first = false;
+                rd_renderer_ws(r, RD_SURFACE_WS_REFS);
+                rd_renderer_muted(r, RD_SURFACE_COMMENT);
+            }
 
-            if(has_xrefs_in && rd_get_type(ctx, ptr_address, &t))
-                xref_address = ptr_address;
-            else
-                is_ptr = false;
+            _rd_render_value(r, xref->address, &t, false);
         }
-
-        // render strings only
-        if((strcmp(t.def->name, "char") != 0 &&
-            strcmp(t.def->name, "char16") != 0) ||
-           !t.count)
-            continue;
-
-        rd_renderer_ws(r, RD_SURFACE_WS_REFS);
-        if(is_ptr) rd_renderer_norm(r, " => ");
-        _rd_render_value(r, xref_address, &t, false);
-    }
+    });
 }
 
-static void _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
-    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return;
+static bool _rd_render_comment_inline(RDRenderer* r, RDAddress address) {
+    if(rd_i_renderer_has_flag(r, RD_RF_NO_COMMENTS)) return false;
 
     const char* cmt = rd_get_comment_inline(r->context, address);
-    if(!cmt) return;
+    if(!cmt) return false;
 
     vect_clear(&r->comment_buf);
 
-    rd_renderer_ws(r, RD_SURFACE_WS_COMMENT);
-    rd_renderer_text(r, "# ", RD_THEME_COMMENT, RD_THEME_BACKGROUND);
+    RD_SURFACE_WRAP_COMMENT(r, {
+        rd_renderer_ws(r, RD_SURFACE_WS_COMMENT);
+        rd_renderer_text(r, RD_SURFACE_COMMENT, RD_THEME_COMMENT,
+                         RD_THEME_BACKGROUND);
 
-    for(const char* c = cmt; *c; c++) {
-        if(*c == '\n') {
-            if(vect_is_empty(&r->comment_buf)) continue;
+        for(const char* c = cmt; *c; c++) {
+            if(*c == '\n') {
+                if(vect_is_empty(&r->comment_buf)) continue;
 
+                vect_push(&r->comment_buf, 0);
+                rd_renderer_text(r, r->comment_buf.data, RD_THEME_COMMENT,
+                                 RD_THEME_BACKGROUND);
+
+                vect_clear(&r->comment_buf);
+                rd_renderer_text(r, " | ", RD_THEME_COMMENT,
+                                 RD_THEME_BACKGROUND);
+            }
+            else {
+                vect_push(&r->comment_buf, *c);
+            }
+        }
+
+        if(!vect_is_empty(&r->comment_buf)) {
             vect_push(&r->comment_buf, 0);
             rd_renderer_text(r, r->comment_buf.data, RD_THEME_COMMENT,
                              RD_THEME_BACKGROUND);
-
-            vect_clear(&r->comment_buf);
-            rd_renderer_text(r, " | ", RD_THEME_COMMENT, RD_THEME_BACKGROUND);
         }
-        else
-            vect_push(&r->comment_buf, *c);
-    }
+    });
 
-    if(!vect_is_empty(&r->comment_buf)) {
-        vect_push(&r->comment_buf, 0);
-        rd_renderer_text(r, r->comment_buf.data, RD_THEME_COMMENT,
-                         RD_THEME_BACKGROUND);
-    }
+    return true;
 }
 
 static void _rd_render_segment_row(RDRenderer* r, const RDSegment* seg,
@@ -286,8 +295,10 @@ static void _rd_render_comment_row(RDRenderer* r, const RDSegment* seg,
     rd_i_renderer_new_row(r, seg, idx, sub_line, indent);
     if(!comment || !(*comment)) return; // just an empty line
 
-    rd_renderer_text(r, "; ", RD_THEME_MUTED, RD_THEME_BACKGROUND);
-    rd_renderer_text(r, comment, RD_THEME_MUTED, RD_THEME_BACKGROUND);
+    RD_SURFACE_WRAP_COMMENT(r, {
+        rd_renderer_norm(r, RD_SURFACE_COMMENT);
+        rd_renderer_norm(r, comment);
+    });
 }
 
 static void _rd_render_label_row(RDRenderer* r, const RDSegment* seg, usize idx,
@@ -406,8 +417,7 @@ static void _rd_render_instruction_row(RDRenderer* r, const RDSegment* seg,
     }
 
     if(r->mode != RD_RM_FLAGS) {
-        _rd_render_refs(r, address);
-        _rd_render_comment_inline(r, address);
+        if(!_rd_render_comment_inline(r, address)) _rd_render_refs(r, address);
     }
 }
 
@@ -508,8 +518,9 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegment* seg, usize idx,
         RDName n;
 
         if(rd_i_typedef_is_compound(tdef) &&
-           rd_i_db_get_name(r->context, address, &n))
+           rd_i_db_get_name(r->context, address, &n)) {
             rd_renderer_norm(r, n.value);
+        }
         else {
             rd_renderer_norm(r, "[");
             rd_renderer_text(r, rd_i_to_dec((i64)d->resolve.item_idx.value),
@@ -517,8 +528,9 @@ static void _rd_render_data_row(RDRenderer* r, const RDSegment* seg, usize idx,
             rd_renderer_norm(r, "]");
         }
     }
-    else if(name)
+    else if(name) {
         rd_renderer_norm(r, name);
+    }
 
     // 5. array size
     if(t.count > 0) {
