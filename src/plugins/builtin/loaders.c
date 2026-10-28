@@ -23,7 +23,7 @@ static bool _builtin_binary_load(RDLoader* ldr, RDContext* ctx) {
     rd_set_base_address(ctx, la.baseaddress);
 
     rd_map_segment_n(ctx, "BINARY", la.address, n, RD_SP_RWX);
-    rd_map_input_n(ctx, la.offset, la.address, n);
+    rd_map_input_n(ctx, la.offset, la.address, n - la.offset);
 
     rd_set_entry_point(ctx, la.entrypoint, NULL);
     return true;
