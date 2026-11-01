@@ -31,6 +31,7 @@ void rd_i_db_load(RDContext* ctx);
 bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg);
+void rd_i_db_set_segment_selector(RDContext* ctx, const RDSegment* seg);
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index);
 const RDSegment* rd_i_db_find_segment(const RDContext* ctx, RDAddress address);
@@ -49,9 +50,9 @@ bool rd_i_db_get_external_ord(RDContext* ctx, const char* module, u32 ord,
 RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
                                           RDExternalVect* v);
 
-bool rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_xref_add(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType t, RDConfidence c);
-bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_xref_del(RDContext* ctx, RDAddress from, RDAddress to,
                       RDConfidence c, RDXRefType* type);
 bool rd_i_db_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefFull* xref);

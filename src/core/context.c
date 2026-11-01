@@ -83,6 +83,24 @@ static inline bool _rd_is_entry_point(const RDContext* ctx, RDAddress address) {
            ctx->entry_point.value == rd_i_rel(ctx, address);
 }
 
+bool rd_i_is_selector_range(const RDContext* self, RDAddress address) {
+    if(address < self->base_address) return false;
+
+    RDRelAddress rel = rd_i_rel(self, address);
+
+    RDSegment** it;
+    vect_each(it, &self->db->segments) {
+        const RDSegment* seg = *it;
+        if(!rd_i_segment_has_selector(seg)) continue;
+
+        if(rel >= seg->rel_start - seg->selector.base &&
+           rel < seg->rel_end - seg->selector.base)
+            return true;
+    }
+
+    return false;
+}
+
 void rd_i_expand_range(RDContext* self, const RDSegment* seg, usize* start,
                        usize* end) {
     assert(start && end);
@@ -337,28 +355,28 @@ RDAnalyzerItemSlice rd_get_analyzer_plugins(const RDContext* self) {
     return vect_to_slice(RDAnalyzerItemSlice, &self->analyzerplugins);
 }
 
-bool rd_map_segment(RDContext* self, const char* name, RDRelAddress addr,
-                    RDRelAddress endaddr, u32 perm) {
+RDSegment* rd_map_segment(RDContext* self, const char* name, RDRelAddress addr,
+                          RDRelAddress endaddr, u32 perm) {
     if(!name) { // autogenerate name
         name = rd_i_format(&self->seg_buf, "seg%03d",
                            (int)vect_length(&self->db->segments));
     }
 
     RDSegment* s = rd_i_segment_create(self, name, addr, endaddr, perm);
-    if(!s) return false;
+    if(!s) return NULL;
 
     if(rd_i_db_add_segment(self, s)) {
         RD_LOG_INFO("mapping segment '%s' (%" PRIX64 " - %" PRIX64 ")", name,
                     rd_segment_get_start(s), rd_segment_get_end(s));
-        return true;
+        return s;
     }
 
     rd_i_segment_destroy(s);
-    return false;
+    return NULL;
 }
 
-bool rd_map_segment_n(RDContext* self, const char* name, RDRelAddress addr,
-                      usize n, u32 perm) {
+RDSegment* rd_map_segment_n(RDContext* self, const char* name,
+                            RDRelAddress addr, usize n, u32 perm) {
     return rd_map_segment(self, name, addr, addr + n, perm);
 }
 
@@ -743,9 +761,10 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->addr_type_buf);
     vect_destroy(&self->symbols_buf);
     vect_destroy(&self->pending_renames);
-    vect_destroy(&self->xrefs_to);
+    vect_destroy(&self->to_xrefs);
     vect_destroy(&self->und_xrefs);
-    vect_destroy(&self->xrefs_from);
+    vect_destroy(&self->resolve_xrefs);
+    vect_destroy(&self->from_xrefs);
     vect_destroy(&self->lift_buf);
     vect_destroy(&self->resolve_buf);
     vect_destroy(&self->problems_buf);
@@ -1214,14 +1233,42 @@ bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
     return rd_i_db_get_xref(self, from, to, xref);
 }
 
+bool rd_i_resolve_selector_xref(RDContext* self, RDAddress from,
+                                RDAddress value, RDAddress* address) {
+    const RDXRefVect* refs =
+        rd_i_get_xrefs_from_ex(self, from, RD_XR_NONE, &self->resolve_xrefs);
+
+    RDAddress res = 0;
+    bool found = false;
+
+    const RDXRef* r;
+    vect_each(r, refs) {
+        if(r->confidence < RD_CONFIDENCE_USER) continue; // decisions only
+
+        const RDSegment* seg = rd_i_db_find_segment(self, r->address);
+        if(!seg || !rd_i_segment_has_selector(seg)) continue;
+
+        // no underflow: rd_segment_set_selector guarantees base <= rel_start
+        if(r->address - seg->selector.base != value) continue;
+
+        if(found) return false; // two user targets: ambiguous, render raw
+
+        res = r->address;
+        found = true;
+    }
+
+    if(found && address) *address = res;
+    return found;
+}
+
 const RDXRefVect* rd_i_get_xrefs_from(RDContext* self, RDAddress fromaddr,
                                       RDXRefType type) {
-    return rd_i_get_xrefs_from_ex(self, fromaddr, type, &self->xrefs_from);
+    return rd_i_get_xrefs_from_ex(self, fromaddr, type, &self->from_xrefs);
 }
 
 const RDXRefVect* rd_i_get_xrefs_to(RDContext* self, RDAddress toaddr,
                                     RDXRefType type) {
-    return rd_i_get_xrefs_to_ex(self, toaddr, type, &self->xrefs_to);
+    return rd_i_get_xrefs_to_ex(self, toaddr, type, &self->to_xrefs);
 }
 
 bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
@@ -1272,7 +1319,7 @@ bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
     return true;
 }
 
-bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c) {
     switch(type) { // reject invalid types
         case RD_DR_READ:
@@ -1285,7 +1332,17 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 
     const RDSegment* fromseg = rd_i_db_find_segment(self, fromaddr);
     const RDSegment* toseg = rd_i_db_find_segment(self, toaddr);
-    if(!fromseg || !toseg) return false;
+    if(!fromseg) return false;
+
+    if(!toseg) {
+        // is 'toaddr' inside some banked segment's CPU range?
+        if(rd_i_is_selector_range(self, toaddr)) {
+            rd_i_add_problem(self, fromaddr, toaddr,
+                             "unresolved banked reference");
+        }
+
+        return false;
+    }
 
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
     usize toidx = rd_i_address2index(toseg, toaddr);
@@ -1300,7 +1357,7 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
         return false;
     }
 
-    if(!rd_i_db_add_xref(self, fromaddr, toaddr, type, c)) return false;
+    if(!rd_i_db_xref_add(self, fromaddr, toaddr, type, c)) return false;
 
     rd_i_flagsbuffer_set_xref_out(fromseg->flags, fromidx);
     rd_i_flagsbuffer_set_xref_in(toseg->flags, toidx);
@@ -1314,7 +1371,7 @@ bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     return true;
 }
 
-bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+bool rd_i_xref_del(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c) {
     const RDSegment* fromseg = rd_i_db_find_segment(self, fromaddr);
     const RDSegment* toseg = rd_i_db_find_segment(self, toaddr);
@@ -1326,7 +1383,7 @@ bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
 
     if(!rd_i_flagsbuffer_has_xref_out(fromseg->flags, from_idx)) return false;
     if(!rd_i_flagsbuffer_has_xref_in(toseg->flags, to_idx)) return false;
-    if(!rd_i_db_del_xref(self, fromaddr, toaddr, c, &type)) return false;
+    if(!rd_i_db_xref_del(self, fromaddr, toaddr, c, &type)) return false;
 
     // flags are head-only: a tail has nothing to keep in step
     if(!rd_flagsbuffer_has_tail(fromseg->flags, from_idx) &&
@@ -1472,9 +1529,32 @@ void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
     rd_i_db_add_problem(self, from, address, result);
 }
 
-bool rd_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
-                 RDXRefType type) {
-    return rd_i_add_xref(self, fromaddr, toaddr, type, RD_CONFIDENCE_AUTO);
+bool rd_auto_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+                      RDXRefType type) {
+    return rd_i_xref_add(self, fromaddr, toaddr, type, RD_CONFIDENCE_AUTO);
+}
+
+bool rd_library_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+                         RDXRefType type) {
+    return rd_i_xref_add(self, fromaddr, toaddr, type, RD_CONFIDENCE_LIBRARY);
+}
+
+bool rd_user_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+                      RDXRefType type) {
+    return rd_i_xref_add(self, fromaddr, toaddr, type, RD_CONFIDENCE_USER);
+}
+
+bool rd_auto_xref_del(RDContext* self, RDAddress fromaddr, RDAddress toaddr) {
+    return rd_i_xref_del(self, fromaddr, toaddr, RD_CONFIDENCE_AUTO);
+}
+
+bool rd_library_xref_del(RDContext* self, RDAddress fromaddr,
+                         RDAddress toaddr) {
+    return rd_i_xref_del(self, fromaddr, toaddr, RD_CONFIDENCE_LIBRARY);
+}
+
+bool rd_user_xref_del(RDContext* self, RDAddress fromaddr, RDAddress toaddr) {
+    return rd_i_xref_del(self, fromaddr, toaddr, RD_CONFIDENCE_USER);
 }
 
 RDXRefSlice rd_get_xrefs_from(RDContext* self, RDAddress fromaddr,
@@ -1526,7 +1606,7 @@ bool rd_operand_as_address(RDContext* self, RDAddress address, int index) {
 
     rd_i_flagsbuffer_set_op_over(seg->flags, idx);
     rd_i_db_set_ovr_operand(self, address, index);
-    rd_i_add_xref(self, address, (RDAddress)op->imm, RD_DR_ADDRESS,
+    rd_i_xref_add(self, address, (RDAddress)op->imm, RD_DR_ADDRESS,
                   RD_CONFIDENCE_USER);
     return true;
 }
@@ -1550,7 +1630,7 @@ bool rd_operand_as_immediate(RDContext* self, RDAddress address, int index) {
     const RDOperand* op = &instr.operands[index];
     if(op->kind != RD_OP_ADDR) return false;
 
-    rd_i_del_xref(self, address, op->addr, RD_CONFIDENCE_USER);
+    rd_i_xref_del(self, address, op->addr, RD_CONFIDENCE_USER);
     rd_i_db_del_ovr_operand(self, address, index);
 
     if(!rd_i_db_has_ovr_operand(self, address))

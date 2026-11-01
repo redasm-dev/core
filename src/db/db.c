@@ -220,6 +220,10 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg) {
     return true;
 }
 
+void rd_i_db_set_segment_selector(RDContext* ctx, const RDSegment* seg) {
+    _rd_i_db_query_set_segment_selector(ctx, seg);
+}
+
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index) {
     if(!_rd_validate_address_bounds(ctx, address)) return false;
@@ -348,12 +352,12 @@ RDExternalVect* rd_i_db_get_all_externals(RDContext* ctx, RDExternalKind kind,
     return _rd_i_db_query_get_all_externals(ctx, kind, v);
 }
 
-bool rd_i_db_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_xref_add(RDContext* ctx, RDAddress from, RDAddress to,
                       RDXRefType type, RDConfidence c) {
     return _rd_i_db_query_add_xref(ctx, from, to, type, c);
 }
 
-bool rd_i_db_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
+bool rd_i_db_xref_del(RDContext* ctx, RDAddress from, RDAddress to,
                       RDConfidence c, RDXRefType* type) {
     return _rd_i_db_query_del_xref(ctx, from, to, c, type);
 }

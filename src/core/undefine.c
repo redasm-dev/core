@@ -53,7 +53,7 @@ static bool _rd_strip_flags(RDContext* self, const RDSegment* seg, usize idx,
         else {
             const RDXRef* xref;
             vect_each(xref, &state->xrefs) {
-                bool ok = rd_i_del_xref(self, address, xref->address,
+                bool ok = rd_i_xref_del(self, address, xref->address,
                                         state->confidence);
                 assert(ok && "undefine: the probe approved a protected xref");
                 RD_UNUSED(ok);

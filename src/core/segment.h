@@ -15,7 +15,16 @@ typedef struct RDSegment {
     RDRelAddress rel_start;
     RDRelAddress rel_end;
     RDSegmentPerm perm;
+
+    struct {
+        usize id;
+        RDRelAddress base;
+    } selector;
 } RDSegment;
+
+static inline bool rd_i_segment_has_selector(const RDSegment* seg) {
+    return seg->selector.id || seg->selector.base;
+}
 
 usize rd_i_address2index(const RDSegment* seg, RDAddress addr);
 RDAddress rd_i_index2address(const RDSegment* seg, usize idx);

@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS Segments ( \
     name      TEXT NOT NULL, \
     rel_start INTEGER NOT NULL, \
     rel_end   INTEGER NOT NULL, \
-    perm      INTEGER NOT NULL \
+    perm      INTEGER NOT NULL, \
+    sel_id    INTEGER NOT NULL DEFAULT 0, \
+    sel_base  INTEGER NOT NULL DEFAULT 0 \
 ); \
 CREATE TABLE IF NOT EXISTS InputMappings ( \
     offset    INTEGER NOT NULL, \
@@ -122,7 +124,8 @@ CREATE TABLE IF NOT EXISTS Problems ( \
     from_is_address   INTEGER NOT NULL, \
     target_value      INTEGER NOT NULL, \
     target_is_address INTEGER NOT NULL, \
-    message           TEXT NOT NULL \
+    message           TEXT NOT NULL, \
+    UNIQUE (from_value, target_value, message) \
 ); \
 \
 CREATE INDEX IF NOT EXISTS Names_NameIdx ON Names(name); \

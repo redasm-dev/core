@@ -91,3 +91,28 @@ void rd_i_segment_clear_ovl(const RDSegment* self, usize idx,
     usize n = self->rel_end - self->rel_start;
     if(idx < n) self->ovl_flags[idx] &= (u8)~f;
 }
+
+bool rd_segment_set_selector(RDSegment* self, usize id, RDRelAddress base,
+                             RDContext* ctx) {
+    if(!self) return false;
+
+    if(base > self->rel_start) {
+        rd_i_add_problem(
+            ctx, rd_segment_get_start(self), rd_segment_get_start(self),
+            "segment '%s': selector base %llx exceeds start %llx", self->name,
+            (unsigned long long)base, (unsigned long long)self->rel_start);
+
+        return false;
+    }
+
+    self->selector.id = id;
+    self->selector.base = base;
+    rd_i_db_set_segment_selector(ctx, self);
+    return true;
+}
+
+void rd_segment_get_selector(const RDSegment* self, usize* id, RDAddress* base,
+                             const RDContext* ctx) {
+    if(id) *id = self->selector.id;
+    if(base) *base = rd_i_abs(ctx, self->selector.base);
+}

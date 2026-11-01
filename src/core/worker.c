@@ -56,7 +56,7 @@ static void _rd_worker_follow_pointers(RDContext* ctx) {
         if(!rd_read_ptr(ctx, address, &dst) || !rd_is_address(ctx, dst))
             continue;
 
-        rd_add_xref(ctx, address, dst, RD_DR_ADDRESS);
+        rd_auto_xref_add(ctx, address, dst, RD_DR_ADDRESS);
     }
 
     vect_destroy(&types);
@@ -187,7 +187,7 @@ static void _rd_worker_reconcile_data(RDContext* ctx, const RDSegment* seg,
 
         const RDXRef* r;
         vect_each(r, refs)
-            rd_i_del_xref(ctx, curr, r->address, RD_CONFIDENCE_MAX);
+            rd_i_xref_del(ctx, curr, r->address, RD_CONFIDENCE_MAX);
     }
 }
 

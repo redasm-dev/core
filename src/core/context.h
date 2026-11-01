@@ -54,9 +54,10 @@ typedef struct RDContext {
     RDProcessor* processor;
 
     RDStringPool strings;
-    RDXRefVect xrefs_from;
-    RDXRefVect xrefs_to;
+    RDXRefVect from_xrefs;
+    RDXRefVect to_xrefs;
     RDXRefVect und_xrefs;
+    RDXRefVect resolve_xrefs;
 
     RDCharVect autoname_buf;
     RDCharVect nameaddr_buf;
@@ -135,6 +136,8 @@ static inline bool rd_i_segment_contains(const RDSegment* seg, RDAddress addr) {
     return addr >= rd_segment_get_start(seg) && addr < rd_segment_get_end(seg);
 }
 
+bool rd_i_is_selector_range(const RDContext* self, RDAddress address);
+
 void rd_i_expand_range(RDContext* self, const RDSegment* seg, usize* start,
                        usize* end);
 
@@ -151,9 +154,9 @@ bool rd_i_get_name_to(RDContext* self, RDAddress address, bool autoname,
                       RDName* n, RDCharVect* buf);
 bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                    RDConfidence c);
-bool rd_i_add_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDXRefType type, RDConfidence c);
-bool rd_i_del_xref(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
+bool rd_i_xref_del(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
                    RDConfidence c);
 
 bool rd_i_set_external(RDContext* self, const RDExternal* ext);
@@ -172,7 +175,8 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefType type, RDXRefVect* r);
 bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
                    RDXRefFull* xref);
-
+bool rd_i_resolve_selector_xref(RDContext* self, RDAddress from,
+                                RDAddress value, RDAddress* address);
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,

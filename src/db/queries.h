@@ -60,6 +60,7 @@ enum {
 
     RD_QUERY_ADD_SEGMENT,
     RD_QUERY_GET_ALL_SEGMENTS,
+    RD_QUERY_SET_SEGMENT_SELECTOR,
 
     RD_QUERY_ADD_MAPPING,
     RD_QUERY_GET_ALL_MAPPINGS,
@@ -90,6 +91,7 @@ enum {
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegment* s);
 RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
                                                RDSegmentVect* v);
+void _rd_i_db_query_set_segment_selector(RDContext* ctx, const RDSegment* s);
 
 void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m);
 RDInputMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
@@ -109,8 +111,6 @@ bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefType type, RDConfidence c);
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDConfidence c, RDXRefType* type);
-void _rd_i_db_query_del_xref_from(RDContext* ctx, RDAddress from, RDAddress to,
-                                  RDXRefType type, RDConfidence c);
 bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
                              RDXRefFull* xref);
 RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,

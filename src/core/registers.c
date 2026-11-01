@@ -289,8 +289,8 @@ bool rd_mark_regval_address(RDContext* ctx, RDReg id) {
     rd_foreach_operand(i, op, &setter) {
         if(op->kind != RD_OP_IMM || op->imm != info.value) continue;
 
-        rd_add_xref(ctx, info.setter.value, (RDAddress)info.value,
-                    RD_DR_ADDRESS);
+        rd_auto_xref_add(ctx, info.setter.value, (RDAddress)info.value,
+                         RD_DR_ADDRESS);
         return true;
     }
 

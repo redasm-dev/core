@@ -153,7 +153,7 @@ static sqlite3_stmt* _rd_db_prepare_set_callconv_reg_query(RDContext* ctx,
 
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegment* s) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_SEGMENT, "\
-        INSERT INTO Segments \
+        INSERT INTO Segments (name, rel_start, rel_end, perm) \
         VALUES (:name, :relstart, :relend, :perm) \
     ");
 
@@ -181,7 +181,7 @@ static sqlite3_stmt* _rd_db_prepare_get_all_callconv_regs(RDContext* ctx,
 RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
                                                RDSegmentVect* v) {
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_SEGMENTS, "\
-        SELECT name, rel_start, rel_end, perm \
+        SELECT name, rel_start, rel_end, perm, sel_id, sel_base \
         FROM Segments \
         ORDER BY rel_start \
     ");
@@ -191,13 +191,32 @@ RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
         RDRelAddress rel_start = (RDRelAddress)sqlite3_column_int64(stmt, 1);
         RDRelAddress rel_end = (RDRelAddress)sqlite3_column_int64(stmt, 2);
         u32 perm = (u32)sqlite3_column_int(stmt, 3);
+        usize sel_id = (usize)sqlite3_column_int64(stmt, 4);
+        RDRelAddress sel_base = (RDRelAddress)sqlite3_column_int64(stmt, 5);
 
         RDSegment* s = rd_i_segment_create(ctx, name, rel_start, rel_end, perm);
         panic_if(!s, "segment '%s' loading failed", name);
+        s->selector.id = sel_id;
+        s->selector.base = sel_base;
         vect_push(v, s);
     }
 
     return v;
+}
+
+void _rd_i_db_query_set_segment_selector(RDContext* ctx, const RDSegment* s) {
+    sqlite3_stmt* stmt =
+        _rd_db_prepare_query(ctx, RD_QUERY_SET_SEGMENT_SELECTOR, "\
+        UPDATE Segments \
+        SET sel_id = :sel_id, sel_base = :sel_base \
+        WHERE rel_start = :rel_start \
+    ");
+
+    _rd_db_bind_param_int(ctx, stmt, ":sel_id", (sqlite3_int64)s->selector.id);
+    _rd_db_bind_param_int(ctx, stmt, ":sel_base",
+                          (sqlite3_int64)s->selector.base);
+    _rd_db_bind_param_int(ctx, stmt, ":rel_start", (sqlite3_int64)s->rel_start);
+    _rd_db_step(ctx, stmt);
 }
 
 void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m) {
@@ -385,10 +404,8 @@ bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
                           (sqlite3_int64)rd_i_rel(ctx, to));
     _rd_db_bind_param_int(ctx, stmt, ":type", type);
     _rd_db_bind_param_int(ctx, stmt, ":confidence", c);
-    _rd_db_step(ctx, stmt);
 
-    // false: a higher confidence row won
-    return sqlite3_changes(ctx->db->handle) > 0;
+    return _rd_db_step(ctx, stmt) == SQLITE_DONE;
 }
 
 bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
@@ -1167,7 +1184,7 @@ void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
     assert(msg);
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_PROBLEM, "\
-        INSERT INTO Problems \
+        INSERT OR IGNORE INTO Problems \
         VALUES (:fromval, :fromisaddr, :targetval, :targetisaddr, :message) \
     ");
 

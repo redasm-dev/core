@@ -21,6 +21,13 @@ static bool _rd_renderer_can_autoname(const RDSegment* seg, usize idx) {
            rd_flagsbuffer_has_item(seg->flags, idx);
 }
 
+static bool _rd_renderer_row_address(const RDRenderer* self,
+                                     RDAddress* address) {
+    if(vect_is_empty(&self->rows_back)) return false; // rendering outside a row
+    *address = vect_last(&self->rows_back)->address;
+    return true;
+}
+
 static const char* _rd_renderer_word_at(RDRenderer* self, const RDRowVect* rows,
                                         int row, int col) {
     if(row >= (int)vect_length(rows)) return NULL;
@@ -500,6 +507,14 @@ void rd_renderer_muted(RDRenderer* self, const char* s) {
 
 void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
                      RDNumberFlags flags) {
+    RDAddress from;
+
+    // unmapped operand: a user xref from this row may say where it goes
+    if(!rd_is_address(self->context, address) &&
+       _rd_renderer_row_address(self, &from)) {
+        rd_i_resolve_selector_xref(self->context, from, address, &address);
+    }
+
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES)) {
         RDName n;
         bool hasname = rd_i_get_name(self->context, address, false, &n);
