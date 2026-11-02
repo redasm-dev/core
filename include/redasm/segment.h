@@ -31,5 +31,5 @@ RD_API RDAddress rd_segment_get_end(const RDSegment* self);
 RD_API usize rd_segment_get_size(const RDSegment* self);
 RD_API bool rd_segment_set_selector(RDSegment* self, usize id,
                                     RDRelAddress base, RDContext* ctx);
-RD_API void rd_segment_get_selector(const RDSegment* self, usize* id,
+RD_API bool rd_segment_get_selector(const RDSegment* self, usize* id,
                                     RDAddress* base, const RDContext* ctx);

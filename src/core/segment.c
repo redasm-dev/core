@@ -111,8 +111,9 @@ bool rd_segment_set_selector(RDSegment* self, usize id, RDRelAddress base,
     return true;
 }
 
-void rd_segment_get_selector(const RDSegment* self, usize* id, RDAddress* base,
+bool rd_segment_get_selector(const RDSegment* self, usize* id, RDAddress* base,
                              const RDContext* ctx) {
     if(id) *id = self->selector.id;
     if(base) *base = rd_i_abs(ctx, self->selector.base);
+    return rd_i_segment_has_selector(self);
 }
