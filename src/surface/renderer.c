@@ -512,8 +512,7 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
     // unmapped operand: user decision first, then the instruction's own window
     if(!rd_is_address(self->context, address) &&
        _rd_renderer_row_address(self, &from)) {
-        if(!rd_i_resolve_selector_xref(self->context, from, address,
-                                       &address)) {
+        if(!rd_i_resolve_bank_xref(self->context, from, address, &address)) {
             const RDSegment* seg = rd_i_db_find_segment(self->context, from);
             rd_i_segment_resolve_same_window(seg, address, &address);
         }

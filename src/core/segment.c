@@ -92,37 +92,37 @@ void rd_i_segment_clear_ovl(const RDSegment* self, usize idx,
     if(idx < n) self->ovl_flags[idx] &= (u8)~f;
 }
 
-bool rd_segment_set_selector(RDSegment* self, usize id, RDRelAddress base,
-                             RDContext* ctx) {
+bool rd_segment_set_bank(RDSegment* self, usize id, RDRelAddress base,
+                         RDContext* ctx) {
     if(!self) return false;
 
     if(base > self->rel_start) {
         rd_i_add_problem(
             ctx, rd_segment_get_start(self), rd_segment_get_start(self),
-            "segment '%s': selector base %llx exceeds start %llx", self->name,
+            "segment '%s': bank base %llx exceeds start %llx", self->name,
             (unsigned long long)base, (unsigned long long)self->rel_start);
 
         return false;
     }
 
-    self->selector.id = id;
-    self->selector.base = base;
-    rd_i_db_set_segment_selector(ctx, self);
+    self->bank.id = id;
+    self->bank.base = base;
+    rd_i_db_set_segment_bank(ctx, self);
     return true;
 }
 
-bool rd_segment_get_selector(const RDSegment* self, usize* id, RDAddress* base,
-                             const RDContext* ctx) {
-    if(id) *id = self->selector.id;
-    if(base) *base = rd_i_abs(ctx, self->selector.base);
-    return rd_i_segment_has_selector(self);
+bool rd_segment_get_bank(const RDSegment* self, usize* id, RDAddress* base,
+                         const RDContext* ctx) {
+    if(id) *id = self->bank.id;
+    if(base) *base = rd_i_abs(ctx, self->bank.base);
+    return rd_i_segment_is_banked(self);
 }
 
 bool rd_i_segment_resolve_same_window(const RDSegment* self, RDAddress value,
                                       RDAddress* address) {
-    if(!self || !rd_i_segment_has_selector(self)) return false;
+    if(!self || !rd_i_segment_is_banked(self)) return false;
 
-    RDAddress resolved = value + self->selector.base;
+    RDAddress resolved = value + self->bank.base;
     if(rd_i_db_find_segment(self->context, resolved) != self) return false;
 
     if(address) *address = resolved;

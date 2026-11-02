@@ -83,7 +83,7 @@ static inline bool _rd_is_entry_point(const RDContext* ctx, RDAddress address) {
            ctx->entry_point.value == rd_i_rel(ctx, address);
 }
 
-bool rd_i_is_selector_range(const RDContext* self, RDAddress address) {
+bool rd_i_in_bank_window(const RDContext* self, RDAddress address) {
     if(address < self->base_address) return false;
 
     RDRelAddress rel = rd_i_rel(self, address);
@@ -91,10 +91,10 @@ bool rd_i_is_selector_range(const RDContext* self, RDAddress address) {
     RDSegment** it;
     vect_each(it, &self->db->segments) {
         const RDSegment* seg = *it;
-        if(!rd_i_segment_has_selector(seg)) continue;
+        if(!rd_i_segment_is_banked(seg)) continue;
 
-        if(rel >= seg->rel_start - seg->selector.base &&
-           rel < seg->rel_end - seg->selector.base)
+        if(rel >= seg->rel_start - seg->bank.base &&
+           rel < seg->rel_end - seg->bank.base)
             return true;
     }
 
@@ -1233,8 +1233,8 @@ bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
     return rd_i_db_get_xref(self, from, to, xref);
 }
 
-bool rd_i_resolve_selector_xref(RDContext* self, RDAddress from,
-                                RDAddress value, RDAddress* address) {
+bool rd_i_resolve_bank_xref(RDContext* self, RDAddress from, RDAddress value,
+                            RDAddress* address) {
     const RDXRefVect* refs =
         rd_i_get_xrefs_from_ex(self, from, RD_XR_NONE, &self->resolve_xrefs);
 
@@ -1246,10 +1246,10 @@ bool rd_i_resolve_selector_xref(RDContext* self, RDAddress from,
         if(r->confidence < RD_CONFIDENCE_USER) continue; // decisions only
 
         const RDSegment* seg = rd_i_db_find_segment(self, r->address);
-        if(!seg || !rd_i_segment_has_selector(seg)) continue;
+        if(!seg || !rd_i_segment_is_banked(seg)) continue;
 
-        // no underflow: rd_segment_set_selector guarantees base <= rel_start
-        if(r->address - seg->selector.base != value) continue;
+        // no underflow: rd_segment_set_bank guarantees base <= rel_start
+        if(r->address - seg->bank.base != value) continue;
 
         if(found) return false; // two user targets: ambiguous, render raw
 
@@ -1335,7 +1335,7 @@ bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     if(!fromseg) return false;
 
     if(!toseg) {
-        if(rd_i_is_selector_range(self, toaddr)) {
+        if(rd_i_in_bank_window(self, toaddr)) {
             RDAddress resolved;
             if(rd_i_segment_resolve_same_window(fromseg, toaddr, &resolved)) {
                 toaddr = resolved;

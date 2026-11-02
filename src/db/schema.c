@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS Segments ( \
     rel_start INTEGER NOT NULL, \
     rel_end   INTEGER NOT NULL, \
     perm      INTEGER NOT NULL, \
-    sel_id    INTEGER NOT NULL DEFAULT 0, \
-    sel_base  INTEGER NOT NULL DEFAULT 0 \
+    bank_id   INTEGER NOT NULL DEFAULT 0, \
+    bank_base INTEGER NOT NULL DEFAULT 0 \
 ); \
 CREATE TABLE IF NOT EXISTS InputMappings ( \
     offset    INTEGER NOT NULL, \

@@ -19,11 +19,11 @@ typedef struct RDSegment {
     struct {
         usize id;
         RDRelAddress base;
-    } selector;
+    } bank;
 } RDSegment;
 
-static inline bool rd_i_segment_has_selector(const RDSegment* seg) {
-    return seg->selector.id || seg->selector.base;
+static inline bool rd_i_segment_is_banked(const RDSegment* seg) {
+    return seg->bank.id || seg->bank.base;
 }
 
 usize rd_i_address2index(const RDSegment* seg, RDAddress addr);

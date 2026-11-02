@@ -136,7 +136,7 @@ static inline bool rd_i_segment_contains(const RDSegment* seg, RDAddress addr) {
     return addr >= rd_segment_get_start(seg) && addr < rd_segment_get_end(seg);
 }
 
-bool rd_i_is_selector_range(const RDContext* self, RDAddress address);
+bool rd_i_in_bank_window(const RDContext* self, RDAddress address);
 
 void rd_i_expand_range(RDContext* self, const RDSegment* seg, usize* start,
                        usize* end);
@@ -175,8 +175,8 @@ const RDXRefVect* rd_i_get_xrefs_to_ex(RDContext* self, RDAddress toaddr,
                                        RDXRefType type, RDXRefVect* r);
 bool rd_i_get_xref(RDContext* self, RDAddress from, RDAddress to,
                    RDXRefFull* xref);
-bool rd_i_resolve_selector_xref(RDContext* self, RDAddress from,
-                                RDAddress value, RDAddress* address);
+bool rd_i_resolve_bank_xref(RDContext* self, RDAddress from, RDAddress value,
+                            RDAddress* address);
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
 void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,

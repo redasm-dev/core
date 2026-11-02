@@ -220,8 +220,8 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg) {
     return true;
 }
 
-void rd_i_db_set_segment_selector(RDContext* ctx, const RDSegment* seg) {
-    _rd_i_db_query_set_segment_selector(ctx, seg);
+void rd_i_db_set_segment_bank(RDContext* ctx, const RDSegment* seg) {
+    _rd_i_db_query_set_segment_bank(ctx, seg);
 }
 
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,

@@ -29,7 +29,7 @@ RD_API const char* rd_segment_get_name(const RDSegment* self);
 RD_API RDAddress rd_segment_get_start(const RDSegment* self);
 RD_API RDAddress rd_segment_get_end(const RDSegment* self);
 RD_API usize rd_segment_get_size(const RDSegment* self);
-RD_API bool rd_segment_set_selector(RDSegment* self, usize id,
-                                    RDRelAddress base, RDContext* ctx);
-RD_API bool rd_segment_get_selector(const RDSegment* self, usize* id,
-                                    RDAddress* base, const RDContext* ctx);
+RD_API bool rd_segment_set_bank(RDSegment* self, usize id, RDRelAddress base,
+                                RDContext* ctx);
+RD_API bool rd_segment_get_bank(const RDSegment* self, usize* id,
+                                RDAddress* base, const RDContext* ctx);

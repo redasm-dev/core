@@ -31,7 +31,7 @@ void rd_i_db_load(RDContext* ctx);
 bool rd_i_db_export(RDContext* ctx, const char* filepath);
 
 bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg);
-void rd_i_db_set_segment_selector(RDContext* ctx, const RDSegment* seg);
+void rd_i_db_set_segment_bank(RDContext* ctx, const RDSegment* seg);
 bool rd_i_db_find_segment_index(const RDContext* ctx, RDAddress address,
                                 usize* index);
 const RDSegment* rd_i_db_find_segment(const RDContext* ctx, RDAddress address);
