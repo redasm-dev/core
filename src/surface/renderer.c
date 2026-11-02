@@ -509,10 +509,14 @@ void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,
                      RDNumberFlags flags) {
     RDAddress from;
 
-    // unmapped operand: a user xref from this row may say where it goes
+    // unmapped operand: user decision first, then the instruction's own window
     if(!rd_is_address(self->context, address) &&
        _rd_renderer_row_address(self, &from)) {
-        rd_i_resolve_selector_xref(self->context, from, address, &address);
+        if(!rd_i_resolve_selector_xref(self->context, from, address,
+                                       &address)) {
+            const RDSegment* seg = rd_i_db_find_segment(self->context, from);
+            rd_i_segment_resolve_same_window(seg, address, &address);
+        }
     }
 
     if(!rd_i_renderer_has_flag(self, RD_RF_NO_NAMES)) {

@@ -1335,14 +1335,21 @@ bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     if(!fromseg) return false;
 
     if(!toseg) {
-        // is 'toaddr' inside some banked segment's CPU range?
         if(rd_i_is_selector_range(self, toaddr)) {
-            rd_i_add_problem(self, fromaddr, toaddr,
-                             "unresolved banked reference");
-        }
+            RDAddress resolved;
+            if(rd_i_segment_resolve_same_window(fromseg, toaddr, &resolved)) {
+                toaddr = resolved;
+                toseg = fromseg;
+            }
 
-        return false;
+            if(!toseg) {
+                rd_i_add_problem(self, fromaddr, toaddr,
+                                 "unresolved banked reference");
+            }
+        }
     }
+
+    if(!toseg) return false;
 
     usize fromidx = rd_i_address2index(fromseg, fromaddr);
     usize toidx = rd_i_address2index(toseg, toaddr);

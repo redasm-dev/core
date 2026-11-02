@@ -8,7 +8,7 @@ typedef enum {
 } RDFlagsOverlay;
 
 typedef struct RDSegment {
-    const RDContext* context;
+    RDContext* context;
     RDFlagsBuffer* flags;
     u8* ovl_flags;
     const char* name;
@@ -34,6 +34,9 @@ RDSegment* rd_i_segment_create(RDContext* ctx, const char* name,
                                u32 perm);
 
 void rd_i_segment_destroy(RDSegment* self);
+
+bool rd_i_segment_resolve_same_window(const RDSegment* self, RDAddress value,
+                                      RDAddress* address);
 
 // Overlay Flags management
 void rd_i_segment_set_ovl(const RDSegment* self, usize idx, RDFlagsOverlay f);

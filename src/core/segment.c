@@ -117,3 +117,14 @@ bool rd_segment_get_selector(const RDSegment* self, usize* id, RDAddress* base,
     if(base) *base = rd_i_abs(ctx, self->selector.base);
     return rd_i_segment_has_selector(self);
 }
+
+bool rd_i_segment_resolve_same_window(const RDSegment* self, RDAddress value,
+                                      RDAddress* address) {
+    if(!self || !rd_i_segment_has_selector(self)) return false;
+
+    RDAddress resolved = value + self->selector.base;
+    if(rd_i_db_find_segment(self->context, resolved) != self) return false;
+
+    if(address) *address = resolved;
+    return true;
+}
