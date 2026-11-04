@@ -17,6 +17,7 @@
 #include "types/type.h"
 #include <redasm/redasm.h>
 #include <redasm/types/def.h>
+#include <stdarg.h>
 #include <time.h>
 
 typedef struct RDHooks RDHooks;
@@ -179,5 +180,10 @@ bool rd_i_resolve_bank_xref(RDContext* self, RDAddress from, RDAddress value,
                             RDAddress* address);
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
-void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
-                      const char* fmt, ...);
+bool rd_i_read_uint(const RDContext* ctx, unsigned int size, RDAddress address,
+                    RDAddress* v);
+
+void rd_i_add_problem_v(RDContext* self, u32 code, RDAddress from,
+                        RDAddress address, const char* fmt, va_list args);
+
+RDRegSetter rd_i_current_setter(const RDContext* ctx);

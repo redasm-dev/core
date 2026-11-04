@@ -1177,18 +1177,20 @@ usize _rd_i_db_query_get_function_count(RDContext* ctx) {
     return 0;
 }
 
-void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
+void _rd_i_db_query_add_problem(RDContext* ctx, u32 code, RDAddress from,
                                 RDAddress target, const char* msg) {
     assert(msg);
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_ADD_PROBLEM, "\
         INSERT OR IGNORE INTO Problems \
-        VALUES (:fromval, :fromisaddr, :targetval, :targetisaddr, :message) \
+        VALUES (:code, :fromval, :fromisaddr, :targetval, :targetisaddr, :message) \
     ");
 
     // if address not valid, just write what the problem passed
     bool from_is_addr = rd_i_db_find_segment(ctx, from) != NULL;
     bool target_is_addr = rd_i_db_find_segment(ctx, target) != NULL;
+
+    _rd_db_bind_param_int(ctx, stmt, ":code", (sqlite3_int64)code);
 
     _rd_db_bind_param_int(ctx, stmt, ":fromval",
                           from_is_addr ? (sqlite3_int64)rd_i_rel(ctx, from)
@@ -1219,42 +1221,47 @@ void _rd_i_db_query_del_problems_from(RDContext* ctx, RDAddress start,
 }
 
 const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
+                                                      u32 req_code,
                                                       RDProblemsVect* v) {
     assert(v);
 
     sqlite3_stmt* stmt = _rd_db_prepare_query(ctx, RD_QUERY_GET_ALL_PROBLEMS, "\
-        SELECT from_value, from_is_address, target_value, target_is_address, message \
+        SELECT code, from_value, from_is_address, target_value, target_is_address, message \
         FROM Problems \
+        WHERE (:code = 0 OR code = :code) \
         ORDER BY from_value, target_value \
     ");
 
     vect_clear(v);
 
+    _rd_db_bind_param_int(ctx, stmt, ":code", (sqlite3_int64)req_code);
+
     while(_rd_db_step(ctx, stmt) == SQLITE_ROW) {
-        RDAddress from = (RDAddress)sqlite3_column_int64(stmt, 0);
-        bool from_is_addr = (bool)sqlite3_column_int(stmt, 1);
-        RDAddress target = (RDAddress)sqlite3_column_int64(stmt, 2);
-        bool target_is_addr = (bool)sqlite3_column_int(stmt, 3);
+        u32 code = (u32)sqlite3_column_int64(stmt, 0);
+        RDAddress from = (RDAddress)sqlite3_column_int64(stmt, 1);
+        bool from_is_addr = (bool)sqlite3_column_int(stmt, 2);
+        RDAddress target = (RDAddress)sqlite3_column_int64(stmt, 3);
+        bool target_is_addr = (bool)sqlite3_column_int(stmt, 4);
+        const char* msg = (const char*)sqlite3_column_text(stmt, 5);
 
         vect_push(
-            v,
-            (RDProblem){
-                .from =
-                    {
-                        .value = from_is_addr ? rd_i_abs(ctx, from) : from,
-                        .is_address = from_is_addr,
-                    },
+            v, (RDProblem){
+                   .code = code,
+                   .from =
+                       {
+                           .value = from_is_addr ? rd_i_abs(ctx, from) : from,
+                           .is_address = from_is_addr,
+                       },
 
-                .target =
-                    {
-                        .value =
-                            target_is_addr ? rd_i_abs(ctx, target) : target,
-                        .is_address = target_is_addr,
-                    },
+                   .target =
+                       {
+                           .value =
+                               target_is_addr ? rd_i_abs(ctx, target) : target,
+                           .is_address = target_is_addr,
+                       },
 
-                .message = rd_i_strpool_intern(
-                    &ctx->strings, (const char*)sqlite3_column_text(stmt, 4)),
-            });
+                   .message = rd_i_strpool_intern(&ctx->strings, msg),
+               });
     }
 
     return v;

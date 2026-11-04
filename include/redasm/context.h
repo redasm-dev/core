@@ -42,7 +42,17 @@ typedef enum {
     RD_UNDEFINE_ALL = 0xFFFF,
 } RDUndefineFlags;
 
+typedef enum {
+    RD_PROBLEM_NONE = 0,
+    RD_PROBLEM_DEFAULT = 1,
+    RD_PROBLEM_BANKED = 2,
+
+    RD_PROBLEM_USERBASE = 0x1000,
+} RDProblemCode;
+
 typedef struct RDProblem {
+    u32 code;
+
     struct {
         RDAddress value;
         bool is_address;
@@ -138,7 +148,7 @@ RD_API bool rd_decode(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_decode_n(RDContext* ctx, RDAddress address, RDInstruction* instrs, usize n);
 RD_API bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr);
 RD_API bool rd_has_problems(const RDContext* self);
-RD_API RDProblemSlice rd_get_all_problems(const RDContext* self);
+RD_API RDProblemSlice rd_get_all_problems(const RDContext* self, RDProblemCode kind);
 RD_API RDTypeDefSlice rd_get_all_type_defs(const RDContext* self);
 RD_API RDAddressSlice rd_get_all_address_by_type(const RDContext* self, const char* filter);
 RD_API RDAddressSlice rd_get_all_functions(const RDContext* self);
@@ -250,4 +260,6 @@ RD_API bool rd_write_be64(RDContext* self, RDAddress address, u64 v);
 RD_API usize rd_write(RDContext* self, RDAddress address, const void* data, usize n);
 RD_API usize rd_patch(RDContext* self, RDAddress address, const void* data, usize n);
 RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
+RD_API void rd_add_problem(RDContext* self, RDAddress from, RDAddress address, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(4, 5);
+RD_API void rd_add_problem_as(RDContext* self, u32 code, RDAddress from, RDAddress address, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(5, 6);
 // clang-format on

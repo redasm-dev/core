@@ -88,100 +88,65 @@ enum {
     RD_QUERY_COUNT,
 };
 
+// clang-format off
 void _rd_i_db_query_add_segment(RDContext* ctx, const RDSegment* s);
-RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx,
-                                               RDSegmentVect* v);
+RDSegmentVect* _rd_i_db_query_get_all_segments(RDContext* ctx, RDSegmentVect* v);
 void _rd_i_db_query_set_segment_bank(RDContext* ctx, const RDSegment* s);
 
 void _rd_i_db_query_add_mapping(RDContext* ctx, const RDInputMapping* m);
-RDInputMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx,
-                                                    RDInputMappingVect* v);
+RDInputMappingVect* _rd_i_db_query_get_all_mappings(RDContext* ctx, RDInputMappingVect* v);
 
 void _rd_i_db_query_set_external(RDContext* ctx, const RDExternal* ext);
-bool _rd_i_db_query_get_external(RDContext* ctx, RDAddress address,
-                                 RDExternal* ext);
-bool _rd_i_db_query_get_external_ord(RDContext* ctx, const char* module,
-                                     u32 ord, RDExternalKind kind,
-                                     RDExternal* ext);
-RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
-                                                 RDExternalKind kind,
-                                                 RDExternalVect* v);
+bool _rd_i_db_query_get_external(RDContext* ctx, RDAddress address, RDExternal* ext);
+bool _rd_i_db_query_get_external_ord(RDContext* ctx, const char* module, u32 ord, RDExternalKind kind, RDExternal* ext);
+RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx, RDExternalKind kind, RDExternalVect* v);
 
-bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                             RDXRefType type, RDConfidence c);
-bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                             RDConfidence c, RDXRefType* type);
-bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to,
-                             RDXRefFull* xref);
-RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,
-                                          RDXRefType type, RDXRefVect* refs);
-RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
-                                        RDXRefType type, RDXRefVect* refs);
-bool _rd_i_db_query_del_xrefs_from(RDContext* ctx, RDAddress from,
-                                   RDConfidence c);
+bool _rd_i_db_query_add_xref(RDContext* ctx, RDAddress from, RDAddress to, RDXRefType type, RDConfidence c);
+bool _rd_i_db_query_del_xref(RDContext* ctx, RDAddress from, RDAddress to, RDConfidence c, RDXRefType* type);
+bool _rd_i_db_query_get_xref(RDContext* ctx, RDAddress from, RDAddress to, RDXRefFull* xref);
+RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from, RDXRefType type, RDXRefVect* refs);
+RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to, RDXRefType type, RDXRefVect* refs);
+bool _rd_i_db_query_del_xrefs_from(RDContext* ctx, RDAddress from, RDConfidence c);
 bool _rd_i_db_query_del_xrefs_to(RDContext* ctx, RDAddress to, RDConfidence c);
-bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address,
-                                   RDXRefType type);
-bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address,
-                                 RDXRefType type);
+bool _rd_i_db_query_has_xrefs_from(RDContext* ctx, RDAddress address, RDXRefType type);
+bool _rd_i_db_query_has_xrefs_to(RDContext* ctx, RDAddress address, RDXRefType type);
 
-bool _rd_i_db_query_get_address(RDContext* ctx, const char* name,
-                                RDAddress* address);
+bool _rd_i_db_query_get_address(RDContext* ctx, const char* name, RDAddress* address);
 bool _rd_i_db_query_get_name(RDContext* ctx, RDAddress address, RDName* n);
-void _rd_i_db_query_set_name(RDContext* ctx, RDAddress address,
-                             const char* name, RDConfidence c);
+void _rd_i_db_query_set_name(RDContext* ctx, RDAddress address, const char* name, RDConfidence c);
 bool _rd_i_db_query_del_name(RDContext* ctx, RDAddress address);
-RDNameVect* _rd_i_db_query_get_all_names(RDContext* ctx, RDAddressVect* av,
-                                         RDNameVect* v);
-RDAddressVect* _rd_i_db_query_get_all_name_addresses(RDContext* ctx,
-                                                     RDAddressVect* v);
+RDNameVect* _rd_i_db_query_get_all_names(RDContext* ctx, RDAddressVect* av, RDNameVect* v);
+RDAddressVect* _rd_i_db_query_get_all_name_addresses(RDContext* ctx, RDAddressVect* v);
 
-void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address, const RDType* t,
-                             RDConfidence c);
+void _rd_i_db_query_set_type(RDContext* ctx, RDAddress address, const RDType* t, RDConfidence c);
 bool _rd_i_db_query_get_type(RDContext* ctx, RDAddress address, RDType* t);
 bool _rd_i_db_query_del_type(RDContext* ctx, RDAddress address);
-RDAddressVect* _rd_i_db_query_get_address_by_type(RDContext* ctx,
-                                                  RDAddressVect* v,
-                                                  const char* filter);
-RDTypeVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av,
-                                         RDTypeVect* v);
-bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address,
-                                  RDType* t);
+RDAddressVect* _rd_i_db_query_get_address_by_type(RDContext* ctx, RDAddressVect* v, const char* filter);
+RDTypeVect* _rd_i_db_query_get_all_types(RDContext* ctx, RDAddressVect* av, RDTypeVect* v);
+bool _rd_i_db_query_get_root_type(RDContext* ctx, RDAddress* address, RDType* t);
 
-void _rd_i_db_query_set_function(RDContext* ctx, RDAddress address,
-                                 const char* type_name);
+void _rd_i_db_query_set_function(RDContext* ctx, RDAddress address, const char* type_name);
 void _rd_i_db_query_del_function(RDContext* ctx, RDAddress address);
-bool _rd_i_db_query_get_function_type(RDContext* ctx, RDAddress address,
-                                      const char** type_name);
-RDAddressVect* _rd_i_db_query_get_all_functions(RDContext* ctx,
-                                                RDAddressVect* v);
+bool _rd_i_db_query_get_function_type(RDContext* ctx, RDAddress address, const char** type_name);
+RDAddressVect* _rd_i_db_query_get_all_functions(RDContext* ctx, RDAddressVect* v);
 usize _rd_i_db_query_get_function_count(RDContext* ctx);
 
 void _rd_i_db_query_set_callconv(RDContext* ctx, const RDCallConv* cc);
-RDCallConvVect* _rd_i_db_query_get_all_callconvs(RDContext* ctx,
-                                                 RDCallConvVect* v);
+RDCallConvVect* _rd_i_db_query_get_all_callconvs(RDContext* ctx, RDCallConvVect* v);
 
 void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef);
-RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
-                                                RDTypeDefVect* v);
+RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx, RDTypeDefVect* v);
 
-const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address,
-                                       RDCommentPlacement p, usize line);
-void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address,
-                                const char* cmt, RDCommentPlacement p);
+const char* _rd_i_db_query_get_comment(RDContext* ctx, RDAddress address, RDCommentPlacement p, usize line);
+void _rd_i_db_query_add_comment(RDContext* ctx, RDAddress address, const char* cmt, RDCommentPlacement p);
 void _rd_i_db_query_del_all_comments(RDContext* ctx, RDAddress address);
-void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address,
-                                RDCommentPlacement p);
-usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address,
-                                       RDCommentPlacement p);
+void _rd_i_db_query_del_comment(RDContext* ctx, RDAddress address, RDCommentPlacement p);
+usize _rd_i_db_query_get_comment_count(RDContext* ctx, RDAddress address, RDCommentPlacement p);
 bool _rd_i_db_query_has_any_comment(RDContext* ctx, RDAddress address);
 
-void _rd_i_db_query_add_problem(RDContext* ctx, RDAddress from,
-                                RDAddress target, const char* msg);
-void _rd_i_db_query_del_problems_from(RDContext* ctx, RDAddress start,
-                                      RDAddress end);
-const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx,
-                                                      RDProblemsVect* v);
+void _rd_i_db_query_add_problem(RDContext* ctx, u32 code, RDAddress from, RDAddress target, const char* msg);
+void _rd_i_db_query_del_problems_from(RDContext* ctx, RDAddress start, RDAddress end);
+const RDProblemsVect* _rd_i_db_query_get_all_problems(RDContext* ctx, u32 req_code, RDProblemsVect* v);
 usize _rd_i_db_query_get_problem_count(RDContext* ctx);
 bool _rd_i_db_query_has_problems(RDContext* ctx);
 
@@ -194,5 +159,5 @@ void _rd_i_db_query_load_all_sregval(RDContext* ctx);
 void _rd_i_db_query_set_ovr_operand(RDContext* ctx, RDAddress address, int idx);
 void _rd_i_db_query_del_ovr_operand(RDContext* ctx, RDAddress address, int idx);
 bool _rd_i_db_query_has_ovr_operand(RDContext* ctx, RDAddress address);
-RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx,
-                                                     RDAddress address);
+RDOvrOperandVect* _rd_i_db_query_get_all_ovr_operand(RDContext* ctx, RDAddress address);
+// clang-format on

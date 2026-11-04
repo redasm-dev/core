@@ -7,6 +7,7 @@
 #include "support/containers.h"
 #include "support/error.h"
 #include "support/utils.h"
+#include <inttypes.h>
 #include <redasm/support/logging.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
@@ -205,11 +206,12 @@ bool rd_i_db_add_segment(RDContext* ctx, RDSegment* seg) {
         RDRelAddress e = (*it)->rel_end;
 
         if(seg->rel_start < e && seg->rel_end > s) {
-            rd_i_add_problem(
-                ctx, rd_segment_get_start(seg), rd_segment_get_start(seg),
-                "segment '%s' [%llx, %llx) overlaps with '%s' [%llx, %llx)",
-                seg->name, rd_segment_get_start(seg), rd_segment_get_end(seg),
-                (*it)->name, s, e);
+            rd_add_problem(ctx, rd_segment_get_start(seg),
+                           rd_segment_get_start(seg),
+                           "segment '%s' [%" PRIX64 ", %" PRIX64
+                           ") overlaps with '%s' [%" PRIX64 ", %" PRIX64 ")",
+                           seg->name, rd_segment_get_start(seg),
+                           rd_segment_get_end(seg), (*it)->name, s, e);
             return false;
         }
     }
@@ -269,9 +271,9 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping* m) {
     usize n = rd_inputmapping_get_size(m);
 
     if(m->offset + n > ctx->input->base.length) {
-        rd_i_add_problem(ctx, rd_inputmapping_get_start(m),
-                         rd_inputmapping_get_start(m),
-                         "trying to map past end of input buffer");
+        rd_add_problem(ctx, rd_inputmapping_get_start(m),
+                       rd_inputmapping_get_start(m),
+                       "trying to map past end of input buffer");
         return false;
     }
 
@@ -280,16 +282,17 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping* m) {
         rd_i_db_find_segment(ctx, rd_inputmapping_get_start(m));
 
     if(!seg) {
-        rd_i_add_problem(ctx, rd_inputmapping_get_start(m),
-                         rd_inputmapping_get_start(m), "no segment at %llx",
-                         rd_inputmapping_get_start(m));
+        rd_add_problem(ctx, rd_inputmapping_get_start(m),
+                       rd_inputmapping_get_start(m), "no segment at %" PRIX64,
+                       rd_inputmapping_get_start(m));
         return false;
     }
 
     if(m->rel_end > seg->rel_end) {
-        rd_i_add_problem(
+        rd_add_problem(
             ctx, rd_inputmapping_get_start(m), rd_inputmapping_get_start(m),
-            "[%llx, %llx) crosses segment boundary '%s' [%llx, %llx)",
+            "[%" PRIX64 ", %" PRIX64 ") crosses segment boundary '%s' [%" PRIX64
+            ", %" PRIX64 ")",
             rd_inputmapping_get_start(m), rd_inputmapping_get_end(m), seg->name,
             rd_segment_get_start(seg), rd_segment_get_end(seg));
         return false;
@@ -299,9 +302,10 @@ bool rd_i_db_add_mapping(RDContext* ctx, RDInputMapping* m) {
     RDInputMapping** it;
     vect_each(it, &ctx->db->mappings) {
         if(m->rel_start < (*it)->rel_end && m->rel_end > (*it)->rel_start) {
-            rd_i_add_problem(
+            rd_add_problem(
                 ctx, rd_inputmapping_get_start(m), rd_inputmapping_get_start(m),
-                "[%llx, %llx) overlaps with existing mapping [%llx, %llx)",
+                "[%" PRIX64 ", %" PRIX64
+                ") overlaps with existing mapping [%" PRIX64 ", %" PRIX64 ")",
                 rd_inputmapping_get_start(m), rd_inputmapping_get_end(m),
                 rd_inputmapping_get_start(*it), rd_inputmapping_get_end(*it));
             return false;
@@ -501,9 +505,9 @@ bool rd_i_db_has_any_comment(RDContext* ctx, RDAddress address) {
     return _rd_i_db_query_has_any_comment(ctx, address);
 }
 
-void rd_i_db_add_problem(RDContext* ctx, RDAddress from, RDAddress target,
-                         const char* msg) {
-    _rd_i_db_query_add_problem(ctx, from, target, msg);
+void rd_i_db_add_problem(RDContext* ctx, RDProblemCode kind, RDAddress from,
+                         RDAddress target, const char* msg) {
+    _rd_i_db_query_add_problem(ctx, kind, from, target, msg);
 }
 
 void rd_i_db_del_problems_from(RDContext* ctx, RDAddress start, RDAddress end) {
@@ -511,8 +515,9 @@ void rd_i_db_del_problems_from(RDContext* ctx, RDAddress start, RDAddress end) {
 }
 
 const RDProblemsVect* rd_i_db_get_all_problems(RDContext* ctx,
+                                               RDProblemCode kind,
                                                RDProblemsVect* v) {
-    return _rd_i_db_query_get_all_problems(ctx, v);
+    return _rd_i_db_query_get_all_problems(ctx, kind, v);
 }
 
 bool rd_i_db_has_problems(RDContext* ctx) {

@@ -92,9 +92,9 @@ static bool _rd_engine_accept_address(RDContext* ctx, RDAddress address,
     // tail = pointing into the middle of an existing instruction:
     // plugin bug or deliberate obfuscation: reject and surface as problem
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(ctx, address, address,
-                         "jump/call target points into the middle of an "
-                         "existing instruction");
+        rd_add_problem(ctx, address, address,
+                       "jump/call target points into the middle of an "
+                       "existing instruction");
         return false;
     }
 
@@ -129,8 +129,8 @@ static RDEngineFlow _rd_engine_execute_delay_slots(RDContext* ctx,
         ctx->engine.dslot_info.n = 0; // back out
 
         if(!len) {
-            rd_i_add_problem(ctx, instr->address, address,
-                             "cannot decode delay slot #%u", nslot);
+            rd_add_problem(ctx, instr->address, address,
+                           "cannot decode delay slot #%u", nslot);
             break;
         }
 
@@ -184,9 +184,9 @@ static bool _rd_engine_next_item(RDContext* ctx) {
         _rd_engine_find_segment(ctx, ctx->engine.current.address);
 
     if(!ctx->engine.segment) {
-        rd_i_add_problem(ctx, ctx->engine.current.address,
-                         ctx->engine.current.address,
-                         "program counter outside any segment");
+        rd_add_problem(ctx, ctx->engine.current.address,
+                       ctx->engine.current.address,
+                       "program counter outside any segment");
         return false;
     }
 
@@ -211,9 +211,9 @@ static bool _rd_engine_should_decode(RDContext* ctx, usize idx,
         const char* queue_kind = _rd_engine_queue_name(cur->kind);
         assert(queue_kind && "invalid queue kind");
 
-        rd_i_add_problem(ctx, cur->from, cur->address,
-                         "%s target points into middle of existing instruction",
-                         queue_kind);
+        rd_add_problem(ctx, cur->from, cur->address,
+                       "%s target points into middle of existing instruction",
+                       queue_kind);
         return false;
     }
 
@@ -238,17 +238,17 @@ static bool _rd_engine_do_decode(RDContext* ctx, usize idx,
     assert(instr->length && "decode succeeded without a length");
 
     if(!rd_i_flagsbuffer_has_unknown_n(seg->flags, idx, instr->length)) {
-        rd_i_add_problem(ctx, cur->address, cur->address,
-                         "instruction overlaps existing item (length: %u)",
-                         instr->length);
+        rd_add_problem(ctx, cur->address, cur->address,
+                       "instruction overlaps existing item (length: %u)",
+                       instr->length);
         instr->length = 0;
         return false;
     }
 
     if(!rd_i_flagsbuffer_set_code(seg->flags, idx, instr->length)) {
-        rd_i_add_problem(ctx, cur->address, cur->address,
-                         "failed to classify as code (length: %u)",
-                         instr->length);
+        rd_add_problem(ctx, cur->address, cur->address,
+                       "failed to classify as code (length: %u)",
+                       instr->length);
         instr->length = 0;
         return false;
     }
@@ -267,8 +267,9 @@ static void _rd_engine_emulate(RDContext* ctx, RDInstruction* instr) {
         // determined by the last delay slot's flow.
         ctx->engine.flow = dslot_flow;
     }
-    else
+    else {
         ctx->processorplugin->emulate(ctx, instr, ctx->processor);
+    }
 }
 
 static void _rd_engine_apply_flags(const RDSegment* seg, usize idx,
@@ -451,14 +452,14 @@ void rd_flow(RDContext* ctx, RDAddress address) {
     usize flow_idx = rd_i_address2index(seg, address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, flow_idx)) {
-        rd_i_add_problem(ctx, address, address,
-                         "flow into the middle of an existing instruction "
-                         "(processor plugin bug: wrong instruction length?)");
+        rd_add_problem(ctx, address, address,
+                       "flow into the middle of an existing instruction "
+                       "(processor plugin bug: wrong instruction length?)");
         return;
     }
 
     if(rd_flagsbuffer_has_data(seg->flags, flow_idx)) {
-        rd_i_add_problem(ctx, address, address, "flow into data region");
+        rd_add_problem(ctx, address, address, "flow into data region");
         return;
     }
 

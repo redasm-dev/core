@@ -1,8 +1,8 @@
 #include "registers.h"
 #include "core/context.h"
-#include "core/worker.h"
 #include "support/containers.h"
 #include "support/hash/murmur3.h"
+#include <inttypes.h>
 
 static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
     RDQueryReg q = {
@@ -13,15 +13,21 @@ static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
     return rd_query_reg(ctx, &q) ? q.name : NULL;
 }
 
-static RDRegSetter _rd_current_setter(const RDContext* ctx) {
-    // outside the emulate step there is no current instruction: initial
-    // register state set by a loader must not look like a definition
-    if(ctx->engine.step != RD_WS_EMULATE) return (RDRegSetter){0};
+// the bits 'res' covers within its root, validated: a plugin bug (empty or
+// malformed mask) is reported and the register is not tracked
+static bool _rd_reg_bits(const RDRegResolved* res, RDRegValue* bits) {
+    RDRegValue m = res->mask.mask;
+    RDRegValue run = res->mask.shift < 64 ? m >> res->mask.shift : 0;
 
-    return (RDRegSetter){
-        .value = ctx->engine.current.address,
-        .has_value = true,
-    };
+    // non empty, starting at 'shift', contiguous
+    if(!m || !(run & 1) || ((run + 1) & run)) {
+        RD_LOG_FAIL("register '%s': invalid mask %" PRIx64 " (shift %u)",
+                    res->name, m, (unsigned int)res->mask.shift);
+        return false;
+    }
+
+    *bits = m;
+    return true;
 }
 
 static size_t _rd_register_hash(const void* e) {
@@ -34,6 +40,19 @@ static bool _rd_register_equal(const void* a, const void* b) {
     const RDRegister* rb = (const RDRegister*)b;
     if(ra->name == rb->name) return true;
     return !strcmp(ra->name, rb->name);
+}
+
+static const RDRegister* _rd_regmap_find(const RDRegisterHMap* map,
+                                         const RDRegResolved* res,
+                                         RDRegValue* bits) {
+    if(!_rd_reg_bits(res, bits)) return NULL;
+
+    RDRegister key = {.name = res->name};
+    const RDRegister* r = hmap_get(map, &key);
+
+    // a single unknown bit makes the requested register unknown
+    if(!r || (r->known_bits & *bits) != *bits) return NULL;
+    return r;
 }
 
 void rd_i_registermap_init(RDRegisterHMap* self) {
@@ -80,26 +99,33 @@ bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
                      RDRegValue value, RDRegSetter setter) {
     assert(res);
 
-    RDRegister r = {.name = res->name};
-    RDRegister* curr = hmap_get(map, &r);
-    bool is_full = res->mask.mask == RD_REGMASK_FULL;
+    RDRegValue bits;
+    if(!_rd_reg_bits(res, &bits)) return false;
 
-    if(!is_full) { // merge partial write
-        RDRegValue base = curr ? curr->value : 0;
-        value = (base & ~res->mask.mask) |
-                ((value << res->mask.shift) & res->mask.mask);
-    }
+    RDRegValue v = (value << res->mask.shift) & bits;
+    RDRegister key = {.name = res->name};
+    RDRegister* curr = hmap_get(map, &key);
 
-    if(curr) {
-        if(is_full) curr->setter = setter;
-        if(curr->value == value) return false;
-        curr->value = value;
+    if(!curr) {
+        key.value = v;
+        key.known_bits = bits;
+        key.setter = setter;
+        key.setter_bits = setter.has_value ? bits : 0;
+        hmap_set(map, &key);
         return true;
     }
 
-    if(is_full) r.setter = setter;
-    r.value = value;
-    hmap_set(map, &r);
+    // payload only: the hash depends on 'name'
+    RDRegValue new_val = (curr->value & ~bits) | v;
+    RDRegValue new_known = curr->known_bits | bits;
+
+    curr->setter = setter;
+    curr->setter_bits = setter.has_value ? bits : 0;
+
+    if(new_val == curr->value && new_known == curr->known_bits) return false;
+
+    curr->value = new_val;
+    curr->known_bits = new_known;
     return true;
 }
 
@@ -107,30 +133,48 @@ bool rd_i_regmap_get(const RDRegisterHMap* map, const RDRegResolved* res,
                      RDRegValue* value) {
     assert(res);
 
-    RDRegister key = {.name = res->name};
-
-    const RDRegister* r = hmap_get(map, &key);
+    RDRegValue bits;
+    const RDRegister* r = _rd_regmap_find(map, res, &bits);
     if(!r) return false;
 
-    if(value) *value = (r->value & res->mask.mask) >> res->mask.shift;
+    if(value) *value = (r->value & bits) >> res->mask.shift;
     return true;
 }
 
 bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res) {
+    assert(res);
+
+    RDRegValue bits;
+    if(!_rd_reg_bits(res, &bits)) return false;
+
     RDRegister key = {.name = res->name};
-    hmap_del(map, &key);
+    RDRegister* r = hmap_get(map, &key);
+    if(!r) return true;
+
+    r->known_bits &= ~bits;
+    r->value &= ~bits;
+    r->setter = (RDRegSetter){0};
+    r->setter_bits = 0;
+
+    if(!r->known_bits) hmap_del(map, &key);
     return true;
 }
 
 bool rd_i_regmap_get_info(const RDRegisterHMap* map, const RDRegResolved* res,
                           RDRegValueInfo* info) {
-    RDRegister key = {.name = res->name};
-    const RDRegister* r = hmap_get(map, &key);
+    assert(res);
+
+    RDRegValue bits;
+    const RDRegister* r = _rd_regmap_find(map, res, &bits);
     if(!r) return false;
 
     if(info) {
-        info->value = (r->value & res->mask.mask) >> res->mask.shift;
-        info->setter = r->setter;
+        info->value = (r->value & bits) >> res->mask.shift;
+
+        if(r->setter.has_value && (r->setter_bits & bits) == bits)
+            info->setter = r->setter;
+        else
+            info->setter = (RDRegSetter){0};
     }
 
     return true;
@@ -140,7 +184,7 @@ bool rd_set_regval(RDContext* ctx, const char* regname, u64 value) {
     RDRegResolved res;
     return rd_i_reg_resolve_name(ctx, regname, &res) &&
            rd_i_regmap_set(&ctx->engine.current.registers, &res, value,
-                           _rd_current_setter(ctx));
+                           rd_i_current_setter(ctx));
 }
 
 bool rd_get_regval(RDContext* ctx, const char* regname, RDRegValue* value) {
@@ -159,7 +203,7 @@ bool rd_set_regval_id(RDContext* ctx, RDReg id, RDRegValue value) {
     RDRegResolved res;
     return rd_i_reg_resolve_id(ctx, id, &res) &&
            rd_i_regmap_set(&ctx->engine.current.registers, &res, value,
-                           _rd_current_setter(ctx));
+                           rd_i_current_setter(ctx));
 }
 
 bool rd_get_regval_id(RDContext* ctx, RDReg id, RDRegValue* value) {

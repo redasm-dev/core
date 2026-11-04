@@ -30,11 +30,16 @@ static bool _rd_vect_contains_address(const RDAddressVect* v, RDAddress addr) {
     return false;
 }
 
-static bool _rd_read_ptr(const RDContext* ctx, unsigned int ptr_size,
-                         RDAddress address, RDAddress* v) {
+static inline bool _rd_is_entry_point(const RDContext* ctx, RDAddress address) {
+    return ctx->entry_point.has_value &&
+           ctx->entry_point.value == rd_i_rel(ctx, address);
+}
+
+bool rd_i_read_uint(const RDContext* ctx, unsigned int size, RDAddress address,
+                    RDAddress* v) {
     bool is_be = ctx->processorplugin->flags & RD_PF_BE;
 
-    switch(ptr_size) {
+    switch(size) {
         case sizeof(u8): {
             u8 ptr_v;
             if(!rd_read_byte(ctx, address, &ptr_v)) return false;
@@ -76,11 +81,6 @@ static bool _rd_read_ptr(const RDContext* ctx, unsigned int ptr_size,
     }
 
     return false;
-}
-
-static inline bool _rd_is_entry_point(const RDContext* ctx, RDAddress address) {
-    return ctx->entry_point.has_value &&
-           ctx->entry_point.value == rd_i_rel(ctx, address);
 }
 
 bool rd_i_in_bank_window(const RDContext* self, RDAddress address) {
@@ -267,8 +267,8 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
 
     usize idx = rd_i_address2index(seg, address);
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set name '%s' on tail byte", name);
+        rd_add_problem(self, address, address,
+                       "cannot set name '%s' on tail byte", name);
         return false;
     }
 
@@ -295,9 +295,9 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
         if(rd_i_db_get_address(self, name, &existing) && existing != address) {
             if(c == RD_CONFIDENCE_USER) {
                 // user tried to set a duplicate name: reject with problem
-                rd_i_add_problem(self, address, address,
-                                 "duplicate name '%s' already exists at %llx",
-                                 name, existing);
+                rd_add_problem(self, address, address,
+                               "duplicate name '%s' already exists at %" PRIX64,
+                               name, existing);
                 return false;
             }
             if(c == RD_CONFIDENCE_LIBRARY) {
@@ -305,10 +305,10 @@ bool rd_i_set_name(RDContext* self, RDAddress address, const char* name,
                 if(rd_i_db_get_name(self, existing, &existingname) &&
                    existingname.confidence == RD_CONFIDENCE_USER) {
                     // USER already owns this name: reject
-                    rd_i_add_problem(self, address, address,
-                                     "duplicate name '%s' already owned by "
-                                     "user at %llx",
-                                     name, existing);
+                    rd_add_problem(self, address, address,
+                                   "duplicate name '%s' already owned by "
+                                   "user at %" PRIX64,
+                                   name, existing);
                     return false;
                 }
             }
@@ -622,8 +622,8 @@ bool rd_set_noreturn(RDContext* self, RDAddress address) {
     usize idx = rd_i_address2index(seg, address);
 
     if(!rd_flagsbuffer_has_func(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set noreturn on a non-function address");
+        rd_add_problem(self, address, address,
+                       "cannot set noreturn on a non-function address");
         return false;
     }
 
@@ -638,8 +638,8 @@ bool rd_set_comment_inline(RDContext* self, RDAddress address,
     usize idx = rd_i_address2index(seg, address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set comment on tail byte");
+        rd_add_problem(self, address, address,
+                       "cannot set comment on tail byte");
         return false;
     }
 
@@ -685,8 +685,8 @@ bool rd_i_add_comment(RDContext* self, RDAddress address, const char* cmt,
     usize idx = rd_i_address2index(seg, address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, address, address,
-                         "cannot set comment on tail byte");
+        rd_add_problem(self, address, address,
+                       "cannot set comment on tail byte");
         return false;
     }
 
@@ -720,7 +720,7 @@ bool rd_set_typed_function(RDContext* self, RDAddress address,
     if(!seg) return false;
 
     if(!rd_segment_has_perm(seg, RD_SP_X)) {
-        rd_i_add_problem(
+        rd_add_problem(
             self, address, address,
             "trying to create a function in non executable segment '%s'",
             seg->name);
@@ -881,11 +881,11 @@ bool rd_read_sleb128(const RDContext* self, RDAddress address, RDSLeb128* v) {
 }
 
 bool rd_read_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
-    return _rd_read_ptr(ctx, rd_get_ptr_size(ctx), address, v);
+    return rd_i_read_uint(ctx, rd_get_ptr_size(ctx), address, v);
 }
 
 bool rd_read_code_ptr(const RDContext* ctx, RDAddress address, RDAddress* v) {
-    return _rd_read_ptr(ctx, rd_get_code_ptr_size(ctx), address, v);
+    return rd_i_read_uint(ctx, rd_get_code_ptr_size(ctx), address, v);
 }
 
 bool rd_follow_ptr(RDContext* ctx, RDAddress address, RDAddress* v) {
@@ -1064,10 +1064,10 @@ bool rd_has_problems(const RDContext* self) {
     return rd_i_db_has_problems((RDContext*)self);
 }
 
-RDProblemSlice rd_get_all_problems(const RDContext* self) {
+RDProblemSlice rd_get_all_problems(const RDContext* self, RDProblemCode kind) {
     return vect_to_slice(
         RDProblemSlice,
-        rd_i_db_get_all_problems((RDContext*)self,
+        rd_i_db_get_all_problems((RDContext*)self, kind,
                                  (RDProblemsVect*)&self->problems_buf));
 }
 
@@ -1280,30 +1280,30 @@ bool rd_i_set_external(RDContext* self, const RDExternal* ext) {
     const RDSegment* seg = rd_i_db_find_segment(self, ext->address);
 
     if(!seg) {
-        rd_i_add_problem(self, ext->address, ext->address,
-                         "skipping external to unmapped address");
+        rd_add_problem(self, ext->address, ext->address,
+                       "skipping external to unmapped address");
         return false;
     }
 
     usize idx = rd_i_address2index(seg, ext->address);
 
     if(rd_flagsbuffer_has_tail(seg->flags, idx)) {
-        rd_i_add_problem(self, ext->address, ext->address,
-                         "cannot set external on tail byte");
+        rd_add_problem(self, ext->address, ext->address,
+                       "cannot set external on tail byte");
         return false;
     }
 
     if(ext->kind == RD_EXT_EXPORTED &&
        rd_flagsbuffer_has_imported(seg->flags, idx)) {
-        rd_i_add_problem(self, ext->address, ext->address,
-                         "already marked as imported, cannot mark as exported");
+        rd_add_problem(self, ext->address, ext->address,
+                       "already marked as imported, cannot mark as exported");
         return false;
     }
 
     if(ext->kind == RD_EXT_IMPORTED &&
        rd_flagsbuffer_has_exported(seg->flags, idx)) {
-        rd_i_add_problem(self, ext->address, ext->address,
-                         "already marked as exported, cannot mark as imported");
+        rd_add_problem(self, ext->address, ext->address,
+                       "already marked as exported, cannot mark as imported");
         return false;
     }
 
@@ -1343,8 +1343,8 @@ bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
             }
 
             if(!toseg) {
-                rd_i_add_problem(self, fromaddr, toaddr,
-                                 "unresolved banked reference");
+                rd_add_problem_as(self, RD_PROBLEM_BANKED, fromaddr, toaddr,
+                                  "unresolved banked reference");
             }
         }
     }
@@ -1355,12 +1355,12 @@ bool rd_i_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,
     usize toidx = rd_i_address2index(toseg, toaddr);
 
     if(rd_flagsbuffer_has_tail(fromseg->flags, fromidx)) {
-        rd_i_add_problem(self, fromaddr, toaddr, "ref FROM tail byte");
+        rd_add_problem(self, fromaddr, toaddr, "ref FROM tail byte");
         return false;
     }
 
     if(rd_flagsbuffer_has_tail(toseg->flags, toidx)) {
-        rd_i_add_problem(self, fromaddr, toaddr, "ref TO tail byte");
+        rd_add_problem(self, fromaddr, toaddr, "ref TO tail byte");
         return false;
     }
 
@@ -1439,10 +1439,9 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     const RDSegment* seg = rd_i_db_find_segment(self, address);
 
     if(!seg) {
-        rd_i_add_problem(
-            self, address, address,
-            "trying to set an entry point '%s' to unmapped address",
-            name ? name : "<unnamed>");
+        rd_add_problem(self, address, address,
+                       "trying to set an entry point '%s' to unmapped address",
+                       name ? name : "<unnamed>");
 
         return false;
     }
@@ -1450,7 +1449,7 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     usize idx = rd_i_address2index(seg, address);
 
     if(rd_flagsbuffer_has_imported(seg->flags, idx)) {
-        rd_i_add_problem(
+        rd_add_problem(
             self, address, address,
             "trying to set an entry point '%s' to an imported address",
             name ? name : "<unnamed>");
@@ -1460,8 +1459,8 @@ bool rd_set_entry_point(RDContext* self, RDAddress address, const char* name) {
     RDRelAddress rel_address = rd_i_rel(self, address);
 
     if(self->entry_point.has_value && self->entry_point.value != rel_address) {
-        rd_i_add_problem(self, rd_i_abs(self, self->entry_point.value), address,
-                         "redefining entry point");
+        rd_add_problem(self, rd_i_abs(self, self->entry_point.value), address,
+                       "redefining entry point");
     }
 
     if(name && *name) rd_library_name(self, address, name);
@@ -1526,14 +1525,45 @@ bool rd_i_set_noret(RDContext* self, RDAddress address) {
     return true;
 }
 
-void rd_i_add_problem(RDContext* self, RDAddress from, RDAddress address,
-                      const char* fmt, ...) {
+RDRegSetter rd_i_current_setter(const RDContext* ctx) {
+    // outside the emulate step there is no current instruction: initial
+    // register state set by a loader must not look like a definition
+    if(ctx->engine.step != RD_WS_EMULATE) return (RDRegSetter){0};
+
+    return (RDRegSetter){
+        .value = ctx->engine.current.address,
+        .has_value = true,
+    };
+}
+
+void rd_i_add_problem_v(RDContext* self, u32 code, RDAddress from,
+                        RDAddress address, const char* fmt, va_list args) {
+    if(!self || !fmt) return;
+
+    // NONE is the "every kind" query value: storing it is a caller bug
+    if(code == RD_PROBLEM_NONE) {
+        RD_LOG_FAIL("problem @ %" PRIx64 " reported without a kind", from);
+        code = RD_PROBLEM_DEFAULT;
+    }
+
+    const char* msg = rd_i_vformat(&self->problem_buf, fmt, args);
+    rd_i_db_add_problem(self, code, from, address, msg);
+}
+
+void rd_add_problem(RDContext* self, RDAddress from, RDAddress address,
+                    const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    const char* result = rd_i_vformat(&self->problem_buf, fmt, args);
+    rd_i_add_problem_v(self, RD_PROBLEM_DEFAULT, from, address, fmt, args);
     va_end(args);
+}
 
-    rd_i_db_add_problem(self, from, address, result);
+void rd_add_problem_as(RDContext* self, u32 code, RDAddress from,
+                       RDAddress address, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    rd_i_add_problem_v(self, code, from, address, fmt, args);
+    va_end(args);
 }
 
 bool rd_auto_xref_add(RDContext* self, RDAddress fromaddr, RDAddress toaddr,

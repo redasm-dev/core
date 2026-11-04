@@ -19,6 +19,7 @@
 #include <redasm/plugins/command.h>
 #include <redasm/plugins/loader/loader.h>
 #include <redasm/plugins/platform.h>
+#include <redasm/plugins/processor/alu.h>
 #include <redasm/plugins/processor/processor.h>
 #include <redasm/rdil/rdil.h>
 #include <redasm/registers.h>

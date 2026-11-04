@@ -15,8 +15,8 @@ typedef struct RDRegSetter {
 } RDRegSetter;
 
 typedef struct RDRegValueInfo {
-    RDRegSetter setter; // instruction that last wrote the register
     RDRegValue value;
+    RDRegSetter setter; // instruction that last wrote the register
 } RDRegValueInfo;
 
 typedef struct RDRegMask {

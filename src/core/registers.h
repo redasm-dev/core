@@ -12,8 +12,10 @@ typedef struct RDRegister {
     HMapHeader hmap_hdr;
 
     const char* name;
-    RDRegSetter setter;
     RDRegValue value;
+    RDRegValue known_bits;
+    RDRegSetter setter;
+    RDRegValue setter_bits;
 } RDRegister;
 
 typedef struct RDRegisterHMap {
@@ -24,6 +26,14 @@ typedef struct RDRegisterHMap {
     HMapHash hash;
     HMapEqual equal;
 } RDRegisterHMap;
+
+static inline RDRegValue rd_i_reg_get_mask(u8 bits, u8 shift) {
+    if(!bits || (unsigned int)bits + shift > 64) return 0;
+
+    RDRegValue ones = bits == 64 ? ~(RDRegValue)0
+                                 : ((RDRegValue)1 << bits) - 1; // 1 << 64: UB
+    return ones << shift;
+}
 
 void rd_i_registermap_init(RDRegisterHMap* self);
 

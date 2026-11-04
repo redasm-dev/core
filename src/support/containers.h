@@ -298,8 +298,9 @@ typedef bool (*HMapEqual)(const void* a, const void* b);
             memcpy((dst)->data, (src)->data,                                   \
                    (src)->capacity * sizeof(*(src)->data));                    \
         }                                                                      \
-        else                                                                   \
+        else {                                                                 \
             (dst)->data = NULL;                                                \
+        }                                                                      \
     } while(0)
 
 #define hmap_destroy(self)                                                     \

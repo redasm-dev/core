@@ -97,7 +97,7 @@ bool rd_segment_set_bank(RDSegment* self, usize id, RDRelAddress base,
     if(!self) return false;
 
     if(base > self->rel_start) {
-        rd_i_add_problem(
+        rd_add_problem(
             ctx, rd_segment_get_start(self), rd_segment_get_start(self),
             "segment '%s': bank base %llx exceeds start %llx", self->name,
             (unsigned long long)base, (unsigned long long)self->rel_start);

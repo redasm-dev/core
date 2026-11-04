@@ -56,6 +56,7 @@ target_sources(${PROJECT_NAME}
         src/plugins/builtin/processors.c
         src/plugins/loader/loader.c
         src/plugins/loader/option.c
+        src/plugins/processor/alu.c
         src/plugins/processor/instruction.c
         src/plugins/processor/processor.c
         src/plugins/analyzer.c
