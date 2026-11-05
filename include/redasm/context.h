@@ -260,6 +260,9 @@ RD_API bool rd_write_be64(RDContext* self, RDAddress address, u64 v);
 RD_API usize rd_write(RDContext* self, RDAddress address, const void* data, usize n);
 RD_API usize rd_patch(RDContext* self, RDAddress address, const void* data, usize n);
 RD_API bool rd_fill(RDContext* self, RDAddress address, usize n);
+RD_API bool rd_auto_branch_table(RDContext* ctx, RDAddress address, const char* elem_type, usize n, RDXRefType xref_type);
+RD_API bool rd_library_branch_table(RDContext* ctx, RDAddress address, const char* elem_type, usize n, RDXRefType xref_type);
+RD_API bool rd_user_branch_table(RDContext* ctx, RDAddress address, const char* elem_type, usize n, RDXRefType xref_type);
 RD_API void rd_add_problem(RDContext* self, RDAddress from, RDAddress address, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(4, 5);
 RD_API void rd_add_problem_as(RDContext* self, u32 code, RDAddress from, RDAddress address, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(5, 6);
 // clang-format on

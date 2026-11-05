@@ -35,7 +35,73 @@ static inline bool _rd_is_entry_point(const RDContext* ctx, RDAddress address) {
            ctx->entry_point.value == rd_i_rel(ctx, address);
 }
 
-bool rd_i_read_uint(const RDContext* ctx, unsigned int size, RDAddress address,
+static bool _rd_branch_table(RDContext* ctx, RDAddress address,
+                             const char* elem_type, usize n,
+                             RDXRefType xref_type, RDConfidence c) {
+    if(!ctx || !n) return false;
+
+    const RDSegment* seg = rd_i_db_find_segment(ctx, address);
+    if(!seg) return false;
+
+    if(xref_type != RD_CR_JUMP && xref_type != RD_CR_CALL) {
+        RD_LOG_FAIL("entries must be jumps or calls");
+        return false;
+    }
+
+    const RDTypeDef* tdef = NULL;
+
+    if(!elem_type) {
+        tdef = rd_integral_typedef_from_size(rd_get_code_ptr_size(ctx), ctx);
+        panic_if(!tdef,
+                 "cannot get integral type from processor code-ptr size");
+    }
+    else {
+        tdef = rd_i_typedef_find(ctx, elem_type);
+    }
+
+    if(!tdef) {
+        RD_LOG_FAIL("element type '%s' not found", elem_type);
+        return false;
+    }
+
+    if(tdef->kind != RD_TKIND_PRIM) {
+        RD_LOG_FAIL("element type '%s' is not primitive", tdef->name);
+        return false;
+    }
+
+    if(rd_integral_typedef_from_size(tdef->size, ctx) != tdef) {
+        RD_LOG_FAIL("element type '%s' is not integral", tdef->name);
+        return false;
+    }
+
+    RDAddress end = address + (n * tdef->size);
+
+    if(end > rd_segment_get_end(seg)) {
+        RD_LOG_FAIL("%zu entries don't fit the segment", n);
+        return false;
+    }
+
+    if(!rd_i_set_type(ctx, address, tdef->name, n, RD_TYPE_NONE, c)) {
+        RD_LOG_FAIL("cannot create branch table of type %s[%zu] in %" PRIX64,
+                    tdef->name, n, address);
+        return false;
+    }
+
+    // every slot references its own target
+    for(usize i = 0; i < n; i++) {
+        RDAddress slot = address + (i * tdef->size);
+        u64 dst;
+
+        if(rd_i_read_uint(ctx, tdef->size, slot, &dst) &&
+           rd_is_executable(ctx, dst))
+            rd_i_xref_add(ctx, slot, (RDAddress)dst, xref_type, c);
+    }
+
+    rd_i_engine_mark_dirty(ctx);
+    return true;
+}
+
+bool rd_i_read_uint(const RDContext* ctx, usize size, RDAddress address,
                     RDAddress* v) {
     bool is_be = ctx->processorplugin->flags & RD_PF_BE;
 
@@ -1548,6 +1614,27 @@ void rd_i_add_problem_v(RDContext* self, u32 code, RDAddress from,
 
     const char* msg = rd_i_vformat(&self->problem_buf, fmt, args);
     rd_i_db_add_problem(self, code, from, address, msg);
+}
+
+bool rd_auto_branch_table(RDContext* ctx, RDAddress address,
+                          const char* elem_type, usize n,
+                          RDXRefType xref_type) {
+    return _rd_branch_table(ctx, address, elem_type, n, xref_type,
+                            RD_CONFIDENCE_AUTO);
+}
+
+bool rd_library_branch_table(RDContext* ctx, RDAddress address,
+                             const char* elem_type, usize n,
+                             RDXRefType xref_type) {
+    return _rd_branch_table(ctx, address, elem_type, n, xref_type,
+                            RD_CONFIDENCE_LIBRARY);
+}
+
+bool rd_user_branch_table(RDContext* ctx, RDAddress address,
+                          const char* elem_type, usize n,
+                          RDXRefType xref_type) {
+    return _rd_branch_table(ctx, address, elem_type, n, xref_type,
+                            RD_CONFIDENCE_USER);
 }
 
 void rd_add_problem(RDContext* self, RDAddress from, RDAddress address,

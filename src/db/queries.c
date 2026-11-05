@@ -53,8 +53,9 @@ static sqlite3_stmt* _rd_db_prepare_query(RDContext* ctx, int id,
         assert(stmt && "statement is NULL");
         ctx->db->queries[id] = stmt;
     }
-    else
+    else {
         sqlite3_reset(ctx->db->queries[id]);
+    }
 
     return ctx->db->queries[id];
 }
@@ -297,8 +298,9 @@ bool _rd_i_db_query_get_external(RDContext* ctx, RDAddress address,
             ext->ordinal.value = (u32)sqlite3_column_int(stmt, 1);
             ext->ordinal.has_value = true;
         }
-        else
+        else {
             ext->ordinal.has_value = false;
+        }
 
         if(ext->kind == RD_EXT_EXPORTED && !ext->module)
             ext->module = ctx->file_name;
@@ -373,8 +375,9 @@ RDExternalVect* _rd_i_db_query_get_all_externals(RDContext* ctx,
             ext.ordinal.value = (u32)sqlite3_column_int(stmt, 2);
             ext.ordinal.has_value = true;
         }
-        else
+        else {
             ext.ordinal.has_value = false;
+        }
 
         if(ext.kind == RD_EXT_EXPORTED && !ext.module)
             ext.module = ctx->file_name;
@@ -877,8 +880,9 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
         _rd_db_bind_param_str(ctx, stmt, ":enum_type",
                               tdef->enum_.base_type->name);
     }
-    else
+    else {
         _rd_db_bind_param_null(ctx, stmt, ":enum_type");
+    }
 
     _rd_db_step(ctx, stmt);
 
@@ -919,8 +923,9 @@ void _rd_i_db_query_set_type_def(RDContext* ctx, const RDTypeDef* tdef) {
             }
         }
     }
-    else
+    else {
         unreachable();
+    }
 }
 
 RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
@@ -943,19 +948,23 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
         sqlite3_stmt* stmt_param = _rd_db_prepare_get_all_type_param(ctx, name);
         RDTypeDef* tdef = NULL;
 
-        if(kind == RD_TKIND_STRUCT)
+        if(kind == RD_TKIND_STRUCT) {
             tdef = rd_typedef_create_struct(name, ctx);
-        else if(kind == RD_TKIND_UNION)
+        }
+        else if(kind == RD_TKIND_UNION) {
             tdef = rd_typedef_create_union(name, ctx);
-        else if(kind == RD_TKIND_ENUM)
+        }
+        else if(kind == RD_TKIND_ENUM) {
             tdef = rd_typedef_create_enum(name, enum_type, ctx);
+        }
         else if(kind == RD_TKIND_FUNC) {
             tdef = rd_typedef_create_func(name, ctx);
             rd_typedef_set_callconv(tdef, callconv);
             rd_typedef_set_noret(tdef, is_noret);
         }
-        else
+        else {
             unreachable();
+        }
 
         assert(tdef);
         tdef->flags = flags; // attach flags directly
@@ -987,11 +996,13 @@ RDTypeDefVect* _rd_i_db_query_get_all_type_defs(RDContext* ctx,
                     rd_typedef_add_arg(tdef, p_type, p_name, p_count, p_mod,
                                        ctx);
                 }
-                else
+                else {
                     rd_typedef_set_ret(tdef, p_type, p_count, p_mod, ctx);
+                }
             }
-            else
+            else {
                 unreachable();
+            }
         }
 
         vect_push(v, tdef);

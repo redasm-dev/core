@@ -37,9 +37,9 @@ static inline bool rd_type_is_ptr(const RDType* self) {
     return self->mod == RD_TYPE_PTR || self->mod == RD_TYPE_CPTR;
 }
 
-RD_API const RDTypeDef* rd_integral_typedef_from_size(unsigned int size,
+RD_API const RDTypeDef* rd_integral_typedef_from_size(usize size,
                                                       const RDContext* ctx);
-RD_API const char* rd_integral_from_size(unsigned int size);
+RD_API const char* rd_integral_from_size(usize size);
 RD_API const char* rd_type_to_str(const RDType* self, RDContext* ctx);
 
 RD_API bool rd_get_type(RDContext* ctx, RDAddress address, RDType* t);

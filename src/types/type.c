@@ -49,8 +49,9 @@ static void _rd_unroll_type(RDContext* ctx, const RDSegment* seg, usize* idx,
             i++;
         }
     }
-    else
+    else {
         *idx += sz;
+    }
 }
 
 static bool _rd_type_resolve(RDContext* ctx, const RDType* type, usize offset,
@@ -200,7 +201,7 @@ bool rd_type_is_void(const RDType* t) {
            t->count == 0;
 }
 
-const char* rd_integral_from_size(unsigned int size) {
+const char* rd_integral_from_size(usize size) {
     switch(size) {
         case sizeof(u8): return "u8";
         case sizeof(u16): return "u16";
@@ -212,7 +213,7 @@ const char* rd_integral_from_size(unsigned int size) {
     return NULL;
 }
 
-const RDTypeDef* rd_integral_typedef_from_size(unsigned int size,
+const RDTypeDef* rd_integral_typedef_from_size(usize size,
                                                const RDContext* ctx) {
     return rd_i_typedef_find(ctx, rd_integral_from_size(size));
 }

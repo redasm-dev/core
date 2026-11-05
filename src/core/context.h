@@ -180,7 +180,7 @@ bool rd_i_resolve_bank_xref(RDContext* self, RDAddress from, RDAddress value,
                             RDAddress* address);
 bool rd_i_set_noret(RDContext* self, RDAddress address);
 
-bool rd_i_read_uint(const RDContext* ctx, unsigned int size, RDAddress address,
+bool rd_i_read_uint(const RDContext* ctx, usize size, RDAddress address,
                     RDAddress* v);
 
 void rd_i_add_problem_v(RDContext* self, u32 code, RDAddress from,

@@ -9,10 +9,10 @@
 
 #define RD_PRIMITIVE(n, s, f)                                                  \
     {                                                                          \
-        .name = n,                                                             \
+        .name = (n),                                                           \
         .kind = RD_TKIND_PRIM,                                                 \
         .flags = RD_TFLAGS_STATIC | RD_TFLAGS_BUILTIN | (f),                   \
-        .size = s,                                                             \
+        .size = (s),                                                           \
     }
 
 // clang-format off
@@ -276,8 +276,9 @@ bool rd_typedef_set_ret(RDTypeDef* self, const char* type, usize n,
         if(!rd_type_init(&self->func_.ret.value, type, n, mod, ctx))
             return false;
     }
-    else
+    else {
         rd_type_init_void(&self->func_.ret.value);
+    }
 
     return true;
 }
@@ -391,8 +392,9 @@ bool rd_typedef_register(RDTypeDef* self, RDContext* ctx) {
             }
         }
     }
-    else if(self->kind != RD_TKIND_PRIM)
+    else if(self->kind != RD_TKIND_PRIM) {
         unreachable();
+    }
 
     rd_i_typedef_measure(ctx, self);
 
@@ -440,13 +442,15 @@ bool rd_typedef_is_builtin(const RDTypeDef* self) {
 void rd_typedef_destroy(RDTypeDef* self) {
     if(self->flags & RD_TFLAGS_STATIC) return;
 
-    if(rd_i_typedef_is_compound(self))
+    if(rd_i_typedef_is_compound(self)) {
         vect_destroy(&self->compound_);
+    }
     else if(self->kind == RD_TKIND_FUNC) {
         if(self->func_.args.has_value) vect_destroy(&self->func_.args.value);
     }
-    else if(self->kind == RD_TKIND_ENUM)
+    else if(self->kind == RD_TKIND_ENUM) {
         vect_destroy(&self->enum_);
+    }
 
     rd_free(self);
 }
