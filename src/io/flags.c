@@ -58,7 +58,7 @@ static const RDFlags FL_IMPORTED = 1U << 15;
 // covers bits 0-15 (NOTE: always add the last flag above)
 #define FL_UNDEFINE_MASK ((RDFlags)((FL_IMPORTED << 1) - 1))
 #define FL_HAS_INFO                                                            \
-    ((RDFlags)(FL_UNDEFINE_MASK & ~(FL_VALUE | FL_PATCH | 0xFF)))
+    ((RDFlags)(FL_UNDEFINE_MASK & ~(FL_VALUE | FL_PATCH | FL_XREFOUT | 0xFF)))
 
 // [ARRIVAL]
 static const RDFlags FL_FLOW = 1U << 16;
