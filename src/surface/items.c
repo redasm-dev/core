@@ -182,7 +182,7 @@ static void _rd_render_value(RDRenderer* r, RDAddress address, const RDType* t,
             (unsigned int)rd_i_size_of(r->context, t->def->name, 0, t->mod);
         panic_if(!sz, "type '%s' has unresolved size", t->def->name);
 
-        if(sz == PTR_SIZE && rd_i_flagsbuffer_has_xref_in(seg->flags, idx))
+        if(sz == PTR_SIZE && rd_i_flagsbuffer_has_xref_out(seg->flags, idx))
             rd_renderer_loc(r, (RDAddress)v, sz * 2, RD_NUM_DEFAULT);
         else
             rd_renderer_num(r, (i64)v, 16, sz * 2, RD_NUM_DEFAULT);
