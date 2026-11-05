@@ -393,8 +393,12 @@ static void _rd_render_elements_row(RDRenderer* r, const RDSegment* seg,
 
     usize sz = rd_type_size(&d->elements.type, r->context);
 
-    usize lead = (address % RD_SURFACE_HEX_LINE) / sz;
-    if(lead) rd_renderer_ws(r, lead * ((sz * 2) + 1));
+    // Only byte arrays sit on the absolute hex grid, wider elements are counted
+    // from the array start and are never padded.
+    if(sz == 1) {
+        usize lead = address % RD_SURFACE_HEX_LINE;
+        if(lead) rd_renderer_ws(r, lead * 3); // hex column: 3 chars per byte
+    }
 
     for(usize i = 0; i < d->elements.count; i++) {
         if(i) rd_renderer_ws(r, 1);

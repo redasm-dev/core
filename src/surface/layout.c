@@ -18,6 +18,16 @@ static inline void _rd_layout_push(RDRowDescVect* out, RDRowKind kind,
                    });
 }
 
+static bool _rd_layout_is_packed_line_start(const RDSegment* seg, usize idx,
+                                            usize elem_size, usize item_idx) {
+    if(elem_size == 1)
+        return ((rd_segment_get_start(seg) + idx) % RD_SURFACE_HEX_LINE) == 0;
+
+    usize per_line = RD_SURFACE_HEX_LINE / elem_size;
+    if(!per_line) per_line = 1;
+    return (item_idx % per_line) == 0;
+}
+
 static void _rd_layout_comments(RDContext* ctx, RDRenderFlags flags,
                                 const RDSegment* seg, usize idx,
                                 RDCommentPlacement p, usize length,
@@ -248,11 +258,14 @@ bool rd_i_is_packed_element_head(const RDSegment* seg, usize idx,
     if(!item_idx) return true; // the array's first element
     if(rd_i_flagsbuffer_has_info(seg->flags, idx)) return true;
 
-    if(((rd_segment_get_start(seg) + idx) % RD_SURFACE_HEX_LINE) == 0)
+    if(_rd_layout_is_packed_line_start(seg, idx, elem_size, item_idx))
         return true;
 
-    // the element right after a broken-out one restarts the run
-    return idx >= elem_size &&
+    // The element right after a broken-out one restarts the run.
+    // Element 0 never counts as broken out: it shares its address with the
+    // array's head row (banner or field link), which already carries its
+    // label and inline comment.
+    return item_idx > 1 && idx >= elem_size &&
            rd_i_flagsbuffer_has_info(seg->flags, idx - elem_size);
 }
 
