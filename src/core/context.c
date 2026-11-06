@@ -1042,6 +1042,11 @@ usize rd_read(const RDContext* self, RDAddress address, void* data, usize n) {
                             data, n);
 }
 
+bool rd_read_exact(const RDContext* self, RDAddress address, void* data,
+                   usize n) {
+    return rd_read(self, address, data, n) == n;
+}
+
 bool rd_write_byte(RDContext* self, RDAddress address, u8 v) {
     const RDSegment* s = rd_i_db_find_segment(self, address);
     if(!s) return false;
