@@ -8,6 +8,7 @@
 #include "support/containers.h"
 #include "support/utils.h"
 #include <inttypes.h>
+#include <stdarg.h>
 
 #define RD_SURFACE_LAY_INITIAL_SIZE 32
 #define RD_SURFACE_BUF_INITIAL_SIZE 1024
@@ -177,6 +178,7 @@ void rd_i_renderer_destroy(RDRenderer* self) {
     vect_destroy(&self->comment_buf);
     vect_destroy(&self->type_buf);
     vect_destroy(&self->text_buf);
+    vect_destroy(&self->render_buf);
     vect_destroy(&self->word_buf);
     rd_i_rowvect_destroy(&self->rows_back);
     rd_i_rowvect_destroy(&self->rows_front);
@@ -503,6 +505,16 @@ void rd_renderer_reg(RDRenderer* self, RDReg reg) {
 
 void rd_renderer_muted(RDRenderer* self, const char* s) {
     rd_renderer_text(self, s, RD_THEME_MUTED, RD_THEME_BACKGROUND);
+}
+
+void rd_renderer_fmt(RDRenderer* self, RDThemeKind fg,
+                     RD_MSVC_CHECK const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    const char* s = rd_i_vformat(&self->render_buf, fmt, args);
+    va_end(args);
+
+    rd_renderer_text(self, s, fg, RD_THEME_BACKGROUND);
 }
 
 void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill,

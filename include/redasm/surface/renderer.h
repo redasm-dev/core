@@ -8,20 +8,18 @@
 
 typedef struct RDRenderer RDRenderer;
 
+// clang-format off
 RD_API RDContext* rd_renderer_get_context(RDRenderer* self);
 RD_API void rd_renderer_ws(RDRenderer* self, usize n);
 RD_API void rd_renderer_norm(RDRenderer* self, const char* s);
-RD_API void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg,
-                             RDThemeKind bg);
-RD_API void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg,
-                             RDThemeKind bg);
+RD_API void rd_renderer_text(RDRenderer* self, const char* s, RDThemeKind fg, RDThemeKind bg);
+RD_API void rd_renderer_word(RDRenderer* self, const char* s, RDThemeKind fg, RDThemeKind bg);
 RD_API void rd_renderer_str(RDRenderer* self, const char* s, bool quoted);
 RD_API void rd_renderer_unkn(RDRenderer* self);
-RD_API void rd_renderer_loc(RDRenderer* self, RDAddress address,
-                            unsigned int fill, RDNumberFlags flags);
-RD_API void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
-                            unsigned int fill, RDNumberFlags flags);
-RD_API void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr,
-                             RDThemeKind fg);
+RD_API void rd_renderer_loc(RDRenderer* self, RDAddress address, unsigned int fill, RDNumberFlags flags);
+RD_API void rd_renderer_num(RDRenderer* self, i64 c, unsigned int base, unsigned int fill, RDNumberFlags flags);
+RD_API void rd_renderer_mnem(RDRenderer* self, const RDInstruction* instr, RDThemeKind fg);
 RD_API void rd_renderer_reg(RDRenderer* self, RDReg reg);
 RD_API void rd_renderer_muted(RDRenderer* self, const char* s);
+RD_API void rd_renderer_fmt(RDRenderer* self, RDThemeKind fg, RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(3, 4);
+// clang-format on
