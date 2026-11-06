@@ -16,7 +16,7 @@ static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
 // the bits 'res' covers within its root, validated: a plugin bug (empty or
 // malformed mask) is reported and the register is not tracked
 static bool _rd_reg_bits(const RDRegResolved* res, RDRegValue* bits) {
-    RDRegValue m = res->mask.mask;
+    RDRegValue m = res->mask.value;
     RDRegValue run = res->mask.shift < 64 ? m >> res->mask.shift : 0;
 
     // non empty, starting at 'shift', contiguous
@@ -317,6 +317,15 @@ RDSegmentRegSlice rd_get_all_sregval(RDContext* ctx, const char* regname) {
     const RDSegmentRegVect* v = rd_i_db_get_all_sregval(ctx, regname);
     if(v) return vect_to_slice(RDSegmentRegSlice, v);
     return (RDSegmentRegSlice){0};
+}
+
+RDRegMask rd_make_regmask(u8 bits, u8 shift) {
+    RDRegValue m = rd_i_get_regmask(bits, shift);
+
+    return (RDRegMask){
+        .value = m,
+        .shift = m ? shift : 0,
+    };
 }
 
 bool rd_mark_regval_address(RDContext* ctx, RDReg id) {

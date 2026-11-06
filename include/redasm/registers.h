@@ -3,7 +3,6 @@
 #include <redasm/common.h>
 #include <redasm/config.h>
 
-#define RD_REGMASK_FULL UINT64_MAX
 #define RD_REGID_INVALID UINT32_MAX
 
 typedef u32 RDReg;
@@ -20,7 +19,7 @@ typedef struct RDRegValueInfo {
 } RDRegValueInfo;
 
 typedef struct RDRegMask {
-    RDRegValue mask;
+    RDRegValue value;
     u8 shift;
 } RDRegMask;
 
@@ -73,5 +72,7 @@ RD_API bool rd_get_regval_info_id(RDContext* ctx, RDReg id, RDRegValueInfo* info
 RD_API RDSegmentRegNameSlice rd_get_all_sreg_names(const RDContext* ctx);
 RD_API RDSegmentRegSlice rd_get_all_sregval(RDContext* ctx, const char* regname);
 
+RD_API RDRegMask rd_make_regmask(u8 bits, u8 shift);
 RD_API bool rd_mark_regval_address(RDContext* ctx, RDReg id);
+
 // clang-format on

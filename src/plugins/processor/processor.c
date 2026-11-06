@@ -169,10 +169,6 @@ bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
     assert(ctx->processorplugin);
     if(!q || !ctx->processorplugin->query_reg) return false;
 
-    // TODO(transitional): remove with RD_REGMASK_FULL once every processor
-    // reports real register widths (capstone, mips, z80, x86, dalvik)
-    q->mask = (RDRegMask){.mask = RD_REGMASK_FULL, .shift = 0};
-
     if(!ctx->processorplugin->query_reg(q, ctx->processor)) return false;
 
     if(!q->name) {
@@ -180,7 +176,7 @@ bool rd_query_reg(const RDContext* ctx, RDQueryReg* q) {
         return false;
     }
 
-    if((q->want & RD_QUERY_REG_WANT_MASK) && !q->mask.mask) {
+    if((q->want & RD_QUERY_REG_WANT_MASK) && !q->mask.value) {
         RD_LOG_WARN("register '%s' has an empty mask", q->name);
         return false;
     }
@@ -220,7 +216,7 @@ bool rd_query_reg_table(RDQueryReg* q, const RDRegisterDef* defs) {
     q->name = found->name;
 
     if(q->want & RD_QUERY_REG_WANT_MASK) {
-        RDRegValue m = rd_i_reg_get_mask(found->bits, found->shift);
+        RDRegValue m = rd_i_get_regmask(found->bits, found->shift);
 
         if(!m) {
             RD_LOG_WARN("register '%s': invalid width %u (shift %u)",
@@ -229,7 +225,7 @@ bool rd_query_reg_table(RDQueryReg* q, const RDRegisterDef* defs) {
             return false;
         }
 
-        q->mask = (RDRegMask){.mask = m, .shift = found->shift};
+        q->mask = (RDRegMask){.value = m, .shift = found->shift};
     }
 
     if(q->want & RD_QUERY_REG_WANT_ROOT) {

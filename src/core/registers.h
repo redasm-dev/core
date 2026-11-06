@@ -27,7 +27,7 @@ typedef struct RDRegisterHMap {
     HMapEqual equal;
 } RDRegisterHMap;
 
-static inline RDRegValue rd_i_reg_get_mask(u8 bits, u8 shift) {
+static inline RDRegValue rd_i_get_regmask(u8 bits, u8 shift) {
     if(!bits || (unsigned int)bits + shift > 64) return 0;
 
     RDRegValue ones = bits == 64 ? ~(RDRegValue)0

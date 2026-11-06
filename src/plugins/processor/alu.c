@@ -88,7 +88,7 @@ static bool _rd_alu_resolve_dst(RDContext* ctx, const RDInstruction* instr,
 }
 
 static u8 _rd_alu_width(const RDRegResolved* res) {
-    RDRegValue run = res->mask.mask >> res->mask.shift;
+    RDRegValue run = res->mask.value >> res->mask.shift;
     u8 w = 0;
 
     while(run & 1) {
@@ -174,7 +174,7 @@ static bool _rd_alu_identity(const RDInstruction* instr, const RDAlu* alu,
 }
 static bool _rd_alu_compute(RDAluOp op, u8 width, RDRegValue a, RDRegValue b,
                             RDRegValue* res) {
-    RDRegValue m = rd_i_reg_get_mask(width, 0);
+    RDRegValue m = rd_i_get_regmask(width, 0);
     a &= m;
 
     switch(op) {
