@@ -28,13 +28,15 @@ bool rd_instr_match(const RDContext* ctx, const RDInstruction* self,
             if(!plugin->get_mnemonic) return false;
             mnem = plugin->get_mnemonic(self, ctx->processor);
         }
-        else
+        else {
             mnem = self->mnemonic;
+        }
 
         if(!mnem || rd_stricmp(mnem, shape->mnemonic) != 0) return false;
     }
-    else if(self->id != shape->id)
+    else if(self->id != shape->id) {
         return false;
+    }
 
     if(self->delay_slots != shape->delay_slots) return false;
     if(self->indirect != shape->indirect) return false;
