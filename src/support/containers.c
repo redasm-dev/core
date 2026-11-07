@@ -169,6 +169,19 @@ void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
     *len = write;
 }
 
+void _vect_dup(void** data, size_t* capacity, size_t* length,
+               const void* src_data, size_t src_length, size_t elem_size) {
+    if(*data == src_data) { // same buffer: vect_dup(&v, &v)
+        *length = src_length;
+        return;
+    }
+
+    if(*capacity < src_length)
+        _vect_reserve(data, capacity, src_length, elem_size);
+    if(src_length) memcpy(*data, src_data, src_length * elem_size);
+    *length = src_length;
+}
+
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred) {
     if(!len) return 0;

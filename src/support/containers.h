@@ -111,14 +111,10 @@ typedef bool (*VectPredicate)(const void*);
 
 #define vect_dup(dst, src)                                                     \
     do {                                                                       \
-        (dst)->length = (src)->length;                                         \
-        (dst)->capacity = (src)->capacity;                                     \
-        if(((src)->capacity)) {                                                \
-            (dst)->data = malloc((src)->capacity * sizeof(*(src)->data));      \
-            assert((dst)->data);                                               \
-            memcpy((dst)->data, (src)->data,                                   \
-                   (src)->length * sizeof(*(src)->data));                      \
-        }                                                                      \
+        static_assert(sizeof(*(dst)->data) == sizeof(*(src)->data),            \
+                      "vect_dup: element size mismatch");                      \
+        _vect_dup((void**)(&(dst)->data), &(dst)->capacity, &(dst)->length,    \
+                  (src)->data, (src)->length, sizeof(*(src)->data));           \
     } while(0)
 
 #define vect_to_slice(SliceType, self)                                         \
@@ -366,6 +362,8 @@ void _vect_del(void* data, size_t* length, size_t idx, size_t n,
                size_t elem_size);
 void _vect_del_if(const void* key, void* data, size_t* len, size_t elem_size,
                   VectDelIf cb);
+void _vect_dup(void** data, size_t* capacity, size_t* length, const void* sdata,
+               size_t slength, size_t elemsize);
 size_t _vect_stable_part(void* data, size_t len, size_t elem_size,
                          VectPredicate pred);
 size_t _vect_lower_bound(const void* key, void* data, size_t len,
