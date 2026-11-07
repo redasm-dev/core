@@ -236,7 +236,7 @@ RDAluStatus rd_alu(RDContext* ctx, const RDInstruction* instr,
     RDRegResolved dst;
     if(!_rd_alu_resolve_dst(ctx, instr, &alu->dst, &dst)) return RD_ALU_SKIP;
 
-    RDRegisterHMap* regs = &ctx->engine.current.registers;
+    RDRegisterVect* regs = &ctx->engine.current.registers;
     u8 width = _rd_alu_width(&dst);
     RDRegValue a, b = 0, res;
 

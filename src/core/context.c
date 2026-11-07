@@ -838,7 +838,7 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->chunks);
     vect_destroy(&self->string_terminators);
     vect_destroy(&self->hooks);
-    hmap_destroy(&self->engine.current.registers);
+    vect_destroy(&self->engine.current.registers);
     rd_i_analyzeritemvect_destroy(&self->analyzerplugins);
     rd_i_engine_destroy(self);
     rd_i_kb_destroy(self->kb);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "support/containers.h"
 #include <redasm/registers.h>
 
 typedef struct RDRegResolved {
@@ -9,8 +8,6 @@ typedef struct RDRegResolved {
 } RDRegResolved;
 
 typedef struct RDRegister {
-    HMapHeader hmap_hdr;
-
     const char* name;
     RDRegValue value;
     RDRegValue known_bits;
@@ -18,14 +15,11 @@ typedef struct RDRegister {
     RDRegValue setter_bits;
 } RDRegister;
 
-typedef struct RDRegisterHMap {
+typedef struct RDRegisterVect {
     RDRegister* data;
     usize length;
     usize capacity;
-    usize tombstones;
-    HMapHash hash;
-    HMapEqual equal;
-} RDRegisterHMap;
+} RDRegisterVect;
 
 static inline RDRegValue rd_i_get_regmask(u8 bits, u8 shift) {
     if(!bits || (unsigned int)bits + shift > 64) return 0;
@@ -35,17 +29,15 @@ static inline RDRegValue rd_i_get_regmask(u8 bits, u8 shift) {
     return ones << shift;
 }
 
-void rd_i_registermap_init(RDRegisterHMap* self);
-
 bool rd_i_reg_resolve_id(RDContext* ctx, RDReg id, RDRegResolved* out);
 bool rd_i_reg_resolve_name(RDContext* ctx, const char* regname,
                            RDRegResolved* out);
 
-bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_set(RDRegisterVect* self, const RDRegResolved* res,
                      RDRegValue value, RDRegSetter setter);
-bool rd_i_regmap_get(const RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_get(const RDRegisterVect* self, const RDRegResolved* res,
                      RDRegValue* value);
-bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res);
+bool rd_i_regmap_del(RDRegisterVect* self, const RDRegResolved* res);
 
-bool rd_i_regmap_get_info(const RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_get_info(const RDRegisterVect* self, const RDRegResolved* res,
                           RDRegValueInfo* info);

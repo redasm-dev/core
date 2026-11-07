@@ -6,7 +6,7 @@
 
 typedef struct RDIL {
     RDContext* context;
-    RDRegisterHMap registers;
+    RDRegisterVect registers;
     RDInstructionVect lifted;
     RDRelAddress current_address;
 

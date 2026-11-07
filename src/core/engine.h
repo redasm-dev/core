@@ -19,7 +19,7 @@ typedef struct RDEngineItem {
     RDAddress from;
     RDAddress address;
     usize n;
-    RDRegisterHMap registers;
+    RDRegisterVect registers;
     const char* func_type;
 } RDEngineItem;
 

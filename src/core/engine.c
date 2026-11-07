@@ -25,7 +25,6 @@ static inline void _rd_engine_enqueue_dirty(RDContext* ctx, RDAddress address,
         .n = n,
     };
 
-    rd_i_registermap_init(&item.registers);
     queue_push(&ctx->engine.qdirty, item);
     rd_i_engine_mark_dirty(ctx);
 }
@@ -34,7 +33,7 @@ static void _rd_engine_queue_drain(RDEngineQueue* q) {
     while(!queue_is_empty(q)) {
         RDEngineItem item;
         queue_pop(q, &item);
-        hmap_destroy(&item.registers); // tolerates zeroed
+        vect_destroy(&item.registers);
     }
 
     queue_destroy(q);
@@ -177,7 +176,7 @@ static bool _rd_engine_next_item(RDContext* ctx) {
     RDEngineQueue* q = _rd_engine_pick_queue(ctx);
     if(!q) return false;
 
-    hmap_destroy(&ctx->engine.current.registers);
+    vect_destroy(&ctx->engine.current.registers);
     queue_pop(q, &ctx->engine.current);
 
     ctx->engine.segment =
@@ -340,7 +339,7 @@ bool rd_i_engine_enqueue_jump(RDContext* ctx, RDAddress address) {
             .from = ctx->engine.current.address,
         };
 
-        hmap_dup(&item.registers, &ctx->engine.current.registers);
+        vect_dup(&item.registers, &ctx->engine.current.registers);
         queue_push(&ctx->engine.qjump, item);
         return true;
     }
@@ -359,7 +358,7 @@ bool rd_i_engine_enqueue_call(RDContext* ctx, RDAddress address,
             .func_type = rd_i_strpool_intern(&ctx->strings, type),
         };
 
-        hmap_dup(&item.registers, &ctx->engine.current.registers);
+        vect_dup(&item.registers, &ctx->engine.current.registers);
         queue_push(&ctx->engine.qcall, item);
         return true;
     }
@@ -416,11 +415,6 @@ u16 rd_i_engine_tick(RDContext* ctx) {
     };
 
     if(!_rd_engine_next_item(ctx)) return 0;
-
-    assert(ctx->engine.current.registers.hash &&
-           "invalid registers hash function");
-    assert(ctx->engine.current.registers.equal &&
-           "invalid registers equal function");
 
     usize idx =
         rd_i_address2index(ctx->engine.segment, ctx->engine.current.address);
@@ -539,7 +533,6 @@ bool rd_decode_prev(RDContext* ctx, RDAddress address, RDInstruction* instr) {
 }
 
 void rd_i_engine_init(RDContext* ctx) {
-    rd_i_registermap_init(&ctx->engine.current.registers);
     queue_reserve(&ctx->engine.qdirty, RD_ENGINE_QUEUE_SIZE);
     queue_reserve(&ctx->engine.qcall, RD_ENGINE_QUEUE_SIZE);
     queue_reserve(&ctx->engine.qjump, RD_ENGINE_QUEUE_SIZE);

@@ -284,20 +284,19 @@ static void _rd_il_eval(RDIL* self, const RDInstruction* il) {
 RDIL* rd_il_create(RDContext* ctx) {
     RDIL* self = rd_alloc(sizeof(*self));
     *self = (RDIL){.context = ctx};
-    rd_i_registermap_init(&self->registers);
     return self;
 }
 
 void rd_il_destroy(RDIL* self) {
     if(!self) return;
 
-    hmap_destroy(&self->registers);
+    vect_destroy(&self->registers);
     vect_destroy(&self->lifted);
     rd_free(self);
 }
 
 void rd_il_flush(RDIL* self) {
-    hmap_clear(&self->registers);
+    vect_clear(&self->registers);
     vect_clear(&self->lifted);
     self->current_address = self->entry.has_value ? self->entry.value : 0;
     self->done = false;

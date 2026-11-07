@@ -227,7 +227,7 @@ static void _rd_worker_step_reconcile(RDContext* ctx, RDWorkerStatus* status) {
             _rd_worker_reconcile_data(ctx, seg, start_idx, end_idx);
 
         // data or unknown: nothing left for EMULATE
-        hmap_destroy(&item->registers);
+        vect_destroy(&item->registers);
         item->kind = RD_EI_NONE;
         continue;
 

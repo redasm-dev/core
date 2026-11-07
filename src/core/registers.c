@@ -1,7 +1,6 @@
 #include "registers.h"
 #include "core/context.h"
 #include "support/containers.h"
-#include "support/hash/murmur3.h"
 #include <inttypes.h>
 
 static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
@@ -11,6 +10,21 @@ static const char* _rd_sreg_name(RDContext* ctx, RDReg id) {
     };
 
     return rd_query_reg(ctx, &q) ? q.name : NULL;
+}
+
+static int _rd_reg_kcmp(const void* key, const void* elem) {
+    return strcmp(*(const char* const*)key, ((const RDRegister*)elem)->name);
+}
+
+static RDRegister* _rd_reg_find_item(RDRegisterVect* v, const char* name,
+                                     usize* idx) {
+    usize i = vect_lower_bound(v, &name, _rd_reg_kcmp);
+    if(idx) *idx = i;
+
+    if(i < vect_length(v) && !strcmp(vect_at(v, i)->name, name))
+        return vect_at(v, i);
+
+    return NULL;
 }
 
 // the bits 'res' covers within its root, validated: a plugin bug (empty or
@@ -30,36 +44,16 @@ static bool _rd_reg_bits(const RDRegResolved* res, RDRegValue* bits) {
     return true;
 }
 
-static size_t _rd_register_hash(const void* e) {
-    const RDRegister* r = (const RDRegister*)e;
-    return rd_i_murmur3(r->name, (u32)strlen(r->name));
-}
-
-static bool _rd_register_equal(const void* a, const void* b) {
-    const RDRegister* ra = (const RDRegister*)a;
-    const RDRegister* rb = (const RDRegister*)b;
-    if(ra->name == rb->name) return true;
-    return !strcmp(ra->name, rb->name);
-}
-
-static const RDRegister* _rd_regmap_find(const RDRegisterHMap* map,
+static const RDRegister* _rd_regmap_find(RDRegisterVect* self,
                                          const RDRegResolved* res,
                                          RDRegValue* bits) {
-    if(!_rd_reg_bits(res, bits)) return NULL;
+    if(!_rd_reg_bits(res, bits)) return NULL; // invalid mask: plugin bug
 
-    RDRegister key = {.name = res->name};
-    const RDRegister* r = hmap_get(map, &key);
+    const RDRegister* r = _rd_reg_find_item(self, res->name, NULL);
 
     // a single unknown bit makes the requested register unknown
     if(!r || (r->known_bits & *bits) != *bits) return NULL;
     return r;
-}
-
-void rd_i_registermap_init(RDRegisterHMap* self) {
-    *self = (RDRegisterHMap){
-        .hash = _rd_register_hash,
-        .equal = _rd_register_equal,
-    };
 }
 
 bool rd_i_reg_resolve_name(RDContext* ctx, const char* regname,
@@ -95,27 +89,30 @@ bool rd_i_reg_resolve_id(RDContext* ctx, RDReg id, RDRegResolved* out) {
     return true;
 }
 
-bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_set(RDRegisterVect* self, const RDRegResolved* res,
                      RDRegValue value, RDRegSetter setter) {
     assert(res);
 
     RDRegValue bits;
     if(!_rd_reg_bits(res, &bits)) return false;
 
+    usize idx;
     RDRegValue v = (value << res->mask.shift) & bits;
-    RDRegister key = {.name = res->name};
-    RDRegister* curr = hmap_get(map, &key);
+    RDRegister* curr = _rd_reg_find_item(self, res->name, &idx);
 
     if(!curr) {
-        key.value = v;
-        key.known_bits = bits;
-        key.setter = setter;
-        key.setter_bits = setter.has_value ? bits : 0;
-        hmap_set(map, &key);
+        vect_ins(self, idx,
+                 (RDRegister){
+                     .name = res->name,
+                     .value = v,
+                     .known_bits = bits,
+                     .setter = setter,
+                     .setter_bits = setter.has_value ? bits : 0,
+                 });
+
         return true;
     }
 
-    // payload only: the hash depends on 'name'
     RDRegValue new_val = (curr->value & ~bits) | v;
     RDRegValue new_known = curr->known_bits | bits;
 
@@ -129,26 +126,26 @@ bool rd_i_regmap_set(RDRegisterHMap* map, const RDRegResolved* res,
     return true;
 }
 
-bool rd_i_regmap_get(const RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_get(const RDRegisterVect* self, const RDRegResolved* res,
                      RDRegValue* value) {
     assert(res);
 
     RDRegValue bits;
-    const RDRegister* r = _rd_regmap_find(map, res, &bits);
+    const RDRegister* r = _rd_regmap_find((RDRegisterVect*)self, res, &bits);
     if(!r) return false;
 
     if(value) *value = (r->value & bits) >> res->mask.shift;
     return true;
 }
 
-bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res) {
+bool rd_i_regmap_del(RDRegisterVect* self, const RDRegResolved* res) {
     assert(res);
 
     RDRegValue bits;
     if(!_rd_reg_bits(res, &bits)) return false;
 
-    RDRegister key = {.name = res->name};
-    RDRegister* r = hmap_get(map, &key);
+    usize idx;
+    RDRegister* r = _rd_reg_find_item(self, res->name, &idx);
     if(!r) return true;
 
     r->known_bits &= ~bits;
@@ -156,16 +153,16 @@ bool rd_i_regmap_del(RDRegisterHMap* map, const RDRegResolved* res) {
     r->setter = (RDRegSetter){0};
     r->setter_bits = 0;
 
-    if(!r->known_bits) hmap_del(map, &key);
+    if(!r->known_bits) vect_del(self, idx, 1); // r is invalid after this
     return true;
 }
 
-bool rd_i_regmap_get_info(const RDRegisterHMap* map, const RDRegResolved* res,
+bool rd_i_regmap_get_info(const RDRegisterVect* self, const RDRegResolved* res,
                           RDRegValueInfo* info) {
     assert(res);
 
     RDRegValue bits;
-    const RDRegister* r = _rd_regmap_find(map, res, &bits);
+    const RDRegister* r = _rd_regmap_find((RDRegisterVect*)self, res, &bits);
     if(!r) return false;
 
     if(info) {
