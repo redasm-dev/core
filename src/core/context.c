@@ -1807,6 +1807,10 @@ out:
     return res;
 }
 
+bool rd_can_encode(const RDContext* ctx) {
+    return ctx && ctx->processorplugin && !!ctx->processorplugin->encode;
+}
+
 bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr,
                           bool fill_nops) {
     const RDSegment* seg = rd_i_db_find_segment(self, address);

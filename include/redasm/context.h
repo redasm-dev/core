@@ -141,6 +141,7 @@ RD_API const char* rd_get_working_dir(const RDContext* self);
 RD_API const char* rd_get_file_name(const RDContext* self);
 RD_API const char* rd_str_intern(RDContext* self, const char* s);
 RD_API const char* rd_resolve_name(RDContext* self, RDAddress address, RDAddress* resolved);
+RD_API bool rd_can_encode(const RDContext* ctx);
 RD_API bool rd_patch_instruction(RDContext* self, RDAddress address, const char* instr, bool fill_nops);
 RD_API bool rd_fill_nops(RDContext* self, RDAddress address, usize n);
 RD_API bool rd_encode(RDContext* ctx, RDAddress address, const char* s, RDScratchBuffer* buf);

@@ -124,8 +124,9 @@ static bool _rd_kb_get_type(const RDDatum* obj, RDType* t,
             panic_if(!t->def, "cannot get code-pointer size");
             t->mod = RD_TYPE_CPTR;
         }
-        else
+        else {
             is_type_ptr = true;
+        }
     }
 
     if(is_type_ptr) {
