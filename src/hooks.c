@@ -23,6 +23,17 @@ static bool _rd_emit_hook(RDContext* ctx, const RDHookEvent* e) {
     size_t i = vect_lower_bound(&ctx->hooks, &key, _rd_hookitem_search);
     size_t start = i;
 
+    if(_rd_hookkind_is_exclusive(e->kind)) {
+        if(i >= vect_length(&ctx->hooks) ||
+           vect_at(&ctx->hooks, i)->name != interned ||
+           vect_at(&ctx->hooks, i)->kind != e->kind)
+            return false;
+
+        // by value: the handler may register hooks and move the vector
+        RDHookItem item = *vect_at(&ctx->hooks, i);
+        return item.fn(ctx, e, item.userdata);
+    }
+
     while(i < vect_length(&ctx->hooks) &&
           vect_at(&ctx->hooks, i)->name == interned &&
           vect_at(&ctx->hooks, i)->kind == e->kind)
@@ -46,11 +57,14 @@ static bool _rd_emit_hook(RDContext* ctx, const RDHookEvent* e) {
     RDHookItemVect snapshot = {0};
     vect_dup(&snapshot, &sub);
 
+    bool handled = false;
     const RDHookItem* item;
-    vect_each(item, &snapshot) item->fn(ctx, e, item->userdata);
+    vect_each(item, &snapshot) {
+        if(item->fn(ctx, e, item->userdata)) handled = true;
+    }
 
     vect_destroy(&snapshot);
-    return true;
+    return handled;
 }
 
 static bool _rd_emit_bus(RDContext* ctx, const char* name, RDAddress addr,

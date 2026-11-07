@@ -35,7 +35,7 @@ typedef struct RDHookEvent {
 } RDHookEvent;
 // clang-format on
 
-typedef void (*RDHookFunc)(RDContext*, const RDHookEvent*, void* userdata);
+typedef bool (*RDHookFunc)(RDContext*, const RDHookEvent*, void* userdata);
 
 RD_API bool rd_register_hook(RDContext* ctx, RDHookKind kind, const char* name,
                              RDHookFunc h, void* userdata);
