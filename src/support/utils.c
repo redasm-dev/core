@@ -329,7 +329,7 @@ char* rd_i_vformat(RDCharVect* buf, const char* fmt, va_list args) {
         len = vsnprintf(buf->data, vect_capacity(buf), fmt, args_copy);
         va_end(args_copy);
 
-        assert(len > 0 && len < (int)vect_capacity(buf) &&
+        assert(len >= 0 && len < (int)vect_capacity(buf) &&
                "formatting buffer overflow");
     }
 
