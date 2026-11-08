@@ -111,6 +111,7 @@ void rd_i_state_init(const RDInitParams* params) {
 void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.optgroup_buf);
     vect_destroy(&rd_i_state.encode_buf.impl);
+    vect_destroy(&rd_i_state.encode_buf.fmt_buf);
     rd_destroy(rd_i_state.encode_ctx);
 
     RDPlugin** it;
@@ -124,7 +125,6 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.analyzers);
     vect_destroy(&rd_i_state.processors);
     vect_destroy(&rd_i_state.loaders);
-    vect_destroy(&rd_i_state.scratch_buf);
     vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
     vect_destroy(&rd_i_state.kb_path_buf);

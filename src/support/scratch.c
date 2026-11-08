@@ -1,5 +1,4 @@
 #include "scratch.h"
-#include "core/state.h"
 #include "support/containers.h"
 #include <redasm/allocator.h>
 #include <redasm/support/logging.h>
@@ -38,6 +37,7 @@ RDScratchBuffer* rd_scratch_create_from_file(const char* filepath) {
 void rd_scratch_destroy(RDScratchBuffer* self) {
     if(!self) return;
 
+    vect_destroy(&self->fmt_buf);
     vect_destroy(&self->impl);
     rd_free(self);
 }
@@ -128,7 +128,7 @@ void rd_scratch_clear(RDScratchBuffer* self) { str_clear(&self->impl); }
 void rd_scratch_putf(RDScratchBuffer* self, const char* fmt, ...) {
     va_list args; // format in a temporary buffer, then append
     va_start(args, fmt);
-    const char* result = rd_i_vformat(&rd_i_state.scratch_buf, fmt, args);
+    const char* result = rd_i_vformat(&self->fmt_buf, fmt, args);
     va_end(args);
 
     rd_scratch_puts(self, result);

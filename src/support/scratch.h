@@ -5,4 +5,5 @@
 
 typedef struct RDScratchBuffer {
     RDCharVect impl;
+    RDCharVect fmt_buf;
 } RDScratchBuffer;

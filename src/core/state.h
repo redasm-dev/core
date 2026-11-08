@@ -50,7 +50,6 @@ typedef struct RDGlobalState {
 
     RDCharVect fmt_buf;
     RDCharVect log_buf;
-    RDCharVect scratch_buf;
     RDCharVect toml_key_buf;
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;
