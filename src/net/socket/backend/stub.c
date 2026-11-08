@@ -13,6 +13,19 @@ RDSocket* _rd_net_socket_connect(RDSocketKind kind, const char* host, u16 port,
     return NULL;
 }
 
+RDSocket* _rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port) {
+    RD_UNUSED(kind);
+    RD_UNUSED(host);
+    RD_UNUSED(port);
+    return NULL;
+}
+
+RDSocket* _rd_net_socket_accept(RDSocket* s, u32 timeout_ms) {
+    RD_UNUSED(s);
+    RD_UNUSED(timeout_ms);
+    return NULL;
+}
+
 RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
                                    u32 timeout_ms) {
     RD_UNUSED(s);

@@ -11,10 +11,30 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#if !defined(MSG_NOSIGNAL)
+#define MSG_NOSIGNAL 0 // SO_NOSIGPIPE is set in _rd_net_socket_new instead
+#endif
+
 typedef struct RDSocket {
     int fd;
     RDSocketKind kind;
+    bool is_server;
+    struct sockaddr_storage peer;
+    socklen_t peer_len;
 } RDSocket;
+
+static RDSocket* _rd_net_socket_new(int fd, RDSocketKind kind, bool is_server) {
+#if defined(SO_NOSIGPIPE)
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
+#endif
+
+    RDSocket* s = rd_alloc0(1, sizeof(RDSocket));
+    s->fd = fd;
+    s->kind = kind;
+    s->is_server = is_server;
+    return s;
+}
 
 static bool _rd_net_socket_wait_ready(int fd, short events, u32 timeout_ms) {
     struct pollfd pfd = {.fd = fd, .events = events};
@@ -101,20 +121,95 @@ RDSocket* _rd_net_socket_connect(RDSocketKind kind, const char* host, u16 port,
     // send/recv below manage their own waits via poll
     _rd_net_socket_set_nonblocking(fd, false);
 
-    RDSocket* s = rd_alloc(sizeof(RDSocket));
-    s->fd = fd;
-    s->kind = kind;
-    return s;
+    return _rd_net_socket_new(fd, kind, false);
+}
+
+RDSocket* _rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port) {
+    if(!host || !port) return NULL;
+
+    struct addrinfo hints = {
+        .ai_family = AF_UNSPEC,
+        .ai_socktype = (kind == RD_SOCKET_TCP) ? SOCK_STREAM : SOCK_DGRAM,
+    };
+
+    char portstr[6];
+    snprintf(portstr, sizeof(portstr), "%u", port);
+
+    struct addrinfo* res = NULL;
+    if(getaddrinfo(host, portstr, &hints, &res) != 0 || !res) {
+        RD_LOG_FAIL("socket: cannot resolve '%s'", host);
+        return NULL;
+    }
+
+    int fd = -1;
+
+    for(struct addrinfo* it = res; it; it = it->ai_next) {
+        fd = socket(it->ai_family, it->ai_socktype, it->ai_protocol);
+        if(fd < 0) continue;
+
+        if(kind == RD_SOCKET_TCP) {
+            // allow rebinding while old connections sit in TIME_WAIT
+            int on = 1;
+            setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+        }
+
+        if(bind(fd, it->ai_addr, it->ai_addrlen) == 0 &&
+           (kind != RD_SOCKET_TCP || listen(fd, SOMAXCONN) == 0))
+            break;
+
+        close(fd);
+        fd = -1;
+    }
+
+    freeaddrinfo(res);
+
+    if(fd < 0) {
+        RD_LOG_FAIL("socket: listen on '%s:%u' failed", host, port);
+        return NULL;
+    }
+
+    // a client can vanish between poll and accept, which must not block
+    if(kind == RD_SOCKET_TCP) _rd_net_socket_set_nonblocking(fd, true);
+    return _rd_net_socket_new(fd, kind, true);
+}
+
+RDSocket* _rd_net_socket_accept(RDSocket* s, u32 timeout_ms) {
+    if(!s || !s->is_server || s->kind != RD_SOCKET_TCP) return NULL;
+
+    for(;;) {
+        if(!_rd_net_socket_wait_ready(s->fd, POLLIN, timeout_ms)) return NULL;
+
+        int fd = accept(s->fd, NULL, NULL);
+
+        if(fd >= 0) {
+            // O_NONBLOCK is inherited from the listener on BSD/macOS
+            _rd_net_socket_set_nonblocking(fd, false);
+            return _rd_net_socket_new(fd, RD_SOCKET_TCP, false);
+        }
+
+        // client gone before accept: keep waiting (timeout restarts)
+        if(errno != EINTR && errno != EAGAIN && errno != ECONNABORTED)
+            return NULL;
+    }
+
+    return NULL;
 }
 
 RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
                                    u32 timeout_ms) {
     RDSocketResult r = {.ok = false, .length = 0};
     if(!s || !data || !n) return r;
+
+    // TCP listeners have no peer, UDP servers need a datagram to reply to
+    if(s->is_server && (s->kind == RD_SOCKET_TCP || !s->peer_len)) return r;
     if(!_rd_net_socket_wait_ready(s->fd, POLLOUT, timeout_ms)) return r;
 
     _rd_net_socket_set_send_timeout(s->fd, timeout_ms);
-    ssize_t sent = send(s->fd, data, n, 0);
+
+    ssize_t sent = s->is_server
+                       ? sendto(s->fd, data, n, MSG_NOSIGNAL,
+                                (const struct sockaddr*)&s->peer, s->peer_len)
+                       : send(s->fd, data, n, MSG_NOSIGNAL);
     if(sent < 0) return r;
 
     r.ok = true;
@@ -127,6 +222,23 @@ RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
 
     RDSocketResult r = {.ok = false, .length = 0};
     if(!s || vect_is_empty(buf)) return r;
+    if(s->is_server && s->kind == RD_SOCKET_TCP) return r;
+
+    if(s->is_server) {
+        struct sockaddr_storage peer;
+        socklen_t peer_len = sizeof(peer);
+
+        ssize_t n = recvfrom(s->fd, buf->data, vect_length(buf), 0,
+                             (struct sockaddr*)&peer, &peer_len);
+        if(n < 0) return r;
+
+        // n == 0 is a valid empty datagram, not a closed connection
+        s->peer = peer;
+        s->peer_len = peer_len;
+        r.ok = true;
+        r.length = (usize)n;
+        return r;
+    }
 
     ssize_t got = recv(s->fd, buf->data, vect_length(buf), 0);
     // got == 0: peer closed the connection - ok stays false, n stays 0

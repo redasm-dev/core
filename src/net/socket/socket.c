@@ -17,6 +17,24 @@ RDSocket* rd_socket_connect(RDSocketKind kind, const char* host, u16 port,
 #endif
 }
 
+RDSocket* rd_socket_listen(RDSocketKind kind, const char* host, u16 port) {
+#if defined(RD_HAS_NETWORK)
+    if(!rd_net_is_enabled()) return NULL;
+    return _rd_net_socket_listen(kind, host, port);
+#else
+    return NULL;
+#endif
+}
+
+RDSocket* rd_socket_accept(RDSocket* s, u32 timeout_ms) {
+#if defined(RD_HAS_NETWORK)
+    if(!rd_net_is_enabled()) return NULL;
+    return _rd_net_socket_accept(s, timeout_ms);
+#else
+    return NULL;
+#endif
+}
+
 RDSocketResult rd_socket_send(RDSocket* s, const void* data, usize n,
                               u32 timeout_ms) {
 #if defined(RD_HAS_NETWORK)
