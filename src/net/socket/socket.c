@@ -7,8 +7,8 @@
 #include <redasm/net/net.h>
 #endif
 
-RDSocket* rd_socket_connect(RDSocketKind kind, const char* host, u16 port,
-                            u32 timeout_ms) {
+RDSocket* rd_net_socket_connect(RDSocketKind kind, const char* host, u16 port,
+                                u32 timeout_ms) {
 #if defined(RD_HAS_NETWORK)
     if(!rd_net_is_enabled()) return NULL;
     return _rd_net_socket_connect(kind, host, port, timeout_ms);
@@ -17,7 +17,7 @@ RDSocket* rd_socket_connect(RDSocketKind kind, const char* host, u16 port,
 #endif
 }
 
-RDSocket* rd_socket_listen(RDSocketKind kind, const char* host, u16 port) {
+RDSocket* rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port) {
 #if defined(RD_HAS_NETWORK)
     if(!rd_net_is_enabled()) return NULL;
     return _rd_net_socket_listen(kind, host, port);
@@ -26,7 +26,7 @@ RDSocket* rd_socket_listen(RDSocketKind kind, const char* host, u16 port) {
 #endif
 }
 
-RDSocket* rd_socket_accept(RDSocket* s, u32 timeout_ms) {
+RDSocket* rd_net_socket_accept(RDSocket* s, u32 timeout_ms) {
 #if defined(RD_HAS_NETWORK)
     if(!rd_net_is_enabled()) return NULL;
     return _rd_net_socket_accept(s, timeout_ms);
@@ -35,8 +35,8 @@ RDSocket* rd_socket_accept(RDSocket* s, u32 timeout_ms) {
 #endif
 }
 
-RDSocketResult rd_socket_send(RDSocket* s, const void* data, usize n,
-                              u32 timeout_ms) {
+RDSocketResult rd_net_socket_send(RDSocket* s, const void* data, usize n,
+                                  u32 timeout_ms) {
 #if defined(RD_HAS_NETWORK)
     return _rd_net_socket_send(s, data, n, timeout_ms);
 #else
@@ -44,7 +44,7 @@ RDSocketResult rd_socket_send(RDSocket* s, const void* data, usize n,
 #endif
 }
 
-RDSocketResult rd_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
+RDSocketResult rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
 #if defined(RD_HAS_NETWORK)
     return _rd_net_socket_recv(s, reply);
 #else
@@ -52,7 +52,7 @@ RDSocketResult rd_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
 #endif
 }
 
-void rd_socket_close(RDSocket* s) {
+void rd_net_socket_close(RDSocket* s) {
 #if defined(RD_HAS_NETWORK)
     _rd_net_socket_close(s);
 #else

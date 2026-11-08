@@ -16,10 +16,10 @@ typedef struct RDSocketResult {
 } RDSocketResult;
 
 // clang-format off
-RD_API RDSocket* rd_socket_connect(RDSocketKind kind, const char* host, u16 port, u32 timeout_ms);
-RD_API RDSocket* rd_socket_listen(RDSocketKind kind, const char* host, u16 port);
-RD_API RDSocket* rd_socket_accept(RDSocket* s, u32 timeout_ms); // 0 = wait forever
-RD_API RDSocketResult rd_socket_send(RDSocket* s, const void* data, usize n, u32 timeout_ms);
-RD_API RDSocketResult rd_socket_recv(RDSocket* s, RDScratchBuffer* reply);
-RD_API void rd_socket_close(RDSocket* s);
+RD_API RDSocket* rd_net_socket_connect(RDSocketKind kind, const char* host, u16 port, u32 timeout_ms);
+RD_API RDSocket* rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port);
+RD_API RDSocket* rd_net_socket_accept(RDSocket* s, u32 timeout_ms); // 0 = wait forever
+RD_API RDSocketResult rd_net_socket_send(RDSocket* s, const void* data, usize n, u32 timeout_ms);
+RD_API RDSocketResult rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply);
+RD_API void rd_net_socket_close(RDSocket* s);
 // clang-format on
