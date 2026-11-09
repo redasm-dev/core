@@ -34,14 +34,36 @@ static RDSocket* _rd_net_socket_new(SOCKET fd, RDSocketKind kind,
     return s;
 }
 
-static bool _rd_net_socket_wait_ready(SOCKET fd, SHORT events, u32 timeout_ms) {
+static RDSocketStatus _rd_net_socket_poll(SOCKET fd, SHORT events,
+                                          u32 timeout_ms, SHORT* revents) {
     WSAPOLLFD pfd = {.fd = fd, .events = events};
     int t = timeout_ms ? (int)timeout_ms : -1;
 
     int r = WSAPoll(&pfd, 1, t);
     if(r <= 0) return false; // timeout or error
+    if(r == 0) return RD_SOCKET_TIMEOUT;
+    if(r < 0) return RD_SOCKET_ERROR;
 
     return (pfd.revents & events) && !(pfd.revents & (POLLERR | POLLHUP));
+    *revents = pfd.revents;
+    return RD_SOCKET_OK;
+}
+
+static RDSocketStatus _rd_net_socket_wait_ready(SOCKET fd, SHORT events,
+                                                u32 timeout_ms) {
+    SHORT revents = 0;
+    RDSocketStatus st = _rd_net_socket_poll(fd, events, timeout_ms, &revents);
+    if(st != RD_SOCKET_OK) return st;
+
+    return ((revents & events) && !(revents & (POLLERR | POLLHUP)))
+               ? RD_SOCKET_OK
+               : RD_SOCKET_ERROR;
+}
+
+static RDSocketStatus _rd_net_socket_last_error(void) {
+    int err = WSAGetLastError();
+    return (err == WSAETIMEDOUT || err == WSAEWOULDBLOCK) ? RD_SOCKET_TIMEOUT
+                                                          : RD_SOCKET_ERROR;
 }
 
 static void _rd_net_socket_set_nonblocking(SOCKET fd, bool enable) {
@@ -105,7 +127,8 @@ RDSocket* _rd_net_socket_connect(RDSocketKind kind, const char* host, u16 port,
         if(rc == 0) break; // connected immediately (common for UDP)
 
         if(WSAGetLastError() == WSAEWOULDBLOCK) {
-            if(_rd_net_socket_wait_ready(fd, POLLOUT, timeout_ms)) {
+            if(_rd_net_socket_wait_ready(fd, POLLOUT, timeout_ms) ==
+               RD_SOCKET_OK) {
                 int err = 0;
                 int len = sizeof(err);
                 getsockopt(fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
@@ -191,7 +214,8 @@ RDSocket* _rd_net_socket_accept(RDSocket* s, u32 timeout_ms) {
     if(!s || !s->is_server || s->kind != RD_SOCKET_TCP) return NULL;
 
     for(;;) {
-        if(!_rd_net_socket_wait_ready(s->fd, POLLRDNORM, timeout_ms))
+        if(!_rd_net_socket_wait_ready(s->fd, POLLRDNORM, timeout_ms) !=
+           RD_SOCKET_OK)
             return NULL;
 
         SOCKET fd = accept(s->fd, NULL, NULL);
@@ -210,14 +234,15 @@ RDSocket* _rd_net_socket_accept(RDSocket* s, u32 timeout_ms) {
 
 RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
                                    u32 timeout_ms) {
-    RDSocketResult r = {.ok = false, .length = 0};
+    RDSocketResult r = {.status = RD_SOCKET_ERROR, .length = 0};
     if(!s) return r;
 
     // TCP listeners have no peer, UDP servers need a datagram to reply to
     if(s->is_server && (s->kind == RD_SOCKET_TCP || !s->peer_len)) return r;
 
-    if(!_rd_net_socket_wait_ready(s->fd, POLLOUT, timeout_ms))
-        return r; // layer 1: buffer wait
+    // layer 1: buffer wait
+    r.status = _rd_net_socket_wait_ready(s->fd, POLLOUT, timeout_ms);
+    if(r.status != RD_SOCKET_OK) return r;
 
     _rd_net_socket_set_send_timeout(s->fd,
                                     timeout_ms); // layer 2: syscall-level bound
@@ -226,18 +251,27 @@ RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
                    ? sendto(s->fd, (const char*)data, (int)n, 0,
                             (const struct sockaddr*)&s->peer, s->peer_len)
                    : send(s->fd, (const char*)data, (int)n, 0);
-    if(sent == SOCKET_ERROR) return r;
 
-    r.ok = true;
+    if(sent == SOCKET_ERROR) {
+        r.status = _rd_net_socket_last_error();
+        return r;
+    }
+
     r.length = (usize)sent;
     return r;
 }
 
-RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
+RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply,
+                                   u32 timeout_ms) {
     RDCharVect* buf = &reply->impl;
-    RDSocketResult r = {.ok = false, .length = 0};
+    RDSocketResult r = {.status = RD_SOCKET_ERROR, .length = 0};
     if(!s || vect_is_empty(buf)) return r;
     if(s->is_server && s->kind == RD_SOCKET_TCP) return r;
+
+    // no error check here: recv reports closed peers after any pending data
+    SHORT revents = 0;
+    r.status = _rd_net_socket_poll(s->fd, POLLRDNORM, timeout_ms, &revents);
+    if(r.status != RD_SOCKET_OK) return r;
 
     if(s->is_server) {
         struct sockaddr_storage peer;
@@ -249,25 +283,27 @@ RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
 
         // oversized datagram: truncate like POSIX does instead of failing
         if(n == SOCKET_ERROR && WSAGetLastError() == WSAEMSGSIZE) n = cap;
-        if(n == SOCKET_ERROR) return r;
+
+        if(n == SOCKET_ERROR) {
+            r.status = _rd_net_socket_last_error();
+            return r;
+        }
 
         // n == 0 is a valid empty datagram, not a closed connection
         s->peer = peer;
         s->peer_len = peer_len;
-        r.ok = true;
         r.length = (usize)n;
         return r;
     }
 
     int got = recv(s->fd, buf->data, (int)vect_length(buf), 0);
 
-    if(got > 0) {
-        r.ok = true;
+    if(got > 0)
         r.length = (usize)got;
-    }
-
-    // got == 0: peer closed the connection - ok stays false
-    // got == SOCKET_ERROR: socket error - same
+    else if(got == 0)
+        r.status = RD_SOCKET_ERROR; // peer closed the connection
+    else
+        r.status = _rd_net_socket_last_error();
 
     return r;
 }

@@ -13,5 +13,6 @@ RDSocket* _rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port);
 RDSocket* _rd_net_socket_accept(RDSocket* s, u32 timeout_ms);
 RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
                                    u32 timeout_ms);
-RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply);
+RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply,
+                                   u32 timeout_ms);
 void _rd_net_socket_close(RDSocket* s);

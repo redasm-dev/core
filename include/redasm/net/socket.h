@@ -10,8 +10,14 @@ typedef enum {
     RD_SOCKET_UDP,
 } RDSocketKind;
 
+typedef enum {
+    RD_SOCKET_ERROR = 0,
+    RD_SOCKET_OK,
+    RD_SOCKET_TIMEOUT,
+} RDSocketStatus;
+
 typedef struct RDSocketResult {
-    bool ok;
+    RDSocketStatus status;
     usize length;
 } RDSocketResult;
 
@@ -20,6 +26,6 @@ RD_API RDSocket* rd_net_socket_connect(RDSocketKind kind, const char* host, u16 
 RD_API RDSocket* rd_net_socket_listen(RDSocketKind kind, const char* host, u16 port);
 RD_API RDSocket* rd_net_socket_accept(RDSocket* s, u32 timeout_ms); // 0 = wait forever
 RD_API RDSocketResult rd_net_socket_send(RDSocket* s, const void* data, usize n, u32 timeout_ms);
-RD_API RDSocketResult rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply);
+RD_API RDSocketResult rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply, u32 timeout_ms); // 0 = wait forever
 RD_API void rd_net_socket_close(RDSocket* s);
 // clang-format on

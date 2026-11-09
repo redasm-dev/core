@@ -32,13 +32,15 @@ RDSocketResult _rd_net_socket_send(RDSocket* s, const void* data, usize n,
     RD_UNUSED(data);
     RD_UNUSED(n);
     RD_UNUSED(timeout_ms);
-    return (RDSocketResult){.ok = false, .length = 0};
+    return (RDSocketResult){.status = RD_SOCKET_ERROR, .length = 0};
 }
 
-RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply) {
+RDSocketResult _rd_net_socket_recv(RDSocket* s, RDScratchBuffer* reply,
+                                   u32 timeout_ms) {
     RD_UNUSED(s);
     RD_UNUSED(reply);
-    return (RDSocketResult){.ok = false, .length = 0};
+    RD_UNUSED(timeout_ms);
+    return (RDSocketResult){.status = RD_SOCKET_ERROR, .length = 0};
 }
 
 void _rd_net_socket_close(RDSocket* s) { RD_UNUSED(s); }
