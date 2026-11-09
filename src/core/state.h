@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/settings.h"
 #include "net/http/http.h"
 #include "net/socket/socket.h"
 #include "plugins/loader/option.h"

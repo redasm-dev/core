@@ -83,7 +83,7 @@ void rd_i_state_init(const RDInitParams* params) {
             rd_i_state.settings_filepath = rd_strdup(params->settings_filepath);
 
             rd_i_state.settings =
-                rd_i_settings_create(rd_i_state.settings_filepath);
+                rd_settings_load(rd_i_state.settings_filepath);
         }
 
 #if defined(RD_HAS_NETWORK)
@@ -139,7 +139,7 @@ void rd_i_state_deinit(void) {
     _rd_i_state_unload_modules();
     rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
 
-    rd_i_settings_destroy(rd_i_state.settings);
+    rd_settings_destroy(rd_i_state.settings);
     rd_free(rd_i_state.settings_filepath);
 
 #if defined(RD_HAS_NETWORK)

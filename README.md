@@ -6,5 +6,5 @@ It's minimal and lightweight on purpose, written in **pure C17** and completely 
 ## Features
 *   **Headless-First**: Can be used as a standalone library for automation pipelines, custom tools, or alternative frontends.
 *   **Decoupled Architecture**: Hot-pluggable modules. Formats and architectures are loaded dynamically at runtime via shared modules.
-*   **Ecosystem**: Powered by our [Knowledge Base (kb)](https://github.com/redasm-dev/kb) database.
+*   **External Database**: TOML based [Knowledge Base](https://github.com/redasm-dev/kb).
 *   **RDIL**: A tiny architecture-neutral intermediate Language.
