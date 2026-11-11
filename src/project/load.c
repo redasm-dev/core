@@ -3,7 +3,6 @@
 #include "io/flagsbuffer.h"
 #include "project.h"
 #include "support/containers.h"
-#include "support/tomlschema.h"
 #include <inttypes.h>
 #include <miniz.h>
 #include <redasm/support/logging.h>
@@ -29,8 +28,7 @@ typedef struct RDProjectManifest {
     RDStringTerminatorVect string_terminators;
     RDAnalyzerItemVect analyzers;
 
-    toml_result_t toml;
-    char* raw;
+    RDDatumDoc* doc;
 } RDProjectManifest;
 
 typedef struct RDProjectPaths {
@@ -44,26 +42,26 @@ static const char* flags_compression_schema[] = {
     NULL,
 };
 
-static const RDTomlSchema ANALYZER_SCHEMA[] = {
-    {.key = "id", .type = TOML_STRING},
-    {.key = "is_selected", .type = TOML_BOOLEAN},
-    {.key = "n_runs", .type = TOML_INT64},
+static const RDDatumSchema ANALYZER_SCHEMA[] = {
+    {.key = "id", .kind = RD_DATUM_STRING},
+    {.key = "is_selected", .kind = RD_DATUM_BOOL},
+    {.key = "n_runs", .kind = RD_DATUM_INT},
     {0},
 };
 
-static const RDTomlSchema MANIFEST_SCHEMA[] = {
-    {.key = "format.api_version", .type = TOML_INT64},
-    {.key = "format.flags_compression", .type = TOML_STRING, .string_values = flags_compression_schema},
-    {.key = "format.file_name", .type = TOML_STRING},
+static const RDDatumSchema MANIFEST_SCHEMA[] = {
+    {.key = "format.api_version", .kind = RD_DATUM_INT},
+    {.key = "format.flags_compression", .kind = RD_DATUM_STRING, .string_values = flags_compression_schema},
+    {.key = "format.file_name", .kind = RD_DATUM_STRING},
 
-    {.key = "analysis.min_string", .type = TOML_INT64},
-    {.key = "analysis.base_address", .type = TOML_INT64},
-    {.key = "analysis.string_terminators", .type = TOML_ARRAY, .array_type = &(RDTomlSchema){.type = TOML_INT64}},
-    {.key = "analysis.loader", .type = TOML_STRING},
-    {.key = "analysis.processor", .type = TOML_STRING},
-    {.key = "analysis.platform", .type = TOML_STRING, .optional = true},
-    {.key = "analysis.analyzers", .type = TOML_ARRAY, .array_type = ANALYZER_SCHEMA},
-    {.key = "analysis.entry_point", .type = TOML_INT64, .optional = true},
+    {.key = "analysis.min_string", .kind = RD_DATUM_INT},
+    {.key = "analysis.base_address", .kind = RD_DATUM_INT},
+    {.key = "analysis.string_terminators", .kind = RD_DATUM_ARRAY, .array_type = &(RDDatumSchema){.kind = RD_DATUM_INT}},
+    {.key = "analysis.loader", .kind = RD_DATUM_STRING},
+    {.key = "analysis.processor", .kind = RD_DATUM_STRING},
+    {.key = "analysis.platform", .kind = RD_DATUM_STRING, .optional = true},
+    {.key = "analysis.analyzers", .kind = RD_DATUM_ARRAY, .array_type = ANALYZER_SCHEMA},
+    {.key = "analysis.entry_point", .kind = RD_DATUM_INT, .optional = true},
 
     {0},
 };
@@ -72,8 +70,7 @@ static const RDTomlSchema MANIFEST_SCHEMA[] = {
 static void _rd_project_manifest_destroy(RDProjectManifest* m) {
     rd_i_analyzeritemvect_destroy(&m->analyzers);
     vect_destroy(&m->string_terminators);
-    toml_free(m->toml);
-    rd_free(m->raw);
+    rd_datumdoc_destroy(m->doc);
 }
 
 static void _rd_project_paths_destroy(RDProjectPaths* p) {
@@ -131,23 +128,19 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         return false;
     }
 
-    // tomlc17 seems to ignore length and wants a null terminator
-    out->raw = rd_alloc0(n + 1, sizeof(char));
-    memcpy(out->raw, manifest_buf, n);
+    out->doc = rd_datumdoc_load_data(manifest_buf, n, MANIFEST_SCHEMA);
     mz_free(manifest_buf);
 
-    out->toml = toml_parse(out->raw, (int)n);
-
-    if(!out->toml.ok) {
-        RD_LOG_FAIL("invalid project manifest: %s", out->toml.errmsg);
+    if(!out->doc) {
+        RD_LOG_FAIL("invalid project manifest");
         return false;
     }
 
-    if(!rd_i_toml_validate_schema(out->toml.toptab, MANIFEST_SCHEMA))
-        return false;
+    const RDDatum* root = rd_datumdoc_get_root(out->doc);
 
-    out->api_version =
-        (u32)toml_seek(out->toml.toptab, "format.api_version").u.int64;
+    i64 v = 0;
+    rd_datum_get_int(root, "format.api_version", &v);
+    out->api_version = (u32)v;
 
     if(out->api_version != RD_API_VERSION) {
         RD_LOG_FAIL("project built with API v%u.%u, this build is v%u.%u",
@@ -157,26 +150,27 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         return false;
     }
 
-    out->file_name = toml_seek(out->toml.toptab, "format.file_name").u.s;
+    out->file_name = rd_datum_get_str(root, "format.file_name");
 
-    out->min_string =
-        (int)toml_seek(out->toml.toptab, "analysis.min_string").u.int64;
+    rd_datum_get_int(root, "analysis.min_string", &v);
+    out->min_string = (int)v;
 
-    out->base_address =
-        (RDAddress)toml_seek(out->toml.toptab, "analysis.base_address").u.int64;
+    rd_datum_get_int(root, "analysis.base_address", &v);
+    out->base_address = (RDAddress)v;
 
-    toml_datum_t string_terminators =
-        toml_seek(out->toml.toptab, "analysis.string_terminators");
+    const RDDatum* string_terminators =
+        rd_datum_get_array(root, "analysis.string_terminators");
 
     vect_reserve(&out->string_terminators,
-                 (usize)string_terminators.u.arr.size);
+                 rd_datum_get_length(string_terminators));
 
-    for(int i = 0; i < string_terminators.u.arr.size; i++) {
-        toml_datum_t elem = string_terminators.u.arr.elem[i];
-        vect_push(&out->string_terminators, (u8)elem.u.int64);
+    const RDDatum* elem;
+    rd_datum_each(elem, string_terminators) {
+        rd_datum_to_int(elem, &v);
+        vect_push(&out->string_terminators, (u8)v);
     }
 
-    const char* loader_id = toml_seek(out->toml.toptab, "analysis.loader").u.s;
+    const char* loader_id = rd_datum_get_str(root, "analysis.loader");
     assert(loader_id);
 
     out->loaderplugin = rd_loader_find(loader_id);
@@ -186,10 +180,8 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         return false;
     }
 
-    const char* processor_id =
-        toml_seek(out->toml.toptab, "analysis.processor").u.s;
-    const char* platform_id =
-        toml_seek(out->toml.toptab, "analysis.platform").u.s;
+    const char* processor_id = rd_datum_get_str(root, "analysis.processor");
+    const char* platform_id = rd_datum_get_str(root, "analysis.platform");
 
     assert(processor_id);
 
@@ -212,15 +204,15 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
         out->platformplugin = NULL;
     }
 
-    toml_datum_t ep = toml_seek(out->toml.toptab, "analysis.entry_point");
-    out->entry_point.has_value = ep.type != TOML_UNKNOWN;
-    out->entry_point.value = (RDAddress)ep.u.int64;
+    v = 0;
+    out->entry_point.has_value =
+        rd_datum_get_int(root, "analysis.entry_point", &v);
+    out->entry_point.value = (RDAddress)v;
 
-    toml_datum_t analyzers = toml_seek(out->toml.toptab, "analysis.analyzers");
+    const RDDatum* analyzers = rd_datum_get_array(root, "analysis.analyzers");
 
-    for(int i = 0; i < analyzers.u.arr.size; i++) {
-        toml_datum_t elem = analyzers.u.arr.elem[i];
-        const char* id = toml_seek(elem, "id").u.s;
+    rd_datum_each(elem, analyzers) {
+        const char* id = rd_datum_get_str(elem, "id");
         const RDAnalyzerPlugin* plugin = rd_analyzer_find(id);
 
         if(!plugin) {
@@ -230,8 +222,9 @@ static bool _rd_project_read_manifest(mz_zip_archive* zip,
 
         RDAnalyzerItem* ai = rd_alloc(sizeof(*ai));
         ai->plugin = plugin;
-        ai->is_selected = toml_seek(elem, "is_selected").u.boolean;
-        ai->n_runs = (usize)toml_seek(elem, "n_runs").u.int64;
+        rd_datum_get_bool(elem, "is_selected", &ai->is_selected);
+        rd_datum_get_int(elem, "n_runs", &v);
+        ai->n_runs = (usize)v;
         vect_push(&out->analyzers, ai);
     }
 

@@ -38,7 +38,7 @@ typedef struct RDGlobalState {
     RDTheme theme;
 
     char* settings_filepath;
-    RDSettings* settings;
+    RDDatumDoc* settings;
 
     RDLogCallback log_callback;
     void* log_userdata;
@@ -49,7 +49,7 @@ typedef struct RDGlobalState {
 
     RDCharVect fmt_buf;
     RDCharVect log_buf;
-    RDCharVect toml_key_buf;
+    RDCharVect datum_key_buf;
     RDCharVect instr_text_buf;
     RDCharVect instr_dump_buf;
     RDCharVect mnem_buf;

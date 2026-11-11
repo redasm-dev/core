@@ -90,7 +90,7 @@ void rd_i_state_init(const RDInitParams* params) {
             rd_i_state.settings_filepath = rd_strdup(params->settings_filepath);
 
             rd_i_state.settings =
-                rd_settings_load(rd_i_state.settings_filepath);
+                rd_datumdoc_load(rd_i_state.settings_filepath, NULL);
         }
 
 #if defined(RD_HAS_NETWORK)
@@ -138,7 +138,7 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.fmt_buf);
     vect_destroy(&rd_i_state.kb_path_buf);
     vect_destroy(&rd_i_state.kb_schema_buf);
-    vect_destroy(&rd_i_state.toml_key_buf);
+    vect_destroy(&rd_i_state.datum_key_buf);
     vect_destroy(&rd_i_state.instr_text_buf);
     vect_destroy(&rd_i_state.instr_dump_buf);
     vect_destroy(&rd_i_state.mnem_buf);
@@ -149,7 +149,7 @@ void rd_i_state_deinit(void) {
     _rd_i_state_unload_modules();
     rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
 
-    rd_settings_destroy(rd_i_state.settings);
+    rd_datumdoc_destroy(rd_i_state.settings);
     rd_free(rd_i_state.settings_filepath);
 
 #if defined(RD_HAS_NETWORK)

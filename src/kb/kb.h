@@ -2,11 +2,12 @@
 
 #include "support/path.h"
 #include <redasm/kb.h>
+#include <redasm/support/datum.h>
 #include <tomlc17.h>
 
 typedef struct RDKBFile {
     char* name;
-    toml_result_t toml;
+    RDDatumDoc* doc;
     const RDDatum* root;
 } RDKBFile;
 

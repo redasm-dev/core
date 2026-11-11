@@ -1,7 +1,32 @@
 #include "datum.h"
 #include "core/state.h"
-#include "support/tomlschema.h"
+#include <redasm/allocator.h>
+#include <redasm/support/logging.h>
 #include <string.h>
+
+typedef struct RDDatumDoc { // box TOML backend
+    toml_result_t toml;
+} RDDatumDoc;
+
+static RDDatumDoc* _rd_datumdoc_create(toml_result_t toml,
+                                       const RDDatumSchema* schema) {
+    if(!toml.ok) {
+        RD_LOG_FAIL("%s", toml.errmsg);
+        toml_free(toml);
+        return NULL;
+    }
+
+    RDDatumDoc* self = rd_alloc(sizeof(*self));
+    self->toml = toml;
+
+    // the validator logs what's wrong
+    if(schema && !rd_datum_validate(rd_datumdoc_get_root(self), schema)) {
+        rd_datumdoc_destroy(self);
+        return NULL;
+    }
+
+    return self;
+}
 
 // we need pointers, do not use toml_get
 static const toml_datum_t* _rd_datum_get(const toml_datum_t* datum,
@@ -25,10 +50,10 @@ static const RDDatum* _rd_datum_seek(const RDDatum* self, const char* key) {
     const toml_datum_t* datum = rd_i_datum_to_handle(self);
     if(!self || datum->type != TOML_TABLE || !key) return NULL;
 
-    str_clear(&rd_i_state.toml_key_buf);
-    str_append(&rd_i_state.toml_key_buf, key);
+    str_clear(&rd_i_state.datum_key_buf);
+    str_append(&rd_i_state.datum_key_buf, key);
 
-    char* p = rd_i_state.toml_key_buf.data;
+    char* p = rd_i_state.datum_key_buf.data;
     const toml_datum_t* cur = datum;
 
     while(cur && datum->type == TOML_TABLE) {
@@ -47,6 +72,37 @@ static const RDDatum* _rd_datum_seek(const RDDatum* self, const char* key) {
     return NULL;
 }
 
+RDDatumDoc* rd_datumdoc_load(const char* filepath,
+                             const RDDatumSchema* schema) {
+    if(!filepath) return NULL;
+    return _rd_datumdoc_create(toml_parse_file_ex(filepath), schema);
+}
+
+RDDatumDoc* rd_datumdoc_load_data(const char* data, usize n,
+                                  const RDDatumSchema* schema) {
+    if(!data || n > INT32_MAX) return NULL;
+
+    // the parser requires a NUL right after the last byte
+    char* buf = rd_alloc(n + 1);
+    memcpy(buf, data, n);
+    buf[n] = '\0';
+
+    RDDatumDoc* self = _rd_datumdoc_create(toml_parse(buf, (int)n), schema);
+    rd_free(buf); // parsed values are owned by the result, not by 'buf'
+    return self;
+}
+
+const RDDatum* rd_datumdoc_get_root(const RDDatumDoc* self) {
+    return self ? rd_i_datum_from_handle(&self->toml.toptab) : NULL;
+}
+
+void rd_datumdoc_destroy(RDDatumDoc* self) {
+    if(!self) return;
+
+    toml_free(self->toml);
+    rd_free(self);
+}
+
 usize rd_datum_get_length(const RDDatum* self) {
     const toml_datum_t* datum = rd_i_datum_to_handle(self);
 
@@ -55,7 +111,7 @@ usize rd_datum_get_length(const RDDatum* self) {
         if(datum->type == TOML_TABLE) return (usize)datum->u.tab.size;
 
         RD_LOG_WARN("trying to get the length of type '%s'",
-                    rd_i_toml_type_str(rd_i_datum_handle_type(self)));
+                    rd_datum_kind_str(rd_datum_get_kind(self)));
     }
 
     return 0;
@@ -67,7 +123,7 @@ RDDatumKind rd_datum_get_kind(const RDDatum* self) {
     if(datum) {
         switch(datum->type) {
             case TOML_UNKNOWN: return RD_DATUM_UNKNOWN;
-            case TOML_STRING: return RD_DATUM_STR;
+            case TOML_STRING: return RD_DATUM_STRING;
             case TOML_INT64: return RD_DATUM_INT;
             case TOML_FP64: return RD_DATUM_FLOAT;
             case TOML_BOOLEAN: return RD_DATUM_BOOL;
@@ -194,7 +250,7 @@ const RDDatum* rd_datum_value_at(const RDDatum* self, usize idx) {
 }
 
 const char* rd_datum_to_str(const RDDatum* self) {
-    if(!self || rd_datum_get_kind(self) != RD_DATUM_STR) return NULL;
+    if(!self || rd_datum_get_kind(self) != RD_DATUM_STRING) return NULL;
     return rd_i_datum_to_handle(self)->u.s;
 }
 

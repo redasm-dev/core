@@ -3,9 +3,7 @@
 #include "core/state.h"
 #include "kb/schema.h"
 #include "support/containers.h"
-#include "support/datum.h"
 #include "support/error.h"
-#include "support/tomlschema.h"
 #include <errno.h>
 #include <inttypes.h>
 #include <redasm/allocator.h>
@@ -32,7 +30,7 @@ static RDKBFile* _rd_kbfile_create(void) {
 }
 
 static void _rd_kbfile_destroy(RDKBFile* self) {
-    toml_free(self->toml);
+    rd_datumdoc_destroy(self->doc);
     rd_free(self->name);
     rd_free(self);
 }
@@ -434,8 +432,8 @@ static void _rd_kb_load_ordinals(const RDDatum* ordinals, RDContext* ctx) {
                 RD_LOG_WARN(
                     "ordinal-name must be '%s', got '%s' for module '%s', "
                     "skipping...",
-                    rd_i_toml_type_str(TOML_STRING),
-                    rd_i_toml_type_str(rd_i_datum_handle_type(ord)), modname);
+                    rd_datum_kind_str(RD_DATUM_STRING),
+                    rd_datum_kind_str(rd_datum_get_kind(ord)), modname);
                 continue;
             }
 
@@ -585,17 +583,13 @@ const RDDatum* rd_kb_load(RDContext* ctx, const char* kb) {
         return NULL;
     }
 
-    toml_result_t toml = toml_parse_file_ex(kb_path);
-
-    if(!toml.ok) {
-        RD_LOG_FAIL("%s", toml.errmsg);
-        return NULL;
-    }
+    RDDatumDoc* doc = rd_datumdoc_load(kb_path, NULL);
+    if(!doc) return NULL;
 
     kbfile = _rd_kbfile_create();
     kbfile->name = rd_strdup(kb);
-    kbfile->toml = toml;
-    kbfile->root = rd_i_datum_from_handle(&kbfile->toml.toptab);
+    kbfile->doc = doc;
+    kbfile->root = rd_datumdoc_get_root(doc);
 
     vect_push(&ctx->kb->files, kbfile); // avoid recursion
     RD_LOG_INFO("loading KB '%s'", kb);

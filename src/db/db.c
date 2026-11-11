@@ -9,6 +9,7 @@
 #include "support/utils.h"
 #include <inttypes.h>
 #include <redasm/support/logging.h>
+#include <stdio.h>
 
 #define RD_DB_KEY_ENTRY_POINT "entry_point"
 

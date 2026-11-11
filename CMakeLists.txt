@@ -82,11 +82,11 @@ target_sources(${PROJECT_NAME}
         src/support/scratch.c
         src/support/utils.c
         src/support/stringpool.c
-        src/support/tomlschema.c
         src/surface/graph.c
         src/surface/layout.c
         src/surface/items.c
         src/surface/path.c
+        src/support/schema.c
         src/surface/renderer.c
         src/surface/row.c
         src/surface/state.c

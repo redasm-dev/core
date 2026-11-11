@@ -10,7 +10,6 @@
 #include <inttypes.h>
 #include <miniz.h>
 #include <redasm/support/logging.h>
-#include <tomlc17.h>
 
 static const char* _rd_project_write_manifest(const RDContext* ctx,
                                               RDCharVect* v) {
