@@ -16,8 +16,17 @@
 #define W_OK 2
 #else
 #include <unistd.h> // access
+#include <limits.h> // realpath
 #endif
 // clang-format on
+
+static bool _rd_path_is_sep(char c) {
+#if defined(_WIN32)
+    return c == '\\' || c == '/';
+#else
+    return c == '/';
+#endif
+}
 
 static const char* _rd_path_get_tmppath(void) {
 #if defined(_WIN32)
@@ -43,6 +52,60 @@ static const char* _rd_path_get_tmppath(void) {
     return NULL;
 #else
 #error "Unsupported temp path implementation"
+#endif
+}
+
+// caller owns the result (rd_free), NULL if 'path' doesn't exist
+static char* _rd_path_resolve_alloc(const char* path) {
+    if(!path || !(*path)) return NULL;
+
+#if defined(_WIN32)
+    int wn = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+    if(wn <= 0) return NULL;
+
+    wchar_t* wpath = rd_alloc((usize)wn * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wn);
+
+    // BACKUP_SEMANTICS is required to open directories
+    HANDLE h = CreateFileW(
+        wpath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    rd_free(wpath);
+    if(h == INVALID_HANDLE_VALUE) return NULL;
+
+    char* res = NULL;
+    DWORD n = GetFinalPathNameByHandleW(h, NULL, 0, FILE_NAME_NORMALIZED);
+
+    if(n) {
+        wchar_t* wres = rd_alloc((usize)n * sizeof(wchar_t));
+        DWORD got = GetFinalPathNameByHandleW(h, wres, n, FILE_NAME_NORMALIZED);
+
+        if(got && got < n) {
+            // drop the "\\?\" prefix for local drives, keep it for UNC paths
+            const wchar_t* p = wres;
+            if(!wcsncmp(p, L"\\\\?\\", 4) && p[5] == L':') p += 4;
+
+            int un =
+                WideCharToMultiByte(CP_UTF8, 0, p, -1, NULL, 0, NULL, NULL);
+
+            if(un > 0) {
+                res = rd_alloc((usize)un);
+                WideCharToMultiByte(CP_UTF8, 0, p, -1, res, un, NULL, NULL);
+            }
+        }
+
+        rd_free(wres);
+    }
+
+    CloseHandle(h);
+    return res;
+#else
+    char* p = realpath(path, NULL); // malloc'd by libc
+    if(!p) return NULL;
+
+    char* res = rd_strdup(p);
+    free(p);
+    return res;
 #endif
 }
 
@@ -119,6 +182,32 @@ bool rd_path_isfile(const char* path) {
 }
 
 bool rd_path_isdir(const char* path) { return _rd_path_kind_is(path, S_IFDIR); }
+
+bool rd_path_isinside(const char* path, const char* dir) {
+    // owned copies: both resolutions must outlive each other
+    char* rp = _rd_path_resolve_alloc(path);
+    char* rd = _rd_path_resolve_alloc(dir);
+    bool res = false;
+
+    if(rp && rd) {
+        usize np = strlen(rp), nd = strlen(rd);
+
+#if defined(_WIN32)
+        bool prefix = !_strnicmp(rp, rd, nd); // NTFS is case-insensitive
+#else
+        bool prefix = !strncmp(rp, rd, nd);
+#endif
+
+        // "/a/b" is inside "/a" but "/ab" isn't; a root like "/" or "C:\"
+        // already ends with a separator
+        if(prefix && np > nd)
+            res = _rd_path_is_sep(rp[nd]) || _rd_path_is_sep(rd[nd - 1]);
+    }
+
+    rd_free(rp);
+    rd_free(rd);
+    return res;
+}
 
 const char* rd_path_dirname(const char* filepath) {
     if(!filepath) return NULL;
@@ -220,4 +309,14 @@ const char* rd_path_join(const char* a, const char* b) {
 
     str_append_n(&rd_i_state.path_join_buf, b, b_len);
     return rd_i_state.path_join_buf.data;
+}
+
+const char* rd_path_resolve(const char* path) {
+    char* p = _rd_path_resolve_alloc(path);
+    if(!p) return NULL;
+
+    str_clear(&rd_i_state.path_resolve_buf);
+    str_append(&rd_i_state.path_resolve_buf, p);
+    rd_free(p);
+    return rd_i_state.path_resolve_buf.data;
 }
