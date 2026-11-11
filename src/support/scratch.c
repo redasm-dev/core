@@ -126,12 +126,15 @@ bool rd_scratch_set(RDScratchBuffer* self, usize idx, char c) {
 void rd_scratch_clear(RDScratchBuffer* self) { str_clear(&self->impl); }
 
 void rd_scratch_putf(RDScratchBuffer* self, const char* fmt, ...) {
-    va_list args; // format in a temporary buffer, then append
+    va_list args;
     va_start(args, fmt);
-    const char* result = rd_i_vformat(&self->fmt_buf, fmt, args);
+    rd_scratch_vputf(self, fmt, args);
     va_end(args);
+}
 
-    rd_scratch_puts(self, result);
+void rd_scratch_vputf(RDScratchBuffer* self, const char* fmt, va_list args) {
+    // format in a temporary buffer, then append
+    rd_scratch_puts(self, rd_i_vformat(&self->fmt_buf, fmt, args));
 }
 
 void rd_scratch_puts(RDScratchBuffer* self, const char* s) {
