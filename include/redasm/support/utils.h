@@ -2,7 +2,6 @@
 
 #include <redasm/config.h>
 #include <redasm/support/scratch.h>
-#include <redasm/support/utils.h>
 
 // clang-format off
 RD_API const char* rd_format(RD_MSVC_CHECK const char* fmt, ...) RD_PRINTF_CHECK(1, 2);
