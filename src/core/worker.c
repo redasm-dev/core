@@ -354,7 +354,7 @@ bool rd_step(RDContext* self, RDWorkerStatus* status) {
 
 bool rd_reanalyze(RDContext* self) { return rd_i_engine_mark_dirty(self); }
 
-void rd_disassemble(RDContext* ctx) {
+void rd_run(RDContext* ctx) {
     while(rd_step(ctx, NULL))
         ;
 }

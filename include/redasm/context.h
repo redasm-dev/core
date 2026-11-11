@@ -136,7 +136,7 @@ RD_API bool rd_step(RDContext* self, RDWorkerStatus* status);
 RD_API bool rd_export(RDContext* self, const char* filepath, RDExportFormat f);
 RD_API bool rd_project_save(RDContext* self, const char* filepath);
 RD_API bool rd_reanalyze(RDContext* self);
-RD_API void rd_disassemble(RDContext* self);
+RD_API void rd_run(RDContext* self);
 RD_API const char* rd_get_working_dir(const RDContext* self);
 RD_API const char* rd_get_file_name(const RDContext* self);
 RD_API const char* rd_str_intern(RDContext* self, const char* s);
