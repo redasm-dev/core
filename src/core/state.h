@@ -56,6 +56,7 @@ typedef struct RDGlobalState {
     RDCharVect path_dirname_buf;
     RDCharVect path_stem_buf;
     RDCharVect path_join_buf;
+    RDCharVect path_resolve_buf;
 
     RDLoaderOptionVect optgroup_buf;
     RDScratchBuffer encode_buf;

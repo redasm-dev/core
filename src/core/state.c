@@ -25,6 +25,13 @@
 
 RDGlobalState rd_i_state = {0};
 
+static void _rd_i_state_shutdown_modules(void) {
+    RDModuleFull** m;
+    vect_each(m, &rd_i_state.modules) {
+        if((*m)->descr->shutdown) (*m)->descr->shutdown();
+    }
+}
+
 static void _rd_i_state_unload_modules(void) {
     RDModuleFull** m;
     vect_each(m, &rd_i_state.modules) {
@@ -109,6 +116,8 @@ void rd_i_state_init(const RDInitParams* params) {
 }
 
 void rd_i_state_deinit(void) {
+    _rd_i_state_shutdown_modules();
+
     vect_destroy(&rd_i_state.optgroup_buf);
     vect_destroy(&rd_i_state.encode_buf.impl);
     vect_destroy(&rd_i_state.encode_buf.fmt_buf);
@@ -136,6 +145,7 @@ void rd_i_state_deinit(void) {
     vect_destroy(&rd_i_state.path_dirname_buf);
     vect_destroy(&rd_i_state.path_stem_buf);
     vect_destroy(&rd_i_state.path_join_buf);
+    vect_destroy(&rd_i_state.path_resolve_buf);
     _rd_i_state_unload_modules();
     rd_i_kb_paths_deinit(&rd_i_state.kb_paths);
 

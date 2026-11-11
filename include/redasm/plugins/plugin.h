@@ -34,6 +34,7 @@ typedef struct RDPluginSlice {
 
 typedef void (*RDModuleLoad)(void);
 typedef void (*RDModuleUnload)(void);
+typedef void (*RDModuleShutdown)(void);
 
 // ABI CONTRACT:
 // - 'api_version' MUST be the first field.
@@ -44,7 +45,8 @@ typedef void (*RDModuleUnload)(void);
 typedef struct RDModuleDescriptor {
     u32 api_version;
     RDModuleLoad load;
-    RDModuleUnload unload; // optional, may be NULL
+    RDModuleUnload unload;     // optional
+    RDModuleShutdown shutdown; // optional (runs while modules are still loaded)
 } RDModuleDescriptor;
 
 typedef struct RDModule {
