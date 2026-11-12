@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/callconv.h"
+#include "core/callgraph.h"
 #include "core/engine.h"
 #include "core/segment.h"
 #include "core/symbol.h"
@@ -75,6 +76,8 @@ typedef struct RDContext {
     RDResolveResultVect resolve_buf;
     RDProblemsVect problems_buf;
     RDSymbolVect symbols_buf;
+    RDCallVect callees_buf;
+    RDCallVect callers_buf;
 
     u32 graph_gen;
     u32 chunk_gen;

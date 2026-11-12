@@ -826,6 +826,8 @@ void rd_destroy(RDContext* self) {
     vect_destroy(&self->functions_buf);
     vect_destroy(&self->addr_type_buf);
     vect_destroy(&self->symbols_buf);
+    vect_destroy(&self->callees_buf);
+    vect_destroy(&self->callers_buf);
     vect_destroy(&self->pending_renames);
     vect_destroy(&self->to_xrefs);
     vect_destroy(&self->und_xrefs);

@@ -1,5 +1,6 @@
 #include "callgraph.h"
 #include "core/context.h"
+#include "core/worker.h"
 #include "function/function.h"
 #include "io/flagsbuffer.h"
 #include <inttypes.h>
@@ -27,6 +28,7 @@ static void _rd_callgraph_destroy(RDGraph* base) {
     vect_destroy(&self->fmt_buf);
     vect_destroy(&self->chunks_buf);
     vect_destroy(&self->xrefs_buf);
+    vect_destroy(&self->calls_buf);
     vect_destroy(&self->wl);
 }
 
@@ -87,32 +89,18 @@ static void _rd_callgraph_explore_up(RDCallGraph* self, RDGraphNode child_node,
                                      RDRelAddress rel_entry) {
     RDContext* ctx = self->base.context;
 
-    const RDXRefVect* xrefs = rd_i_db_get_xrefs_to(
-        ctx, rd_i_abs(ctx, rel_entry), RD_XR_NONE, &self->xrefs_buf);
+    rd_i_callgraph_collect_callers(ctx, rel_entry, &self->xrefs_buf,
+                                   &self->calls_buf);
 
-    const RDXRef* xref;
-    vect_each(xref, xrefs) {
-        bool direct = xref->type == RD_CR_CALL;
-
-        // Same rule as explore_down: an edge exists only if a call-flagged
-        // instruction references the callee.
-        // Plain references (address taken, data reads, jumps) are not calls.
-        if(!direct) {
-            const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
-            if(!seg) continue;
-
-            usize idx = rd_i_address2index(seg, xref->address);
-            if(!rd_flagsbuffer_has_call(seg->flags, idx)) continue;
-        }
+    const RDCall* call;
+    vect_each(call, &self->calls_buf) {
+        bool direct = call->type == RD_CR_CALL;
 
         // Key by the containing function so several calls from one caller
         // collapse into a single node.
         RDRelAddress key;
-        if(!rd_i_function_find_rel(ctx, xref->address, &key))
+        if(!rd_i_function_find_rel(ctx, call->address, &key))
             continue; // call site not (yet) claimed by a function
-
-        // an indirect call back into our own entry isn't a caller edge
-        if(!direct && key == rel_entry) continue;
 
         RDGraphNode n = _rd_callgraph_get_or_add_block(self, key);
 
@@ -132,44 +120,23 @@ static void _rd_callgraph_explore_down(RDCallGraph* self,
                                        RDRelAddress rel_entry) {
     RDContext* ctx = self->base.context;
 
-    rd_i_chunks_collect(ctx, rd_i_abs(ctx, rel_entry), &self->chunks_buf);
+    rd_i_callgraph_collect_callees(ctx, rel_entry, &self->chunks_buf,
+                                   &self->xrefs_buf, &self->calls_buf);
 
-    const RDChunk* c;
-    vect_each(c, &self->chunks_buf) {
-        const RDSegment* seg =
-            rd_i_db_find_segment(ctx, rd_i_abs(ctx, c->start));
-        if(!seg) continue;
+    const RDCall* call;
+    vect_each(call, &self->calls_buf) {
+        bool direct = call->type == RD_CR_CALL;
 
-        usize idx = c->start - seg->rel_start,
-              end_idx = c->end - seg->rel_start;
+        RDGraphNode n =
+            _rd_callgraph_get_or_add_block(self, rd_i_rel(ctx, call->target));
 
-        while(idx < end_idx) {
-            if(rd_flagsbuffer_has_call(seg->flags, idx)) {
-                RDAddress addr = rd_i_index2address(seg, idx);
-                const RDXRefVect* xrefs = rd_i_db_get_xrefs_from(
-                    ctx, addr, RD_XR_NONE, &self->xrefs_buf);
+        RDGraphEdge e = rd_graph_add_edge(&self->base, parent_node, n);
 
-                const RDXRef* xref;
-                vect_each(xref, xrefs) {
-                    bool direct = xref->type == RD_CR_CALL;
+        rd_graph_set_edge_color(
+            &self->base, &e,
+            rd_get_theme_color(direct ? RD_THEME_SUCCESS : RD_THEME_WARNING));
 
-                    RDGraphNode n = _rd_callgraph_get_or_add_block(
-                        self, rd_i_rel(ctx, xref->address));
-
-                    RDGraphEdge e =
-                        rd_graph_add_edge(&self->base, parent_node, n);
-
-                    rd_graph_set_edge_color(
-                        &self->base, &e,
-                        rd_get_theme_color(direct ? RD_THEME_SUCCESS
-                                                  : RD_THEME_WARNING));
-
-                    if(direct) _rd_callgraph_enqueue(self, n, false);
-                }
-            }
-
-            idx += rd_i_flagsbuffer_get_range_length(seg->flags, idx);
-        }
+        if(direct) _rd_callgraph_enqueue(self, n, false);
     }
 }
 
@@ -199,6 +166,39 @@ static void _rd_callgraph_walk_down(RDCallGraph* self) {
         if(rd_is_function(ctx, rd_i_abs(ctx, d->func_rel_address)))
             _rd_callgraph_explore_down(self, n, d->func_rel_address);
     }
+}
+
+static int _rd_call_cmp(const RDCall* a, const RDCall* b) {
+    if(a->address != b->address) return a->address < b->address ? -1 : 1;
+    if(a->target != b->target) return a->target < b->target ? -1 : 1;
+    return 0;
+}
+
+static RDCallSlice _rd_get_calls(RDContext* self, RDAddress address,
+                                 RDCallVect* out, bool callees) {
+    vect_clear(out);
+
+    // an incomplete list would look like a complete one
+    if(self->engine.step < RD_WS_DONE) return vect_to_slice(RDCallSlice, out);
+
+    RDRelAddress rel_entry;
+    if(!rd_i_function_find_rel(self, address, &rel_entry))
+        return vect_to_slice(RDCallSlice, out);
+
+    // local: the context's xref buffers back slices the caller may hold
+    RDXRefVect xrefs = {0};
+    RDChunkVect chunks = {0};
+
+    if(callees)
+        rd_i_callgraph_collect_callees(self, rel_entry, &chunks, &xrefs, out);
+    else
+        rd_i_callgraph_collect_callers(self, rel_entry, &xrefs, out);
+
+    vect_destroy(&chunks);
+    vect_destroy(&xrefs);
+
+    vect_sort(out, _rd_call_cmp);
+    return vect_to_slice(RDCallSlice, out);
 }
 
 RDCallGraph* rd_callgraph_create(RDContext* ctx, RDAddress address) {
@@ -241,4 +241,85 @@ u32 rd_callgraph_get_hash(const RDCallGraph* self) {
 
 const char* rd_callgraph_generate_dot(const RDCallGraph* self) {
     return rd_graph_generate_dot(&self->base, _rd_callgraph_dot_props, NULL);
+}
+
+// Callers of 'rel_entry': call-flagged instructions that reference it.
+// Plain references (address taken, data reads, jumps) are not calls.
+void rd_i_callgraph_collect_callers(RDContext* ctx, RDRelAddress rel_entry,
+                                    RDXRefVect* xrefs_buf, RDCallVect* out) {
+    vect_clear(out);
+
+    RDAddress entry = rd_i_abs(ctx, rel_entry);
+    const RDXRefVect* xrefs =
+        rd_i_db_get_xrefs_to(ctx, entry, RD_XR_NONE, xrefs_buf);
+
+    const RDXRef* xref;
+    vect_each(xref, xrefs) {
+        bool direct = xref->type == RD_CR_CALL;
+
+        if(!direct) {
+            const RDSegment* seg = rd_i_db_find_segment(ctx, xref->address);
+            if(!seg) continue;
+
+            usize idx = rd_i_address2index(seg, xref->address);
+            if(!rd_flagsbuffer_has_call(seg->flags, idx)) continue;
+
+            // an indirect call back into our own entry isn't a caller
+            RDRelAddress key;
+            if(rd_i_function_find_rel(ctx, xref->address, &key) &&
+               key == rel_entry)
+                continue;
+        }
+
+        vect_push(out, (RDCall){
+                           .address = xref->address,
+                           .target = entry,
+                           .type = xref->type,
+                       });
+    }
+}
+
+// Callees of 'rel_entry': everything its call-flagged instructions reference
+void rd_i_callgraph_collect_callees(RDContext* ctx, RDRelAddress rel_entry,
+                                    RDChunkVect* chunks_buf,
+                                    RDXRefVect* xrefs_buf, RDCallVect* out) {
+    vect_clear(out);
+    rd_i_chunks_collect(ctx, rd_i_abs(ctx, rel_entry), chunks_buf);
+
+    const RDChunk* c;
+    vect_each(c, chunks_buf) {
+        const RDSegment* seg =
+            rd_i_db_find_segment(ctx, rd_i_abs(ctx, c->start));
+        if(!seg) continue;
+
+        usize idx = c->start - seg->rel_start,
+              end_idx = c->end - seg->rel_start;
+
+        while(idx < end_idx) {
+            if(rd_flagsbuffer_has_call(seg->flags, idx)) {
+                RDAddress addr = rd_i_index2address(seg, idx);
+                const RDXRefVect* xrefs =
+                    rd_i_db_get_xrefs_from(ctx, addr, RD_XR_NONE, xrefs_buf);
+
+                const RDXRef* xref;
+                vect_each(xref, xrefs) {
+                    vect_push(out, (RDCall){
+                                       .address = addr,
+                                       .target = xref->address,
+                                       .type = xref->type,
+                                   });
+                }
+            }
+
+            idx += rd_i_flagsbuffer_get_range_length(seg->flags, idx);
+        }
+    }
+}
+
+RDCallSlice rd_get_callees(RDContext* self, RDAddress address) {
+    return _rd_get_calls(self, address, &self->callees_buf, true);
+}
+
+RDCallSlice rd_get_callers(RDContext* self, RDAddress address) {
+    return _rd_get_calls(self, address, &self->callers_buf, false);
 }
