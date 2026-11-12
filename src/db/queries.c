@@ -470,6 +470,7 @@ RDXRefVect* _rd_i_db_query_get_xrefs_from(RDContext* ctx, RDAddress from,
         FROM XRefs \
         WHERE from_address = :fromaddr \
         AND (:type = 0 OR type = :type) \
+        ORDER BY to_address \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":fromaddr",
@@ -498,6 +499,7 @@ RDXRefVect* _rd_i_db_query_get_xrefs_to(RDContext* ctx, RDAddress to,
         FROM XRefs \
         WHERE to_address = :toaddr \
         AND (:type = 0 OR type = :type) \
+        ORDER BY from_address \
     ");
 
     _rd_db_bind_param_int(ctx, stmt, ":toaddr",
