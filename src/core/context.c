@@ -617,14 +617,15 @@ const char* rd_to_hexaddr(const RDContext* self, usize v) {
     return rd_i_to_hex((isize)v, PTR_SIZE);
 }
 
-const char* rd_render_text(RDContext* self, RDAddress address) {
+const char* rd_render_text_as(RDContext* self, RDAddress address,
+                              RDRenderFlags f) {
     vect_clear(&self->str_buf);
 
     RDRenderer* r = NULL;
     const RDSegment* seg = rd_i_db_find_segment(self, address);
     if(!seg) goto done;
 
-    r = rd_i_renderer_create(self, RD_RF_TEXT);
+    r = rd_i_renderer_create(self, f);
     rd_i_render_item_any(r, seg, rd_i_address2index(seg, address));
     rd_i_renderer_swap(r);
     rd_i_renderer_write_text(r, &self->str_buf);
@@ -633,6 +634,10 @@ const char* rd_render_text(RDContext* self, RDAddress address) {
 done:
     vect_push(&self->str_buf, 0);
     return self->str_buf.data;
+}
+
+const char* rd_render_text(RDContext* self, RDAddress address) {
+    return rd_render_text_as(self, address, RD_RF_TEXT);
 }
 
 bool rd_make_code(RDContext* self, RDAddress address) {

@@ -18,6 +18,7 @@ typedef enum {
     RD_RF_NO_SELECTION = 1U << 9,
     RD_RF_NO_HIGHLIGHT = 1U << 10,
     RD_RF_NO_NAMES = 1U << 11,
+    RD_RF_NO_RADIX = 1U << 12,
 } RDRenderFlags;
 
 #define RD_RF_GRAPH                                                            \
