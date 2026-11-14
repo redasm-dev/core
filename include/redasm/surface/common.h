@@ -5,7 +5,7 @@
 #include <redasm/theme.h>
 
 typedef enum {
-    RD_RF_DEFAULT = 0U,
+    RD_RF_NONE = 0U,
     RD_RF_NO_INDENT = 1U << 0,
     RD_RF_NO_SEGMENT = 1U << 1,
     RD_RF_NO_ADDRESS = 1U << 2,
@@ -21,12 +21,14 @@ typedef enum {
     RD_RF_NO_RADIX = 1U << 12,
 } RDRenderFlags;
 
+#define RD_RF_DEFAULT ((RDRenderFlags)RD_RF_NO_RADIX)
+
 #define RD_RF_GRAPH                                                            \
-    ((RDRenderFlags)(RD_RF_NO_SEGMENT | RD_RF_NO_INDENT |                      \
+    ((RDRenderFlags)(RD_RF_NO_RADIX | RD_RF_NO_SEGMENT | RD_RF_NO_INDENT |     \
                      RD_RF_NO_SEGMENT_LINE))
 
 #define RD_RF_POPUP                                                            \
-    ((RDRenderFlags)(RD_RF_NO_CURSOR | RD_RF_NO_SELECTION |                    \
+    ((RDRenderFlags)(RD_RF_NO_RADIX | RD_RF_NO_CURSOR | RD_RF_NO_SELECTION |   \
                      RD_RF_NO_CURSOR_LINE))
 
 #define RD_RF_TEXT ((RDRenderFlags)~0U & (RDRenderFlags)~RD_RF_NO_NAMES)
@@ -40,7 +42,7 @@ typedef enum {
 typedef enum {
     RD_NUM_DEFAULT = 0,
     RD_NUM_SIGNED = 1U << 0,
-    RD_NUM_PREFIX = 1U << 1,
+    RD_NUM_RADIX = 1U << 1,
     RD_NUM_NOADDR = 1U << 2,
 } RDNumberFlags;
 

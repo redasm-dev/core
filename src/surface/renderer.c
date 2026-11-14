@@ -67,7 +67,8 @@ static void _rd_renderer_num(RDRenderer* self, i64 c, unsigned int base,
                              RDNumberFlags flags) {
     RDBaseParams p = {
         .base = base ? base : 16,
-        .with_prefix = flags & RD_NUM_PREFIX,
+        .with_radix = (flags & RD_NUM_RADIX) ||
+                      !rd_i_renderer_has_flag(self, RD_RF_NO_RADIX),
         .with_sign = flags & RD_NUM_SIGNED,
         .fill = fill,
     };

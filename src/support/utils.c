@@ -18,7 +18,7 @@
 
 static const RDBaseParams RD_BASE_DEFAULTS = {
     .base = 10,
-    .with_prefix = false,
+    .with_radix = false,
     .with_sign = true,
     .fill = 0,
 };
@@ -226,12 +226,10 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
 
     static const char DIGITS[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-    // Max bits in isize (64) in base 2 = 64 digits
-    // + 1 negative sign + 2 prefix (0x/0b/0o) + 1 NUL = 68
-    static char out[68];
+    // 64 digits + "36#" + sign + NUL
+    static char out[64 + 3 + 1 + 1];
 
-    panic_if(p->fill >= sizeof(out), "fill overflow (%d >= %d)", p->fill,
-             sizeof(out));
+    panic_if(p->fill >= 64, "fill overflow (%u >= 64)", p->fill);
 
     int c = sizeof(out) - 1;
     out[c] = '\0';
@@ -258,8 +256,8 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
         }
     }
 
-    // Prefix: 0x, 0b, 0o
-    if(p->with_prefix) {
+    // Radix: 0x, 0b, 0o, <base>#
+    if(p->with_radix) {
         switch(p->base) {
             case 16:
                 out[--c] = 'x';
@@ -276,7 +274,19 @@ const char* rd_i_to_base(i64 v, const RDBaseParams* p) {
                 out[--c] = '0';
                 break;
 
-            default: break; // no prefix for other bases
+            default: {
+                if(p->base == 10) break; // bare means decimal
+
+                out[--c] = '#';
+                unsigned int b = p->base;
+
+                do {
+                    out[--c] = (char)('0' + (b % 10));
+                    b /= 10;
+                } while(b);
+
+                break;
+            }
         }
     }
 

@@ -20,7 +20,7 @@ typedef struct RDStringVect {
 typedef struct RDBaseParams {
     unsigned int base;
     unsigned int fill;
-    bool with_prefix;
+    bool with_radix;
     bool with_sign;
 } RDBaseParams;
 
@@ -62,7 +62,7 @@ static inline const char* rd_i_to_hex(i64 v, unsigned int size) {
     return rd_i_to_base(v, &(RDBaseParams){
                                .base = 16,
                                .fill = size * 2,
-                               .with_prefix = false,
+                               .with_radix = false,
                            });
 }
 
