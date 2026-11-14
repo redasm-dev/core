@@ -615,3 +615,10 @@ const RDDatum* rd_kb_load(RDContext* ctx, const char* kb) {
 
     return kbfile->root;
 }
+
+RDStringSlice rd_kb_get_paths(void) {
+    return (RDStringSlice){
+        .data = (const char**)rd_i_state.kb_paths.data,
+        .length = rd_i_state.kb_paths.length,
+    };
+}
