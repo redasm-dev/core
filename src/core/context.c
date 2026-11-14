@@ -813,7 +813,10 @@ bool rd_set_typed_function(RDContext* self, RDAddress address,
         return true;
     }
 
-    return rd_i_engine_enqueue_call(self, address, type);
+    if(!rd_i_engine_enqueue_call(self, address, type)) return false;
+
+    rd_i_engine_mark_dirty(self);
+    return true;
 }
 
 void rd_destroy(RDContext* self) {
