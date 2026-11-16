@@ -195,24 +195,56 @@ static void _rd_radial_assign_angles(RDRadialLayout* ll, RDRadialBlock* block,
 
 // ---------------------------------------------------------------------------
 // Step 5: compute_positions
-// x = cx + ring*ring_step*cos(angle), y = cy + ring*ring_step*sin(angle).
-// Root (ring 0) always lands exactly at (cx, cy) regardless of its angle.
+// Places every block center around the origin:
+//   x = ring*ring_step*cos(angle), y = ring*ring_step*sin(angle)
+// then translates the whole drawing so its real bounding box starts at
+// (PADDING, PADDING), and sizes the area from that same box.
+// The canvas is [0, area_w] x [0, area_h] (like the layered and ego layouts),
+// so positions and area must come from one bounding box: guessing a center
+// up front and measuring the area separately lets them drift apart and the
+// view clips whatever sits past the area's edge.
+// Root (ring 0) is the origin before the shift, wherever it ends up after.
 // ---------------------------------------------------------------------------
 
 static void _rd_radial_compute_positions(RDRadialLayout* ll) {
+    float minx = 0.0F, maxx = 0.0F, miny = 0.0F, maxy = 0.0F;
+
     for(usize i = 0; i < vect_length(&ll->blocks); i++) {
-        RDRadialBlock* block = &ll->blocks.data[i];
-        double radius = (double)block->ring * (double)ll->ring_step;
+        RDRadialBlock* b = &ll->blocks.data[i];
+        double radius = (double)b->ring * (double)ll->ring_step;
 
         // block->x/y stay the true CENTER
-        block->x = ll->cx + (float)(radius * cos(block->angle));
-        block->y = ll->cy + (float)(radius * sin(block->angle));
+        b->x = (float)(radius * cos(b->angle));
+        b->y = (float)(radius * sin(b->angle));
 
-        rd_graph_set_node_x(ll->graph, block->node,
-                            (int)(block->x - ((float)block->width / 2.0F)));
-        rd_graph_set_node_y(ll->graph, block->node,
-                            (int)(block->y - ((float)block->height / 2.0F)));
+        float hw = (float)b->width / 2.0F, hh = (float)b->height / 2.0F;
+        if(i == 0 || (b->x - hw) < minx) minx = b->x - hw;
+        if(i == 0 || (b->x + hw) > maxx) maxx = b->x + hw;
+        if(i == 0 || (b->y - hh) < miny) miny = b->y - hh;
+        if(i == 0 || (b->y + hh) > maxy) maxy = b->y + hh;
     }
+
+    // shift so the bounding box's top-left corner lands on (PADDING, PADDING)
+    ll->cx = (float)RD_RADIAL_PADDING - minx;
+    ll->cy = (float)RD_RADIAL_PADDING - miny;
+
+    for(usize i = 0; i < vect_length(&ll->blocks); i++) {
+        RDRadialBlock* b = &ll->blocks.data[i];
+        b->x += ll->cx;
+        b->y += ll->cy;
+
+        rd_graph_set_node_x(ll->graph, b->node,
+                            (int)(b->x - ((float)b->width / 2.0F)));
+        rd_graph_set_node_y(ll->graph, b->node,
+                            (int)(b->y - ((float)b->height / 2.0F)));
+    }
+
+    // ceil: truncating the extent could shave the last pixel off the
+    // right/bottom-most node
+    rd_graph_set_area_width(
+        ll->graph, (int)ceilf(maxx - minx) + (RD_RADIAL_PADDING * 2));
+    rd_graph_set_area_height(
+        ll->graph, (int)ceilf(maxy - miny) + (RD_RADIAL_PADDING * 2));
 }
 
 // ---------------------------------------------------------------------------
@@ -310,30 +342,6 @@ static void _rd_radial_route_edges(RDRadialLayout* ll) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 7: compute_area
-// Bounding box of every node's actual drawn extent, for canvas sizing.
-// ---------------------------------------------------------------------------
-
-static void _rd_radial_compute_area(RDRadialLayout* ll) {
-    float minx = ll->cx, maxx = ll->cx, miny = ll->cy, maxy = ll->cy;
-
-    for(usize i = 0; i < vect_length(&ll->blocks); i++) {
-        RDRadialBlock* b = &ll->blocks.data[i];
-        float hw = (float)b->width / 2.0F, hh = (float)b->height / 2.0F;
-
-        if((b->x - hw) < minx) minx = b->x - hw;
-        if((b->x + hw) > maxx) maxx = b->x + hw;
-        if((b->y - hh) < miny) miny = b->y - hh;
-        if((b->y + hh) > maxy) maxy = b->y + hh;
-    }
-
-    rd_graph_set_area_width(ll->graph,
-                            (int)(maxx - minx) + (RD_RADIAL_PADDING * 2));
-    rd_graph_set_area_height(ll->graph,
-                             (int)(maxy - miny) + (RD_RADIAL_PADDING * 2));
-}
-
-// ---------------------------------------------------------------------------
 // Cleanup
 // ---------------------------------------------------------------------------
 
@@ -364,14 +372,8 @@ bool rd_graph_compute_radial(RDGraph* self) {
     _rd_radial_assign_angles(&ll, _rd_radial_block(&ll, self->root), 0.0,
                              RD_RADIAL_TAU);
 
-    // center offset large enough that no node's radius*ring_step reach
-    // can go negative, given ring_step already accounts for max node size
-    ll.cx = ll.cy =
-        (float)((ll.max_ring + 1) * ll.ring_step) + RD_RADIAL_PADDING;
-
     _rd_radial_compute_positions(&ll);
     _rd_radial_route_edges(&ll);
-    _rd_radial_compute_area(&ll);
 
     _rd_radial_destroy(&ll);
     return true;
