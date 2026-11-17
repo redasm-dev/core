@@ -89,8 +89,10 @@ void rd_i_state_init(const RDInitParams* params) {
         if(params->settings_filepath) {
             rd_i_state.settings_filepath = rd_strdup(params->settings_filepath);
 
-            rd_i_state.settings =
-                rd_datumdoc_load(rd_i_state.settings_filepath, NULL);
+            if(rd_path_isfile(rd_i_state.settings_filepath)) {
+                rd_i_state.settings =
+                    rd_datumdoc_load(rd_i_state.settings_filepath, NULL);
+            }
         }
 
 #if defined(RD_HAS_NETWORK)
