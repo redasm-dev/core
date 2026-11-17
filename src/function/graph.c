@@ -175,7 +175,7 @@ bool rd_functiongraph_populate(RDFunctionGraph* self, RDAddress entry) {
     if(!rd_graph_order(g, _rd_functiongraph_weight, NULL)) {
         rd_functiongraph_destroy(self);
         panic("ordering failed at 0x%" PRIX64, entry);
-        return NULL;
+        return false;
     }
 
     return true;
