@@ -4,3 +4,4 @@
 #include <redasm/net/socket.h>
 
 RD_API bool rd_net_is_enabled(void);
+RD_API bool rd_net_is_supported(void);

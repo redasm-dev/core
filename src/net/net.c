@@ -13,3 +13,11 @@ bool rd_net_is_enabled(void) {
     return false;
 #endif
 }
+
+bool rd_net_is_supported(void) {
+#if defined(RD_HAS_NETWORK)
+    return true;
+#else
+    return false;
+#endif
+}
