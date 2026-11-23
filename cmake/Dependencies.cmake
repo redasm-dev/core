@@ -1,4 +1,5 @@
 include(cmake/REDasmDepot.cmake)
+include(cmake/REDasmUtils.cmake)
 include(cmake/Depot_SQLite3.cmake)
 include(cmake/Depot_tomlc17.cmake)
 include(cmake/Depot_miniz.cmake)

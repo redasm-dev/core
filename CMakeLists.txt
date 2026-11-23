@@ -163,6 +163,7 @@ install(
     FILES 
         "${CMAKE_CURRENT_BINARY_DIR}/redasmConfig.cmake"
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/REDasmDepot.cmake"
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/REDasmUtils.cmake"
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPM.cmake"
 
     DESTINATION 
