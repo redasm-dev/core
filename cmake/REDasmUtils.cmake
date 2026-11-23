@@ -1,3 +1,12 @@
+function(redasm_stage target dest)
+    add_custom_target(stage_${target} ALL
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${dest}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${target}>" "${dest}/"
+        COMMENT "Staging ${target} -> ${dest}"
+        DEPENDS ${target}
+    )
+endfunction()
+
 function(redasm_install_plugins category)
     if(WIN32)
         set(_dest "plugins/${category}")
@@ -59,4 +68,9 @@ function(redasm_install_executable target)
 
     install(TARGETS ${target}
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    # set by an aggregate build (the workspace), unset in standalone builds
+    if(REDASM_STAGE_DIR)
+        redasm_stage(${target} "${REDASM_STAGE_DIR}")
+    endif()
 endfunction()
