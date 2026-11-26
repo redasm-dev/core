@@ -4,10 +4,10 @@
 #include "plugins/loader/option.h"
 #include <redasm/redasm.h>
 
-typedef struct RDParseResult {
+typedef struct RDLoaderParseResult {
     RDLoader* loader;
     const RDProcessorPlugin* processorplugin;
-} RDParseResult;
+} RDLoaderParseResult;
 
 typedef struct RDTestResult {
     char* filepath;
@@ -24,7 +24,7 @@ void rd_i_loader_destroy(const RDLoaderPlugin* plugin, RDLoader* ldr);
 const char* rd_i_loader_get_platform(const RDLoaderPlugin* plugin,
                                      const RDLoader* ldr);
 
-RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
-                         const char* filepath);
+RDLoaderParseResult rd_i_parse(const RDLoaderPlugin* plugin,
+                               RDByteBuffer* inputbuf, const char* filepath);
 
 RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath);

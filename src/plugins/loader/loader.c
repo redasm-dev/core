@@ -48,7 +48,7 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
         const RDLoaderPlugin* loaderplugin = (*it)->loader;
         RD_LOG_DEBUG("testing '%s' ...", loaderplugin->id);
 
-        RDParseResult pr = rd_i_parse(loaderplugin, inputbuf, filepath);
+        RDLoaderParseResult pr = rd_i_parse(loaderplugin, inputbuf, filepath);
         if(!pr.processorplugin) continue;
 
         RDTestResult* tr = rd_i_testresult_create(
@@ -70,16 +70,16 @@ RDTestResultSlice rd_i_test(RDByteBuffer* inputbuf, const char* filepath) {
     return vect_to_slice(RDTestResultSlice, &rd_i_state.tests);
 }
 
-RDParseResult rd_i_parse(const RDLoaderPlugin* plugin, RDByteBuffer* inputbuf,
-                         const char* filepath) {
-    RDLoaderRequest req = {
+RDLoaderParseResult rd_i_parse(const RDLoaderPlugin* plugin,
+                               RDByteBuffer* inputbuf, const char* filepath) {
+    RDParseRequest req = {
         .filepath = filepath,
         .input = rd_i_reader_create((RDBuffer*)inputbuf),
         .name = rd_path_filename(filepath),
         .ext = rd_path_ext(filepath),
     };
 
-    RDParseResult pr = {.loader = rd_i_loader_create(plugin)};
+    RDLoaderParseResult pr = {.loader = rd_i_loader_create(plugin)};
 
     if(plugin->parse(pr.loader, &req)) {
         if(plugin->get_processor) {
