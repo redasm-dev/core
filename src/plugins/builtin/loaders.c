@@ -7,7 +7,7 @@ static const char* _builtin_binary_get_name(const RDLoader* ldr) {
     return "Binary";
 }
 
-static bool _builtin_binary_parse(RDLoader* ldr, const RDLoaderRequest* req) {
+static bool _builtin_binary_parse(RDLoader* ldr, const RDParseRequest* req) {
     RD_UNUSED(ldr);
     RD_UNUSED(req);
     return true;

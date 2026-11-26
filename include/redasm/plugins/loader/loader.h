@@ -1,18 +1,11 @@
 #pragma once
 
 #include <redasm/common.h>
-#include <redasm/io/reader.h>
+#include <redasm/plugins/common.h>
 #include <redasm/plugins/loader/option.h>
 #include <redasm/plugins/plugin.h>
 
 typedef struct RDLoader RDLoader;
-
-typedef struct RDLoaderRequest {
-    RDReader* input;
-    const char* filepath;
-    const char* name;
-    const char* ext;
-} RDLoaderRequest;
 
 typedef enum {
     RD_LF_NONE = 0,
@@ -27,7 +20,7 @@ typedef struct RDLoaderPlugin {
     RDLoader* (*create)(const struct RDLoaderPlugin*);
     void (*destroy)(RDLoader*);
 
-    bool (*parse)(RDLoader*, const RDLoaderRequest*);
+    bool (*parse)(RDLoader*, const RDParseRequest*);
     bool (*load)(RDLoader*, RDContext*);
     const char* (*get_name)(const RDLoader*);
     const char* (*get_processor)(const RDLoader*);
