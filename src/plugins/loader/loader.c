@@ -4,6 +4,7 @@
 #include "plugins/builtin/builtin.h"
 #include "plugins/common.h"
 #include "support/containers.h"
+#include <redasm/allocator.h>
 #include <redasm/support/logging.h>
 
 static bool _rd_part_loaders(const RDTestResult** tr) {
