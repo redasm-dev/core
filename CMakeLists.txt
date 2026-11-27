@@ -71,6 +71,7 @@ target_sources(${PROJECT_NAME}
         src/rdil/renderer.c
         src/support/containers.c
         src/support/datum.c
+        src/support/dynlib.c
         src/support/error.c
         src/support/hash/adler32.c
         src/support/hash/hash.c
@@ -121,6 +122,7 @@ target_link_libraries(${PROJECT_NAME}
         SQLite3::SQLite3
         tomlc17
         miniz::miniz
+        ${CMAKE_DL_LIBS}
         $<$<BOOL:${REDASM_HAS_NETWORK}>:${REDASM_NETWORK_LIBS}>
 )
 
