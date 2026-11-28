@@ -62,6 +62,7 @@ target_sources(${PROJECT_NAME}
         src/plugins/analyzer.c
         src/plugins/command.c
         src/plugins/common.c
+        src/plugins/container.c
         src/plugins/module.c
         src/plugins/platform.c
         src/project/save.c

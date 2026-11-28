@@ -126,16 +126,20 @@ void rd_i_state_deinit(void) {
     rd_destroy(rd_i_state.encode_ctx);
 
     RDPlugin** it;
-    vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }
+    vect_each(it, &rd_i_state.loaders) { rd_free(*it); }
+    vect_each(it, &rd_i_state.containers) { rd_free(*it); }
     vect_each(it, &rd_i_state.processors) { rd_free(*it); }
     vect_each(it, &rd_i_state.platforms) { rd_free(*it); }
-    vect_each(it, &rd_i_state.loaders) { rd_free(*it); }
+    vect_each(it, &rd_i_state.analyzers) { rd_free(*it); }
     vect_each(it, &rd_i_state.commands) { rd_free(*it); }
 
-    vect_destroy(&rd_i_state.commands);
-    vect_destroy(&rd_i_state.analyzers);
-    vect_destroy(&rd_i_state.processors);
     vect_destroy(&rd_i_state.loaders);
+    vect_destroy(&rd_i_state.containers);
+    vect_destroy(&rd_i_state.processors);
+    vect_destroy(&rd_i_state.platforms);
+    vect_destroy(&rd_i_state.analyzers);
+    vect_destroy(&rd_i_state.commands);
+
     vect_destroy(&rd_i_state.log_buf);
     vect_destroy(&rd_i_state.fmt_buf);
     vect_destroy(&rd_i_state.kb_path_buf);
@@ -168,6 +172,10 @@ void rd_set_log_callback(RDLogCallback cb, void* userdata) {
 
 const RDLoaderPlugin* rd_loader_find(const char* id) {
     RD_RETURN_PLUGIN_FIND_IMPL(id, loader);
+}
+
+const RDContainerPlugin* rd_container_find(const char* id) {
+    RD_RETURN_PLUGIN_FIND_IMPL(id, container);
 }
 
 const RDProcessorPlugin* rd_processor_find(const char* id) {
@@ -216,6 +224,13 @@ RDPluginSlice rd_get_all_loader_plugins(void) {
     return (RDPluginSlice){
         .data = (const RDPlugin**)rd_i_state.loaders.data,
         .length = rd_i_state.loaders.length,
+    };
+}
+
+RDPluginSlice rd_get_all_container_plugins(void) {
+    return (RDPluginSlice){
+        .data = (const RDPlugin**)rd_i_state.containers.data,
+        .length = rd_i_state.containers.length,
     };
 }
 

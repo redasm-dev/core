@@ -17,6 +17,7 @@
 #include <redasm/net/net.h>
 #include <redasm/plugins/analyzer.h>
 #include <redasm/plugins/command.h>
+#include <redasm/plugins/container.h>
 #include <redasm/plugins/loader/loader.h>
 #include <redasm/plugins/platform.h>
 #include <redasm/plugins/processor/alu.h>

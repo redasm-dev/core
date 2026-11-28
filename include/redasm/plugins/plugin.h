@@ -4,6 +4,7 @@
 
 #define _RD_PLUGIN_TYPES(X)                                                    \
     X(RDLoaderPlugin, loader)                                                  \
+    X(RDContainerPlugin, container)                                            \
     X(RDProcessorPlugin, processor)                                            \
     X(RDPlatformPlugin, platform)                                              \
     X(RDAnalyzerPlugin, analyzer)                                              \
@@ -60,11 +61,13 @@ typedef struct RDModuleSlice {
 
 RD_API RDModuleSlice rd_get_all_modules(void);
 RD_API RDPluginSlice rd_get_all_loader_plugins(void);
+RD_API RDPluginSlice rd_get_all_container_plugins(void);
 RD_API RDPluginSlice rd_get_all_processor_plugins(void);
 RD_API RDPluginSlice rd_get_all_platform_plugins(void);
 RD_API RDPluginSlice rd_get_all_analyzer_plugins(void);
 RD_API RDPluginSlice rd_get_all_command_plugins(void);
 RD_API const RDLoaderPlugin* rd_loader_find(const char* id);
+RD_API const RDContainerPlugin* rd_container_find(const char* id);
 RD_API const RDProcessorPlugin* rd_processor_find(const char* id);
 RD_API const RDAnalyzerPlugin* rd_analyzer_find(const char* id);
 RD_API const RDCommandPlugin* rd_command_find(const char* id);
